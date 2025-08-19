@@ -8,6 +8,7 @@ Core orchestration and helper modules that coordinate the overall workflow.
 - `classify.py`: assign industry codes and tags.
 - `duplicate_check.py`: basic duplicate detection.
 - `feature_flags.py`: toggles for optional features.
+- `trigger_words.py`: load and match trigger words.
 
 ## Dependencies
 Standard Python libraries only in this skeleton.

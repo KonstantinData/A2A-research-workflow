@@ -1,6 +1,7 @@
-research:
+research
 meeting preparation
 business customer
 recherche
 meeting-vorbereitung
+geschäftskunde
 meeting vorbereitung

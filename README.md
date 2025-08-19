@@ -9,7 +9,7 @@ This repository provides a skeleton implementation of the A2A research workflow.
 ## Setup Instructions
 
 1. Create and activate a Python 3.11 environment.
-2. Install dependencies (placeholder):
+2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
@@ -44,6 +44,7 @@ Key directories:
 - `logging/` – logging utilities and error definitions.
 - `tests/` – unit, integration, and end-to-end tests.
 - `ops/` – operational files such as Dockerfile and CI/CD configs.
+- `config/` – configuration files such as trigger word list.
 
 ## License
 
