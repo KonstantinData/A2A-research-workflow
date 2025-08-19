@@ -14,22 +14,24 @@ This repository provides a skeleton implementation of the A2A research workflow.
    pip install -r requirements.txt
    ```
 3. Set required environment variables as needed (see `ops/CONFIG.md`).
+4. Adjust trigger words in `config/trigger_words.txt` or point `TRIGGER_WORDS_FILE` to a custom list.
 
 ## Workflow Description
 
 1. Poll Google Calendar and Contacts for new entries containing trigger words.
-2. Run duplicate checks in HubSpot.
-3. Execute research agents and classify results.
-4. Consolidate data and generate PDF/CSV outputs.
-5. Optionally enrich HubSpot with core fields and attach the PDF.
+2. Normalize each trigger with its creator e‑mail and source.
+3. Run duplicate checks in HubSpot.
+4. Execute research agents and classify results.
+5. Consolidate data and generate PDF/CSV outputs.
+6. Optionally enrich HubSpot with core fields and attach the PDF.
 
 ## Example Run
 
 ```bash
-python core/orchestrator.py --company "Acme GmbH" --website "https://acme.example"
+python -m core.orchestrator
 ```
 
-This will generate a JSON object and demonstrate PDF/CSV export (placeholders in this skeleton).
+This will poll Google services for triggers and send notification e‑mails (stubbed in tests).
 
 ## Repository Structure
 

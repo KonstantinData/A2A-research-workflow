@@ -1,4 +1,9 @@
-
+research
+meeting preparation
+business customer
+recherche
+meeting-vorbereitung
+geschäftskunde
 besuchsvorbereitung
 briefing
 business client
@@ -13,4 +18,3 @@ recherche
 research
 terminvorbereitung
 unternehmensrecherche
-
