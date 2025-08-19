@@ -6,7 +6,6 @@ from typing import Any, Callable, Dict, Iterable, List
 
 from integrations import email_sender, google_calendar, google_contacts
 
-
 Normalized = Dict[str, Any]
 
 
@@ -50,7 +49,6 @@ def gather_triggers(
     contact_fetcher: Callable[[], Iterable[Dict[str, Any]]] = google_contacts.fetch_contacts,
 ) -> List[Normalized]:
     """Gather and normalize triggers from calendar events and contacts."""
-
     triggers: List[Normalized] = []
     triggers.extend(_normalize_calendar(event_fetcher()))
     triggers.extend(_normalize_contacts(contact_fetcher()))
@@ -67,7 +65,6 @@ def run(
     Returns the list of normalized trigger payloads. Each payload results in an
     email notification to its creator.
     """
-
     triggers = gather_triggers(event_fetcher, contact_fetcher)
     subject = "Research workflow triggered"
     for item in triggers:
@@ -80,4 +77,3 @@ __all__ = ["gather_triggers", "run"]
 
 if __name__ == "__main__":  # pragma: no cover - manual invocation
     run()
-
