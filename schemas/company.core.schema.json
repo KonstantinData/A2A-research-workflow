@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Company Core Schema",
+  "type": "object",
+  "properties": {
+    "meta": {
+      "type": "object"
+    }
+  }
+}
