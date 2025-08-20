@@ -16,6 +16,7 @@ except ImportError:  # pragma: no cover - optional dependency
     build = None  # type: ignore
 
 from core.trigger_words import contains_trigger
+from core.translate import to_us_business_english
 
 
 def fetch_events() -> List[Dict[str, Any]]:
@@ -48,11 +49,12 @@ def fetch_events() -> List[Dict[str, Any]]:
     for item in items:
         description = item.get("description", "")
         if contains_trigger(description):
+            translated = to_us_business_english(description.strip())
             triggered.append(
                 {
                     "id": item.get("id"),
                     "summary": item.get("summary"),
-                    "description": description.strip(),
+                    "description": translated,
                     "creator": item.get("creator", {}).get("email"),
                     "start": item.get("start"),
                 }

@@ -15,6 +15,7 @@ except ImportError:  # pragma: no cover - optional dependency
     build = None  # type: ignore
 
 from core.trigger_words import contains_trigger
+from core.translate import to_us_business_english
 
 
 def fetch_contacts() -> List[Dict[str, Any]]:
@@ -46,12 +47,13 @@ def fetch_contacts() -> List[Dict[str, Any]]:
         biographies = person.get("biographies", [])
         notes = biographies[0].get("value", "") if biographies else ""
         if contains_trigger(notes):
+            translated = to_us_business_english(notes.strip())
             results.append(
                 {
                     "resourceName": person.get("resourceName"),
                     "names": person.get("names", []),
                     "emailAddresses": person.get("emailAddresses", []),
-                    "notes": notes.strip(),
+                    "notes": translated,
                 }
             )
     return results

@@ -22,7 +22,7 @@ This repository provides a skeleton implementation of the A2A research workflow.
 2. Normalize each trigger with its creator e‑mail and source.
 3. Run duplicate checks in HubSpot.
 4. Execute research agents and classify results.
-5. Consolidate data and generate PDF/CSV outputs.
+5. Consolidate data, translate findings to U.S. Business English, and generate PDF/CSV outputs.
 6. Optionally enrich HubSpot with core fields and attach the PDF.
 
 ## Example Run
