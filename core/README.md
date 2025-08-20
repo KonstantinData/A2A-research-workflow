@@ -1,5 +1,6 @@
 # Core
 
+## Purpose
 Core orchestration and helper modules that coordinate the overall workflow.
 
 ## Files
@@ -12,3 +13,6 @@ Core orchestration and helper modules that coordinate the overall workflow.
 
 ## Dependencies
 Standard Python libraries only in this skeleton.
+
+## Usage
+The orchestrator coordinates agents, consolidation, rendering, and notifications; invoke with `python -m core.orchestrator`.
