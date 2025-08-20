@@ -1,5 +1,32 @@
-"""Agent 2 - company search by classification stub."""
+"""Agent 2 - company search by classification."""
 
-def run():
-    """Run company search by classification."""
-    pass
+from __future__ import annotations
+
+from typing import Any, Dict
+
+
+Normalized = Dict[str, Any]
+
+
+def run(trigger: Normalized) -> Normalized:
+    """Run company search by classification.
+
+    Parameters
+    ----------
+    trigger:
+        Normalized trigger dictionary passed from the orchestrator.
+
+    Returns
+    -------
+    Normalized
+        Structured result with ``source``, ``creator``, ``recipient`` and
+        ``payload`` keys.
+    """
+    return {
+        "source": "company_search",
+        "creator": trigger.get("creator"),
+        "recipient": trigger.get("recipient"),
+        "payload": {
+            "companies": [],
+        },
+    }
