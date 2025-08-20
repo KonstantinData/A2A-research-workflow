@@ -1,5 +1,32 @@
-"""Agent 5 - internal customer research stub."""
+"""Agent 5 - internal customer research."""
 
-def run():
-    """Run internal customer research."""
-    pass
+from __future__ import annotations
+
+from typing import Any, Dict
+
+
+Normalized = Dict[str, Any]
+
+
+def run(trigger: Normalized) -> Normalized:
+    """Run internal customer research.
+
+    Parameters
+    ----------
+    trigger:
+        Normalized trigger dictionary passed from the orchestrator.
+
+    Returns
+    -------
+    Normalized
+        Structured result with ``source``, ``creator``, ``recipient`` and
+        ``payload`` keys.
+    """
+    return {
+        "source": "internal_customer_research",
+        "creator": trigger.get("creator"),
+        "recipient": trigger.get("recipient"),
+        "payload": {
+            "customer_notes": [],
+        },
+    }
