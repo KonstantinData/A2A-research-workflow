@@ -14,11 +14,15 @@ except ImportError:  # pragma: no cover - optional dependency
     Credentials = None  # type: ignore
     build = None  # type: ignore
 
-from core.trigger_words import contains_trigger
+from core.trigger_words import contains_trigger, load_trigger_words
 
 
 def fetch_contacts() -> List[Dict[str, Any]]:
     """Fetch contacts with trigger words in their notes."""
+    words = load_trigger_words()
+    if not words:
+        return []
+
     if Credentials is None or build is None:
         raise ImportError("google-api-python-client is required")
 
@@ -45,7 +49,7 @@ def fetch_contacts() -> List[Dict[str, Any]]:
     for person in connections:
         biographies = person.get("biographies", [])
         notes = biographies[0].get("value", "") if biographies else ""
-        if contains_trigger(notes):
+        if contains_trigger(notes, words):
             results.append(
                 {
                     "resourceName": person.get("resourceName"),
@@ -55,3 +59,23 @@ def fetch_contacts() -> List[Dict[str, Any]]:
                 }
             )
     return results
+
+
+def scheduled_poll() -> List[Dict[str, Any]]:
+    """Scheduled poll that returns normalized trigger payloads."""
+    contacts = fetch_contacts()
+    normalized: List[Dict[str, Any]] = []
+    for contact in contacts:
+        emails = contact.get("emailAddresses", [])
+        email = emails[0].get("value") if emails else None
+        if not email:
+            continue
+        normalized.append(
+            {
+                "creator": email,
+                "trigger_source": "contacts",
+                "recipient": email,
+                "payload": contact,
+            }
+        )
+    return normalized

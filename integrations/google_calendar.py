@@ -15,11 +15,15 @@ except ImportError:  # pragma: no cover - optional dependency
     Credentials = None  # type: ignore
     build = None  # type: ignore
 
-from core.trigger_words import contains_trigger
+from core.trigger_words import contains_trigger, load_trigger_words
 
 
 def fetch_events() -> List[Dict[str, Any]]:
     """Fetch upcoming events containing trigger words."""
+    words = load_trigger_words()
+    if not words:
+        return []
+
     if Credentials is None or build is None:
         raise ImportError("google-api-python-client is required")
 
@@ -47,7 +51,7 @@ def fetch_events() -> List[Dict[str, Any]]:
     triggered: List[Dict[str, Any]] = []
     for item in items:
         description = item.get("description", "")
-        if contains_trigger(description):
+        if contains_trigger(description, words):
             triggered.append(
                 {
                     "id": item.get("id"),
@@ -58,3 +62,22 @@ def fetch_events() -> List[Dict[str, Any]]:
                 }
             )
     return triggered
+
+
+def scheduled_poll() -> List[Dict[str, Any]]:
+    """Scheduled poll that returns normalized trigger payloads."""
+    events = fetch_events()
+    normalized: List[Dict[str, Any]] = []
+    for event in events:
+        creator = event.get("creator")
+        if not creator:
+            continue
+        normalized.append(
+            {
+                "creator": creator,
+                "trigger_source": "calendar",
+                "recipient": creator,
+                "payload": event,
+            }
+        )
+    return normalized
