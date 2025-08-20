@@ -29,6 +29,8 @@ from __future__ import annotations
 import datetime as dt
 from typing import Any, Dict, Iterable
 
+from .classify import classify
+
 
 def consolidate(results: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
     """Merge multiple agent result dictionaries.
@@ -46,19 +48,37 @@ def consolidate(results: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
         the value, the original source and a ``last_verified_at`` timestamp.
     """
 
-    consolidated: Dict[str, Any] = {}
+    has_payload = any("payload" in r for r in results)
     timestamp = dt.datetime.utcnow().isoformat()
+
+    if not has_payload:
+        consolidated: Dict[str, Any] = {}
+        for result in results:
+            source = result.get("source", "unknown")
+            for key, value in result.items():
+                if key == "source" or value in (None, ""):
+                    continue
+                consolidated[key] = {
+                    "value": value,
+                    "source": source,
+                    "last_verified_at": timestamp,
+                }
+        return consolidated
+
+    data: Dict[str, Any] = {}
+    meta: Dict[str, Dict[str, Any]] = {}
     for result in results:
         source = result.get("source", "unknown")
-        for key, value in result.items():
-            if key == "source" or value in (None, ""):
+        payload: Dict[str, Any] = result.get("payload", {})
+        for key, value in payload.items():
+            if value in (None, ""):
                 continue
-            consolidated[key] = {
-                "value": value,
-                "source": source,
-                "last_verified_at": timestamp,
-            }
-    return consolidated
+            data[key] = value
+            meta[key] = {"source": source, "last_verified_at": timestamp}
+
+    data["meta"] = meta
+    data["classification"] = classify({"description": data.get("summary", "")})
+    return data
 
 
 __all__ = ["consolidate"]

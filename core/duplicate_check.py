@@ -60,7 +60,7 @@ def hybrid_score(existing: Dict[str, str], candidate: Dict[str, str]) -> float:
     return 0.6 * domain_score + 0.4 * name_score
 
 
-def is_duplicate(existing: Dict[str, str], candidate: Dict[str, str], *, threshold: float = 0.8) -> bool:
+def is_duplicate(existing: Dict[str, str], candidate: Dict[str, str] | None = None, *, threshold: float = 0.8) -> bool:
     """Return ``True`` if ``candidate`` is considered a duplicate of ``existing``.
 
     Parameters
@@ -71,6 +71,8 @@ def is_duplicate(existing: Dict[str, str], candidate: Dict[str, str], *, thresho
         Minimum score to be classified as a duplicate.
     """
 
+    if candidate is None:
+        return False
     return hybrid_score(existing, candidate) >= threshold
 
 

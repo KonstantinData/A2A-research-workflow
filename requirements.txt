@@ -5,3 +5,4 @@ weasyprint
 ruff
 flake8
 pytest
+requests

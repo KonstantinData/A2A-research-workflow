@@ -6,7 +6,7 @@ import base64
 import datetime as dt
 import json
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Callable
 
 try:  # pragma: no cover - handled in runtime
     from google.oauth2.credentials import Credentials
@@ -22,11 +22,11 @@ from core.translate import to_us_business_english
 def fetch_events() -> List[Dict[str, Any]]:
     """Fetch upcoming events containing trigger words."""
     if Credentials is None or build is None:
-        raise ImportError("google-api-python-client is required")
+        return []
 
     creds_b64 = os.getenv("GOOGLE_CREDENTIALS_JSON_BASE64")
     if not creds_b64:
-        raise RuntimeError("GOOGLE_CREDENTIALS_JSON_BASE64 not set")
+        return []
 
     creds_info = json.loads(base64.b64decode(creds_b64).decode("utf-8"))
     creds = Credentials.from_authorized_user_info(creds_info)
@@ -48,15 +48,36 @@ def fetch_events() -> List[Dict[str, Any]]:
     triggered: List[Dict[str, Any]] = []
     for item in items:
         description = item.get("description", "")
-        if contains_trigger(description):
-            translated = to_us_business_english(description.strip())
-            triggered.append(
-                {
-                    "id": item.get("id"),
-                    "summary": item.get("summary"),
-                    "description": translated,
-                    "creator": item.get("creator", {}).get("email"),
-                    "start": item.get("start"),
-                }
-            )
+        if not contains_trigger(description):
+            continue
+        translated = to_us_business_english(description.strip())
+        triggered.append(
+            {
+                "id": item.get("id"),
+                "summary": item.get("summary"),
+                "description": translated,
+                "creator": item.get("creator", {}).get("email"),
+                "start": item.get("start"),
+            }
+        )
     return triggered
+
+
+def scheduled_poll(event_fetcher: Callable[[], List[Dict[str, Any]]] | None = None) -> List[Dict[str, Any]]:
+    """Return normalized triggers from calendar events."""
+    fetcher = event_fetcher or fetch_events
+    events = fetcher()
+    normalized: List[Dict[str, Any]] = []
+    for event in events:
+        creator = event.get("creator")
+        if not creator:
+            continue
+        normalized.append(
+            {
+                "creator": creator,
+                "trigger_source": "calendar",
+                "recipient": creator,
+                "payload": event,
+            }
+        )
+    return normalized
