@@ -2,11 +2,28 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Iterable, List
+import time
+from pathlib import Path
+from typing import Any, Callable, Dict, Iterable, List, Sequence
 
-from integrations import email_sender, google_calendar, google_contacts
+from integrations import google_calendar, google_contacts, hubspot_api
+from output import csv_export, pdf_render
+from core import consolidate, feature_flags
 
 Normalized = Dict[str, Any]
+
+
+def _retry(func: Callable[[], Any], retries: int = 3, base_delay: float = 1.0) -> Any:
+    """Execute ``func`` with exponential backoff."""
+    delay = base_delay
+    for attempt in range(retries):
+        try:
+            return func()
+        except Exception:  # pragma: no cover - errors propagated after retries
+            if attempt == retries - 1:
+                raise
+            time.sleep(delay)
+            delay *= 2
 
 
 def _normalize_calendar(events: Iterable[Dict[str, Any]]) -> List[Normalized]:
@@ -50,26 +67,53 @@ def gather_triggers(
 ) -> List[Normalized]:
     """Gather and normalize triggers from calendar events and contacts."""
     triggers: List[Normalized] = []
-    triggers.extend(_normalize_calendar(event_fetcher()))
-    triggers.extend(_normalize_contacts(contact_fetcher()))
+    events = _retry(event_fetcher)
+    contacts = _retry(contact_fetcher)
+    triggers.extend(_normalize_calendar(events))
+    triggers.extend(_normalize_contacts(contacts))
     return triggers
 
 
 def run(
     event_fetcher: Callable[[], Iterable[Dict[str, Any]]] = google_calendar.fetch_events,
     contact_fetcher: Callable[[], Iterable[Dict[str, Any]]] = google_contacts.fetch_contacts,
-    send: Callable[[str, str, str], None] = email_sender.send_email,
-) -> List[Normalized]:
-    """Entry point for orchestrating research workflow.
+    researchers: Sequence[Callable[[Normalized], Any]] | None = None,
+    consolidate_fn: Callable[[Iterable[Any]], Any] = consolidate.consolidate,
+    pdf_renderer: Callable[[Any, Path], None] = pdf_render.render_pdf,
+    csv_exporter: Callable[[Any, Path], None] = csv_export.export_csv,
+    hubspot_upsert: Callable[[Any], None] = hubspot_api.upsert_company,
+    hubspot_attach: Callable[[Path], None] = hubspot_api.attach_pdf,
+    triggers: Iterable[Normalized] | None = None,
+) -> Any:
+    """Entry point for orchestrating the research workflow."""
+    if triggers is None:
+        if feature_flags.USE_PUSH_TRIGGERS:
+            triggers = []
+        else:
+            triggers = gather_triggers(event_fetcher, contact_fetcher)
 
-    Returns the list of normalized trigger payloads. Each payload results in an
-    email notification to its creator.
-    """
-    triggers = gather_triggers(event_fetcher, contact_fetcher)
-    subject = "Research workflow triggered"
-    for item in triggers:
-        send(item["recipient"], subject, f"Trigger source: {item['source']}")
-    return triggers
+    research_results: List[Any] = []
+    for trigger in triggers:
+        for func in researchers or []:
+            if getattr(func, "pro", False) and not feature_flags.ENABLE_PRO_SOURCES:
+                continue
+            research_results.append(_retry(lambda f=func, t=trigger: f(t)))
+
+    consolidated = consolidate_fn(research_results)
+
+    output_dir = Path("output/exports")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    pdf_path = output_dir / "report.pdf"
+    csv_path = output_dir / "data.csv"
+
+    _retry(lambda: pdf_renderer(consolidated, pdf_path))
+    _retry(lambda: csv_exporter(consolidated, csv_path))
+
+    _retry(lambda: hubspot_upsert(consolidated))
+    if feature_flags.ATTACH_PDF_TO_HUBSPOT:
+        _retry(lambda: hubspot_attach(pdf_path))
+
+    return consolidated
 
 
 __all__ = ["gather_triggers", "run"]
