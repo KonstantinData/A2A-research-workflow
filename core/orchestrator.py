@@ -6,7 +6,9 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Sequence
 
-from integrations import google_calendar, google_contacts, hubspot_api
+import os
+
+from integrations import email_sender, google_calendar, google_contacts, hubspot_api
 from output import csv_export, pdf_render
 from core import consolidate, feature_flags
 
@@ -112,6 +114,27 @@ def run(
     _retry(lambda: hubspot_upsert(consolidated))
     if feature_flags.ATTACH_PDF_TO_HUBSPOT:
         _retry(lambda: hubspot_attach(pdf_path))
+
+    recipient = os.getenv("MAIL_TO")
+    if recipient:
+        def _send_email() -> None:
+            attachments = [
+                ("report.pdf", pdf_path.read_bytes(), "application/pdf"),
+                ("data.csv", csv_path.read_bytes(), "text/csv"),
+            ]
+            details_path = csv_path.with_name("details.csv")
+            if details_path.exists():
+                attachments.append(
+                    ("details.csv", details_path.read_bytes(), "text/csv")
+                )
+            email_sender.send_email(
+                recipient,
+                "A2A Research Report",
+                "Attached report and data.",
+                attachments,
+            )
+
+        _retry(_send_email)
 
     return consolidated
 
