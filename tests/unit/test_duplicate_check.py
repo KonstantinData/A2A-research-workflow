@@ -8,6 +8,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from core.duplicate_check import is_duplicate
 
 
-def test_is_duplicate_always_false():
+def test_is_duplicate_detects_similarity():
+    record = {"name": "Acme GmbH"}
+    existing = [{"name": "ACME gmbh"}]
+    assert is_duplicate(record, existing) is True
+
+
+def test_is_duplicate_rejects_different_names():
     record = {"name": "Acme"}
-    assert is_duplicate(record) is False
+    existing = [{"name": "Different"}]
+    assert is_duplicate(record, existing) is False
