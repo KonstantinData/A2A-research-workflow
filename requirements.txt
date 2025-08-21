@@ -5,3 +5,4 @@ weasyprint>=65.0
 ruff
 flake8
 pytest
+requests
