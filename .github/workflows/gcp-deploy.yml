@@ -1,0 +1,53 @@
+name: GCP Deploy (OIDC)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        name: Authenticate to Google Cloud (OIDC)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github-pool/providers/github"
+          service_account: "gh-actions-deploy@<PROJECT_ID>.iam.gserviceaccount.com"
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: "<PROJECT_ID>"
+
+      - name: Verify identity
+        run: |
+          gcloud auth list --filter=status:ACTIVE --format="value(account)"
+          gcloud config list project
+
+      # Example: GCS Upload (if ./dist exists)
+      # - name: Upload to GCS
+      #   run: |
+      #     gsutil -m rsync -r ./dist gs://<BUCKET>/
+
+      # Example: Cloud Run Deploy (if Docker + service exists)
+      # - name: Build & Push to Artifact Registry
+      #   run: |
+      #     gcloud auth configure-docker ${REGION}-docker.pkg.dev --quiet
+      #     IMAGE=${REGION}-docker.pkg.dev/<PROJECT_ID>/<AR_REPO>/<SERVICE>:${{ github.sha }}
+      #     docker build -t "$IMAGE" .
+      #     docker push "$IMAGE"
+      # - name: Deploy to Cloud Run
+      #   run: |
+      #     gcloud run deploy <SERVICE> \
+      #       --image ${REGION}-docker.pkg.dev/<PROJECT_ID>/<AR_REPO>/<SERVICE>:${{ github.sha }} \
+      #       --region ${REGION} \
+      #       --platform managed \
+      #       --allow-unauthenticated
