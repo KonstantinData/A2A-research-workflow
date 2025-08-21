@@ -11,7 +11,6 @@ def _env_flag(name: str, default: bool) -> bool:
     ``default`` is used if the variable is unset. Values ``1``, ``true``,
     ``yes`` and ``on`` (case-insensitive) evaluate to ``True``.
     """
-
     value = os.getenv(name)
     if value is None:
         return default
@@ -29,4 +28,3 @@ __all__ = [
     "ENABLE_PRO_SOURCES",
     "ATTACH_PDF_TO_HUBSPOT",
 ]
-

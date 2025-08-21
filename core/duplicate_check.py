@@ -1,7 +1,7 @@
 """Duplicate detection helpers.
 
 The real system would query HubSpot to determine whether a company already
-exists.  For testing purposes we implement a small in-memory duplicate checker
+exists. For testing purposes we implement a small in-memory duplicate checker
 that scores a candidate against an existing record using a hybrid of domain and
 company name similarity.
 """
@@ -19,7 +19,6 @@ def _normalize_domain(domain: str) -> str:
     The function strips protocols and leading ``www`` and lowercases the
     resulting host name.
     """
-
     if not domain:
         return ""
     parsed = urlparse(domain if "://" in domain else f"http://{domain}")
@@ -36,7 +35,6 @@ def _name_similarity(a: str, b: str) -> float:
     ``SequenceMatcher`` provides a ratio between 0 and 1 which we treat as a
     rough substitute for a more advanced Jaro‑Winkler score.
     """
-
     return SequenceMatcher(None, a.lower(), b.lower()).ratio()
 
 
@@ -44,9 +42,8 @@ def hybrid_score(existing: Dict[str, str], candidate: Dict[str, str]) -> float:
     """Calculate a duplicate score for ``candidate`` against ``existing``.
 
     The score is based on domain equality (60%) and fuzzy name similarity
-    (40%).  A perfect match yields ``1.0``.
+    (40%). A perfect match yields ``1.0``.
     """
-
     domain_score = 0.0
     if _normalize_domain(existing.get("domain")) == _normalize_domain(
         candidate.get("domain")
@@ -60,7 +57,12 @@ def hybrid_score(existing: Dict[str, str], candidate: Dict[str, str]) -> float:
     return 0.6 * domain_score + 0.4 * name_score
 
 
-def is_duplicate(existing: Dict[str, str], candidate: Dict[str, str] | None = None, *, threshold: float = 0.8) -> bool:
+def is_duplicate(
+    existing: Dict[str, str],
+    candidate: Dict[str, str] | None = None,
+    *,
+    threshold: float = 0.8,
+) -> bool:
     """Return ``True`` if ``candidate`` is considered a duplicate of ``existing``.
 
     Parameters
@@ -70,11 +72,9 @@ def is_duplicate(existing: Dict[str, str], candidate: Dict[str, str] | None = No
     threshold:
         Minimum score to be classified as a duplicate.
     """
-
     if candidate is None:
         return False
     return hybrid_score(existing, candidate) >= threshold
 
 
 __all__ = ["hybrid_score", "is_duplicate"]
-

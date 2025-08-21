@@ -1,85 +1,52 @@
-"""Consolidate results produced by individual research agents.
-
-The real project would merge a complex nested structure following the
-``company.core.schema.json`` definition.  For the purposes of this exercise we
-only need a light‑weight merger that records which agent supplied which piece of
-information and when it was collected.  Each agent is expected to return a
-dictionary where top level keys are field names and the special key ``source``
-identifies the agent.
-
-Example input::
-
-    [
-        {"source": "agent1", "legal_name": "Acme GmbH"},
-        {"source": "agent2", "employees": 120},
-    ]
-
-Output::
-
-    {
-        "legal_name": {"value": "Acme GmbH", "source": "agent1",
-                       "last_verified_at": "..."},
-        "employees": {"value": 120, "source": "agent2",
-                       "last_verified_at": "..."},
-    }
-"""
+"""Consolidation logic for merging agent outputs."""
 
 from __future__ import annotations
 
-import datetime as dt
+from datetime import datetime, timezone
 from typing import Any, Dict, Iterable
 
-from .classify import classify
+from . import classify
+
+Normalized = Dict[str, Any]
 
 
-def consolidate(results: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
-    """Merge multiple agent result dictionaries.
+def consolidate(results: Iterable[Normalized]) -> Dict[str, Any]:
+    """Consolidate data from multiple agents into the core schema.
 
-    Parameters
-    ----------
-    results:
-        Iterable of dictionaries produced by agents.  Each dictionary should
-        contain a ``source`` key and any number of field/value pairs.
-
-    Returns
-    -------
-    dict
-        A dictionary where every field is expanded into a structure containing
-        the value, the original source and a ``last_verified_at`` timestamp.
+    Each element in ``results`` is expected to be a mapping containing at least
+    ``source`` and ``payload`` keys. The payload is merged into a single
+    structure, and ``meta`` information is recorded for every field capturing
+    the originating source and when the data was consolidated.
     """
 
-    has_payload = any("payload" in r for r in results)
-    timestamp = dt.datetime.utcnow().isoformat()
+    consolidated: Dict[str, Any] = {"meta": {}}
+    now = datetime.now(timezone.utc).isoformat()
+    sources: list[str] = []
 
-    if not has_payload:
-        consolidated: Dict[str, Any] = {}
-        for result in results:
-            source = result.get("source", "unknown")
-            for key, value in result.items():
-                if key == "source" or value in (None, ""):
-                    continue
-                consolidated[key] = {
-                    "value": value,
-                    "source": source,
-                    "last_verified_at": timestamp,
-                }
-        return consolidated
-
-    data: Dict[str, Any] = {}
-    meta: Dict[str, Dict[str, Any]] = {}
     for result in results:
         source = result.get("source", "unknown")
-        payload: Dict[str, Any] = result.get("payload", {})
+        payload = result.get("payload", {})
+        if not isinstance(payload, dict):
+            continue
+        sources.append(source)
         for key, value in payload.items():
-            if value in (None, ""):
-                continue
-            data[key] = value
-            meta[key] = {"source": source, "last_verified_at": timestamp}
+            consolidated[key] = value
+            consolidated["meta"][key] = {
+                "source": source,
+                "last_verified_at": now,
+            }
 
-    data["meta"] = meta
-    data["classification"] = classify({"description": data.get("summary", "")})
-    return data
+    consolidated["meta"]["sources"] = sources
+    consolidated["meta"]["last_verified_at"] = now
 
+    # Add classification information based on the consolidated payload.
+    payload_only = {k: v for k, v in consolidated.items() if k != "meta"}
+    classification = classify.classify(payload_only)
+    if classification["wz2008"] or classification["gpt_tags"]:
+        consolidated["classification"] = classification
+        consolidated["meta"]["classification"] = {
+            "source": "classifier",
+            "last_verified_at": now,
+        }
 
-__all__ = ["consolidate"]
-
+    return consolidated

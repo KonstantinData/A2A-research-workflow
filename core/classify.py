@@ -1,62 +1,72 @@
-"""Simple classification helpers.
-
-This module provides a tiny keyword based classifier used during tests.  It is
-not meant to be exhaustive but gives the orchestrator something deterministic
-to work with.  The classifier inspects a free form ``description`` field and
-assigns a WZ2008 code and a set of GPT style tags based on keyword matches.
-
-The mapping is intentionally minimal – it only covers a couple of common
-keywords so that unit tests can exercise the consolidation pipeline without
-requiring external services.
-"""
+"""Classification utilities."""
 
 from __future__ import annotations
 
 from typing import Any, Dict, List
 
-
-# Very small mapping of keywords to WZ2008 industry codes.  The keywords are
-# matched case‑insensitively against the provided description text.  The codes
-# include the dot notation used in the unit tests.
-_WZ_KEYWORDS = {
-    "software": "6201",  # Software development
-    "consulting": "7022",  # Business consulting
-    "retail": "4719",  # Retail trade
+# Simple keyword mapping to WZ2008 classification codes.
+# This is a tiny subset for demonstration purposes only.
+WZ2008_KEYWORDS: Dict[str, str] = {
+    "agriculture": "01",
+    "manufacturing": "28",
+    "software": "62.01",
+    "consulting": "70.22",
+    "retail": "47.19",
 }
 
 
+def _collect_text(data: Any) -> str:
+    """Recursively collect text from ``data``.
+
+    ``data`` may be nested ``dict``/``list``/``str`` structures. Any text
+    encountered is concatenated into a single lowercase string which is then
+    analysed for keyword matches.
+    """
+    parts: List[str] = []
+    if isinstance(data, str):
+        parts.append(data.lower())
+    elif isinstance(data, dict):
+        for value in data.values():
+            parts.append(_collect_text(value))
+    elif isinstance(data, list):
+        for value in data:
+            parts.append(_collect_text(value))
+    return " ".join(p for p in parts if p)
+
+
 def classify(data: Dict[str, Any]) -> Dict[str, List[str]]:
-    """Classify company information into WZ2008 codes and GPT tags.
+    """Classify company data into WZ2008 codes and GPT tags.
 
     Parameters
     ----------
     data:
-        A dictionary that may contain a ``description`` field with arbitrary
-        text.  The text is inspected for known keywords.
+        Arbitrary nested structure describing a company. Textual values are
+        scanned for keywords which are mapped to WZ2008 codes. GPT tags may be
+        supplied explicitly via a ``gpt_tags`` key.
 
     Returns
     -------
     dict
-        ``{"wz2008": [...], "gpt_tags": [...]}`` – both lists may be empty
-        when no keywords were detected.
+        Dictionary with ``wz2008`` and ``gpt_tags`` keys mapping to lists of
+        matched codes/tags.
     """
-
-    description = (data.get("description") or "").lower()
-    existing_tags = list(data.get("gpt_tags", []))
+    text = _collect_text(data)
 
     wz_codes: List[str] = []
-    tags: List[str] = existing_tags.copy()
-    for keyword, code in _WZ_KEYWORDS.items():
-        if keyword in description:
-            dotted = f"{code[:2]}.{code[2:]}"
-            for variant in {code, dotted}:
-                if variant not in wz_codes:
-                    wz_codes.append(variant)
+    tags: List[str] = []
+
+    for keyword, code in WZ2008_KEYWORDS.items():
+        if keyword in text:
+            if code not in wz_codes:
+                wz_codes.append(code)
             if keyword not in tags:
                 tags.append(keyword)
+
+    for tag in data.get("gpt_tags", []):
+        if tag not in tags:
+            tags.append(tag)
 
     return {"wz2008": wz_codes, "gpt_tags": tags}
 
 
 __all__ = ["classify"]
-

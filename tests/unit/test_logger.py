@@ -3,7 +3,7 @@
 import json
 import importlib.util
 import pathlib
-
+import logging
 
 spec = importlib.util.spec_from_file_location(
     "a2a_logger", pathlib.Path("logging/logger.py")
@@ -23,4 +23,3 @@ def test_logger_emits_json_with_context(capfd):
     assert payload["stage"] == "unit"
     assert payload["level"] == "info"
     assert payload["message"] == "hello world"
-

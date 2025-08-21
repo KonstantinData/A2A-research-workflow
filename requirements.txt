@@ -1,7 +1,7 @@
 google-api-python-client
 google-auth
 google-auth-oauthlib
-weasyprint
+weasyprint>=65.0
 ruff
 flake8
 pytest
