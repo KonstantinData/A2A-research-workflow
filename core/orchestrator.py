@@ -2,60 +2,46 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
+from core.feature_flags import (
+    ATTACH_PDF_TO_HUBSPOT,
+    USE_PUSH_TRIGGERS,
+)
 from integrations import email_sender, google_calendar, google_contacts
-from output import pdf_render, csv_export
+from output import csv_export, pdf_render
 
 
 Normalized = Dict[str, Any]
-
-
-def _normalize_calendar(events: Iterable[Dict[str, Any]]) -> List[Normalized]:
-    normalized: List[Normalized] = []
-    for event in events:
-        creator = event.get("creator")
-        if not creator:
-            continue
-        normalized.append(
-            {
-                "source": "calendar",
-                "creator": creator,
-                "recipient": creator,
-                "payload": event,
-            }
-        )
-    return normalized
-
-
-def _normalize_contacts(contacts: Iterable[Dict[str, Any]]) -> List[Normalized]:
-    normalized: List[Normalized] = []
-    for contact in contacts:
-        emails = contact.get("emailAddresses", [])
-        email = emails[0].get("value") if emails else None
-        if not email:
-            continue
-        normalized.append(
-            {
-                "source": "contacts",
-                "creator": email,
-                "recipient": email,
-                "payload": contact,
-            }
-        )
-    return normalized
 
 
 def gather_triggers(
     event_fetcher: Callable[[], Iterable[Dict[str, Any]]] = google_calendar.fetch_events,
     contact_fetcher: Callable[[], Iterable[Dict[str, Any]]] = google_contacts.fetch_contacts,
 ) -> List[Normalized]:
-    """Gather and normalize triggers from calendar events and contacts."""
+    """Gather normalized triggers from calendar and contacts."""
 
     triggers: List[Normalized] = []
-    triggers.extend(_normalize_calendar(event_fetcher()))
-    triggers.extend(_normalize_contacts(contact_fetcher()))
+    for trig in google_calendar.scheduled_poll(event_fetcher):
+        trig["source"] = trig.pop("trigger_source")
+        triggers.append(trig)
+    for trig in google_contacts.scheduled_poll(contact_fetcher):
+        trig["source"] = trig.pop("trigger_source")
+        triggers.append(trig)
     return triggers
+
+
+def _with_retries(func: Callable[..., Any], *args: Any, retries: int = 3, **kwargs: Any) -> Any:
+    """Execute ``func`` with simple exponential backoff retries."""
+
+    for attempt in range(retries):
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            if attempt == retries - 1:
+                raise
+            time.sleep(0.1 * 2**attempt)
 
 
 def run(
@@ -78,8 +64,8 @@ def run(
     """
 
     if triggers is None:
-        triggers = gather_triggers(event_fetcher, contact_fetcher)
-    else:
+        triggers = [] if USE_PUSH_TRIGGERS else gather_triggers(event_fetcher, contact_fetcher)
+    elif not USE_PUSH_TRIGGERS:
         triggers.extend(gather_triggers(event_fetcher, contact_fetcher))
 
     if not triggers:
@@ -90,7 +76,10 @@ def run(
     for trigger in triggers:
         results: List[Dict[str, Any]] = []
         for researcher in researchers or []:
-            results.append(researcher(trigger))
+            try:
+                results.append(_with_retries(researcher, trigger))
+            except Exception:
+                continue
 
         data: Dict[str, Any] = (
             consolidate_fn(results) if consolidate_fn is not None else {}
@@ -100,13 +89,13 @@ def run(
         csv_path = "output/exports/data.csv"
 
         if pdf_renderer is not None:
-            pdf_renderer(data, pdf_path)
+            _with_retries(pdf_renderer, data, pdf_path)
         if csv_exporter is not None:
-            csv_exporter(data, csv_path)
+            _with_retries(csv_exporter, data, csv_path)
         if hubspot_upsert is not None:
-            hubspot_upsert(data)
-        if hubspot_attach is not None and pdf_renderer is not None:
-            hubspot_attach(pdf_path)
+            _with_retries(hubspot_upsert, data)
+        if hubspot_attach is not None and pdf_renderer is not None and ATTACH_PDF_TO_HUBSPOT:
+            _with_retries(hubspot_attach, pdf_path)
 
         try:
             send(
