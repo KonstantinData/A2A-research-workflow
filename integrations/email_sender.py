@@ -17,13 +17,13 @@ def send_email(
     attachments: Optional[Iterable[Attachment]] = None,
 ) -> None:
     """Send an email with optional attachments via SMTP."""
-    host = os.getenv("MAIL_SMTP_HOST")
+    host = os.getenv("EMAIL_SMTP_HOST") or os.getenv("MAIL_SMTP_HOST")
     if not host:
         raise RuntimeError("MAIL_SMTP_HOST not configured")
 
     port = int(os.getenv("MAIL_SMTP_PORT", "587"))
-    user = os.getenv("MAIL_USER")
-    password = os.getenv("MAIL_SMTP_PASS")
+    user = os.getenv("EMAIL_SMTP_USER") or os.getenv("MAIL_USER")
+    password = os.getenv("EMAIL_SMTP_PASS") or os.getenv("MAIL_SMTP_PASS")
     sender = os.getenv("MAIL_FROM", user or "")
     secure = os.getenv("MAIL_SMTP_SECURE", "true").lower() == "true"
 

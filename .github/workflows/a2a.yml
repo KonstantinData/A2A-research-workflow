@@ -1,0 +1,55 @@
+name: A2A Research
+
+on:
+  schedule: [{ cron: "*/10 * * * *" }]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: a2a-research
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run orchestrator
+        run: |
+          set -e
+          # Auto-Discovery: nehme vorhandenen Einstiegspunkt
+          if [ -f scripts/a2a_run.py ]; then python scripts/a2a_run.py; \
+          elif [ -f a2a_run.py ]; then python a2a_run.py; \
+          elif ls -1 **/*orchestrator*.py 2>/dev/null | head -n1 | xargs -r python; \
+          else echo "No entrypoint found"; exit 1; fi
+        env:
+          HUBSPOT_ACCESS_TOKEN: ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
+          GOOGLE_CLIENT_ID:     ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          EMAIL_SMTP_HOST:      ${{ secrets.EMAIL_SMTP_HOST }}
+          EMAIL_SMTP_USER:      ${{ secrets.EMAIL_SMTP_USER }}
+          EMAIL_SMTP_PASS:      ${{ secrets.EMAIL_SMTP_PASS }}
+
+      - name: Upload PDFs (optional)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdf-output
+          path: |
+            output/**
+            **/*.pdf
+          if-no-files-found: ignore

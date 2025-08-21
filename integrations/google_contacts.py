@@ -27,10 +27,21 @@ def fetch_contacts() -> List[Dict[str, Any]]:
         raise ImportError("google-api-python-client is required")
 
     creds_b64 = os.getenv("GOOGLE_CREDENTIALS_JSON_BASE64")
-    if not creds_b64:
-        raise RuntimeError("GOOGLE_CREDENTIALS_JSON_BASE64 not set")
+    if creds_b64:
+        creds_info = json.loads(base64.b64decode(creds_b64).decode("utf-8"))
+    else:
+        client_id = os.getenv("GOOGLE_CLIENT_ID")
+        client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+        refresh_token = os.getenv("GOOGLE_REFRESH_TOKEN")
+        if not all([client_id, client_secret, refresh_token]):
+            raise RuntimeError("Google OAuth credentials not configured")
+        creds_info = {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "refresh_token": refresh_token,
+            "token_uri": "https://oauth2.googleapis.com/token",
+        }
 
-    creds_info = json.loads(base64.b64decode(creds_b64).decode("utf-8"))
     creds = Credentials.from_authorized_user_info(creds_info)
 
     service = build("people", "v1", credentials=creds)

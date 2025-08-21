@@ -21,10 +21,12 @@ def _env_flag(name: str, default: bool) -> bool:
 USE_PUSH_TRIGGERS = _env_flag("USE_PUSH_TRIGGERS", False)
 ENABLE_PRO_SOURCES = _env_flag("ENABLE_PRO_SOURCES", False)
 ATTACH_PDF_TO_HUBSPOT = _env_flag("ATTACH_PDF_TO_HUBSPOT", True)
+USE_GCP = _env_flag("USE_GCP", False)
 
 
 __all__ = [
     "USE_PUSH_TRIGGERS",
     "ENABLE_PRO_SOURCES",
     "ATTACH_PDF_TO_HUBSPOT",
+    "USE_GCP",
 ]
