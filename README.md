@@ -82,6 +82,10 @@ Key directories:
 - `tests/` – unit, integration, and end-to-end tests.
 - `ops/` – operational files such as Dockerfile and CI/CD configs.
 - `config/` – configuration files such as trigger word list.
+## Deploy via GCP OIDC
+
+This repository includes a GitHub Actions workflow (`.github/workflows/gcp-deploy.yml`) that deploys to Google Cloud using Workload Identity Federation and requires no long-lived service account keys. Replace `<PROJECT_ID>` and `<PROJECT_NUMBER>` and optionally `<REGION>`, `<BUCKET>`, `<AR_REPO>`, `<SERVICE>` before use.
+
 
 ## License
 
