@@ -15,4 +15,4 @@ Core orchestration and helper modules that coordinate the overall workflow.
 Standard Python libraries only in this skeleton.
 
 ## Usage
-The orchestrator coordinates agents, consolidation, rendering, and notifications; invoke with `python -m core.orchestrator`.
+The orchestrator coordinates agents, consolidation, duplicate detection, rendering, and notifications; invoke with `python -m core.orchestrator`.

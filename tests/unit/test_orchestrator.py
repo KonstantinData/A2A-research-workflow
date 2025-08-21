@@ -108,3 +108,45 @@ def test_run_skips_intake_when_push_triggers_enabled(monkeypatch):
 
     assert not gathered["called"]
 
+
+def test_run_skips_processing_when_duplicate():
+    triggers = [
+        {
+            "source": "calendar",
+            "creator": "alice@example.com",
+            "recipient": "alice@example.com",
+            "payload": {},
+        }
+    ]
+
+    calls = {"pdf": 0, "csv": 0, "upsert": 0, "attach": 0}
+
+    def consolidate_fn(results):
+        return {"name": "Acme"}
+
+    def fake_pdf(data, path):
+        calls["pdf"] += 1
+
+    def fake_csv(data, path):
+        calls["csv"] += 1
+
+    def fake_upsert(data):
+        calls["upsert"] += 1
+
+    def fake_attach(path):
+        calls["attach"] += 1
+
+    result = orchestrator.run(
+        triggers=triggers,
+        researchers=[],
+        consolidate_fn=consolidate_fn,
+        pdf_renderer=fake_pdf,
+        csv_exporter=fake_csv,
+        hubspot_upsert=fake_upsert,
+        hubspot_attach=fake_attach,
+        duplicate_checker=lambda rec, existing: True,
+    )
+
+    assert result == {"name": "Acme"}
+    assert calls == {"pdf": 0, "csv": 0, "upsert": 0, "attach": 0}
+

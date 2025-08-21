@@ -10,7 +10,7 @@ import os
 
 from integrations import email_sender, google_calendar, google_contacts, hubspot_api
 from output import csv_export, pdf_render
-from core import consolidate, feature_flags
+from core import consolidate, feature_flags, duplicate_check
 
 Normalized = Dict[str, Any]
 
@@ -85,6 +85,8 @@ def run(
     csv_exporter: Callable[[Any, Path], None] = csv_export.export_csv,
     hubspot_upsert: Callable[[Any], None] = hubspot_api.upsert_company,
     hubspot_attach: Callable[[Path], None] = hubspot_api.attach_pdf,
+    duplicate_checker: Callable[[Dict[str, Any], Iterable[Dict[str, Any]] | None], bool] = duplicate_check.is_duplicate,
+    existing_records: Iterable[Dict[str, Any]] | None = None,
     triggers: Iterable[Normalized] | None = None,
 ) -> Any:
     """Entry point for orchestrating the research workflow."""
@@ -102,6 +104,10 @@ def run(
             research_results.append(_retry(lambda f=func, t=trigger: f(t)))
 
     consolidated = consolidate_fn(research_results)
+
+    # Skip further processing if the record already exists.
+    if isinstance(consolidated, dict) and duplicate_checker(consolidated, existing_records):
+        return consolidated
 
     output_dir = Path("output/exports")
     output_dir.mkdir(parents=True, exist_ok=True)
