@@ -1,6 +1,8 @@
 # A2A-research-workflow
 
-Automated Agent-to-Agent (A2A) research workflow for company data enrichment, HubSpot integration, and standardized PDF/CSV reporting using Python, GitHub Actions, AWS, and Docker.
+Automated Agent-to-Agent (A2A) research workflow for company data enrichment, HubSpot integration, and standardized PDF/CSV reporting using Python and GitHub Actions.
+
+No external cloud services are required; the job runs entirely within GitHub Actions.
 
 ## Project Overview
 
@@ -50,19 +52,23 @@ This will poll Google services for triggers and send notification e‑mails (stu
 
 | Variable | Description | Default |
 | --- | --- | --- |
-| `MAIL_SMTP_HOST` | SMTP server hostname | – |
+| `EMAIL_SMTP_HOST` | SMTP server hostname | – |
 | `MAIL_SMTP_PORT` | SMTP server port | `587` |
-| `MAIL_USER` | SMTP username | – |
-| `MAIL_SMTP_PASS` | SMTP password | – |
-| `MAIL_FROM` | Sender e‑mail address | `MAIL_USER` |
+| `EMAIL_SMTP_USER` | SMTP username | – |
+| `EMAIL_SMTP_PASS` | SMTP password | – |
+| `MAIL_FROM` | Sender e‑mail address | `EMAIL_SMTP_USER` |
 | `MAIL_SMTP_SECURE` | Use SSL for SMTP (`true`/`false`) | `true` |
 | `MAIL_TO` | Recipient e‑mail for reports | – |
 | `TRIGGER_WORDS_FILE` | Path to trigger words list | `config/trigger_words.txt` |
-| `GOOGLE_CREDENTIALS_JSON_BASE64` | Base64‑encoded Google credentials | – |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID | – |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | – |
+| `GOOGLE_REFRESH_TOKEN` | Google OAuth refresh token | – |
 | `GOOGLE_CALENDAR_ID` | Calendar ID to poll | `primary` |
+| `HUBSPOT_ACCESS_TOKEN` | HubSpot private app token | – |
 | `USE_PUSH_TRIGGERS` | Disable scheduled polling | `false` |
 | `ENABLE_PRO_SOURCES` | Allow pro research agents | `false` |
 | `ATTACH_PDF_TO_HUBSPOT` | Upload PDF to HubSpot | `true` |
+| `USE_GCP` | Enable Google Cloud features | `false` |
 | `RUN_ID` | Identifier for logging | random UUID |
 | `STAGE` | Logging stage label | – |
 | `GITHUB_REPOSITORY` | Repository for error issues | – |
@@ -82,11 +88,6 @@ Key directories:
 - `tests/` – unit, integration, and end-to-end tests.
 - `ops/` – operational files such as Dockerfile and CI/CD configs.
 - `config/` – configuration files such as trigger word list.
-## Deploy via GCP OIDC
-
-This repository includes a GitHub Actions workflow (`.github/workflows/gcp-deploy.yml`) that deploys to Google Cloud using Workload Identity Federation and requires no long-lived service account keys. Replace `<PROJECT_ID>` and `<PROJECT_NUMBER>` and optionally `<REGION>`, `<BUCKET>`, `<AR_REPO>`, `<SERVICE>` before use.
-
-
 ## License
 
 MIT
