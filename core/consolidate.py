@@ -1,9 +1,9 @@
+# core/consolidate.py
 """Consolidation logic for merging agent outputs."""
-
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable
+from typing import Any, Dict, Iterable, List
 
 from . import classify
 
@@ -11,42 +11,39 @@ Normalized = Dict[str, Any]
 
 
 def consolidate(results: Iterable[Normalized]) -> Dict[str, Any]:
-    """Consolidate data from multiple agents into the core schema.
+    """Consolidate data from multiple agents into a simple schema.
 
-    Each element in ``results`` is expected to be a mapping containing at least
-    ``source`` and ``payload`` keys. The payload is merged into a single
-    structure, and ``meta`` information is recorded for every field capturing
-    the originating source and when the data was consolidated.
+    The result structure:
+    {
+      "payload": {...},          # merged keys from agents
+      "meta": {
+         "sources": [...],
+         "last_verified_at": "...iso..."
+      }
+    }
     """
-
-    consolidated: Dict[str, Any] = {"meta": {}}
     now = datetime.now(timezone.utc).isoformat()
-    sources: list[str] = []
+    consolidated: Dict[str, Any] = {
+        "payload": {},
+        "meta": {"sources": [], "last_verified_at": now},
+    }
 
-    for result in results:
-        source = result.get("source", "unknown")
-        payload = result.get("payload", {})
-        if not isinstance(payload, dict):
-            continue
-        sources.append(source)
-        for key, value in payload.items():
-            consolidated[key] = value
-            consolidated["meta"][key] = {
-                "source": source,
-                "last_verified_at": now,
-            }
+    for res in results or []:
+        source = res.get("source") or "unknown"
+        consolidated["meta"]["sources"].append(source)
+        payload = res.get("payload") or {}
+        # merge shallow keys
+        for k, v in payload.items():
+            # prefer first non-empty value
+            if k not in consolidated["payload"] or not consolidated["payload"][k]:
+                consolidated["payload"][k] = v
 
-    consolidated["meta"]["sources"] = sources
-    consolidated["meta"]["last_verified_at"] = now
-
-    # Add classification information based on the consolidated payload.
-    payload_only = {k: v for k, v in consolidated.items() if k != "meta"}
-    classification = classify.classify(payload_only)
-    if classification["wz2008"] or classification["gpt_tags"]:
+    # Attach a lightweight classification based on keywords
+    classification = classify.classify(consolidated["payload"])
+    if classification:
         consolidated["classification"] = classification
-        consolidated["meta"]["classification"] = {
-            "source": "classifier",
-            "last_verified_at": now,
-        }
 
+    # bubble up creator/recipient if present
+    consolidated["creator"] = consolidated["payload"].get("creator") or None
+    consolidated["recipient"] = consolidated["payload"].get("recipient") or None
     return consolidated

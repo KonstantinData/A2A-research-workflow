@@ -1,93 +1,141 @@
-"""Main orchestrator for the A2A workflow."""
+# core/orchestrator.py
+"""Main orchestrator for the A2A workflow.
+
+This module wires together the trigger fetchers (Google Calendar / Contacts),
+the research agents, consolidation, export (PDF/CSV) and notifications.
+
+It is intentionally dependency-light so it can run in GitHub Actions without
+special setup beyond the required secrets.
+"""
 
 from __future__ import annotations
 
-import time
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Sequence
-
+from typing import Any, Callable, Dict, Iterable, List, Sequence, Optional
 import os
+import time
 
-from integrations import email_sender, google_calendar, google_contacts, hubspot_api
-from output import csv_export, pdf_render
 from core import consolidate, feature_flags, duplicate_check
+from integrations import google_calendar, google_contacts, hubspot_api, email_sender
+from output import pdf_render, csv_export
 
 Normalized = Dict[str, Any]
 
 
-def _retry(func: Callable[[], Any], retries: int = 3, base_delay: float = 1.0) -> Any:
-    """Execute ``func`` with exponential backoff."""
-    delay = base_delay
-    for attempt in range(retries):
+# ------------------------------ utils ---------------------------------------
+def _retry(fn: Callable[[], Any], retries: int = 3, delay: float = 2.0) -> Any:
+    """Retry helper for flaky integrations."""
+    last_exc: Optional[BaseException] = None
+    for i in range(retries):
         try:
-            return func()
-        except Exception:  # pragma: no cover - errors propagated after retries
-            if attempt == retries - 1:
-                raise
+            return fn()
+        except BaseException as exc:  # pragma: no cover - defensive
+            last_exc = exc
             time.sleep(delay)
-            delay *= 2
+    if last_exc:
+        raise last_exc
+    return None
 
 
-def _normalize_calendar(events: Iterable[Dict[str, Any]]) -> List[Normalized]:
-    normalized: List[Normalized] = []
-    for event in events:
-        creator = event.get("creator")
-        if not creator:
-            continue
-        normalized.append(
+# ---------------------------- normalization ---------------------------------
+def _normalize_events(events: Iterable[Dict[str, Any]]) -> List[Normalized]:
+    norm: List[Normalized] = []
+    for ev in events or []:
+        creator = (ev.get("creator") or {}).get("email") or ev.get("organizer", {}).get(
+            "email"
+        )
+        norm.append(
             {
                 "source": "calendar",
                 "creator": creator,
                 "recipient": creator,
-                "payload": event,
+                "payload": ev,
             }
         )
-    return normalized
+    return norm
 
 
 def _normalize_contacts(contacts: Iterable[Dict[str, Any]]) -> List[Normalized]:
-    normalized: List[Normalized] = []
-    for contact in contacts:
-        emails = contact.get("emailAddresses", [])
-        email = emails[0].get("value") if emails else None
-        if not email:
-            continue
-        normalized.append(
+    norm: List[Normalized] = []
+    for c in contacts or []:
+        email: Optional[str] = None
+        for item in c.get("emailAddresses", []):
+            if "value" in item:
+                email = item["value"]
+                break
+        norm.append(
             {
                 "source": "contacts",
                 "creator": email,
                 "recipient": email,
-                "payload": contact,
+                "payload": c,
             }
         )
-    return normalized
+    return norm
 
 
+# --------------------------------- IO ---------------------------------------
 def gather_triggers(
-    event_fetcher: Callable[[], Iterable[Dict[str, Any]]] = google_calendar.fetch_events,
-    contact_fetcher: Callable[[], Iterable[Dict[str, Any]]] = google_contacts.fetch_contacts,
+    event_fetcher: Callable[
+        [], Iterable[Dict[str, Any]]
+    ] = google_calendar.fetch_events,
+    contact_fetcher: Callable[
+        [], Iterable[Dict[str, Any]]
+    ] = google_contacts.fetch_contacts,
 ) -> List[Normalized]:
-    """Gather and normalize triggers from calendar events and contacts."""
-    triggers: List[Normalized] = []
+    """Collect triggers from calendar and contacts in one list."""
     events = _retry(event_fetcher)
     contacts = _retry(contact_fetcher)
-    triggers.extend(_normalize_calendar(events))
-    triggers.extend(_normalize_contacts(contacts))
+
+    triggers: List[Normalized] = []
+    triggers.extend(_normalize_events(events or []))
+    triggers.extend(_normalize_contacts(contacts or []))
     return triggers
 
 
+# ------------------------------- pipeline -----------------------------------
+def _default_researchers() -> List[Callable[[Normalized], Any]]:
+    """Return a minimal set of research functions.
+
+    Agents are optional; we import lazily to keep startup robust even if files
+    are modified by the user.
+    """
+    funcs: List[Callable[[Normalized], Any]] = []
+    try:
+        from agents import (
+            agent1_internal_company_research as a1,
+            agent2_company_search as a2,
+            agent3_external_branch_research as a3,
+            agent4_external_customer_research as a4,
+            agent5_internal_customer_research as a5,
+        )
+
+        funcs.extend([a1.run, a2.run, a3.run, a4.run, a5.run])
+    except Exception:
+        # If any agent import fails, continue with what we have.
+        pass
+    return funcs
+
+
 def run(
-    event_fetcher: Callable[[], Iterable[Dict[str, Any]]] = google_calendar.fetch_events,
-    contact_fetcher: Callable[[], Iterable[Dict[str, Any]]] = google_contacts.fetch_contacts,
-    researchers: Sequence[Callable[[Normalized], Any]] | None = None,
+    event_fetcher: Callable[
+        [], Iterable[Dict[str, Any]]
+    ] = google_calendar.fetch_events,
+    contact_fetcher: Callable[
+        [], Iterable[Dict[str, Any]]
+    ] = google_contacts.fetch_contacts,
+    researchers: Optional[Sequence[Callable[[Normalized], Any]]] = None,
     consolidate_fn: Callable[[Iterable[Any]], Any] = consolidate.consolidate,
     pdf_renderer: Callable[[Any, Path], None] = pdf_render.render_pdf,
     csv_exporter: Callable[[Any, Path], None] = csv_export.export_csv,
     hubspot_upsert: Callable[[Any], None] = hubspot_api.upsert_company,
     hubspot_attach: Callable[[Path], None] = hubspot_api.attach_pdf,
-    duplicate_checker: Callable[[Dict[str, Any], Iterable[Dict[str, Any]] | None], bool] = duplicate_check.is_duplicate,
-    existing_records: Iterable[Dict[str, Any]] | None = None,
-    triggers: Iterable[Normalized] | None = None,
+    duplicate_checker: Callable[
+        [Dict[str, Any], Optional[Iterable[Dict[str, Any]]]], bool
+    ] = duplicate_check.is_duplicate,
+    existing_records: Optional[Iterable[Dict[str, Any]]] = None,
+    triggers: Optional[Iterable[Normalized]] = None,
 ) -> Any:
     """Entry point for orchestrating the research workflow."""
     if triggers is None:
@@ -97,56 +145,51 @@ def run(
             triggers = gather_triggers(event_fetcher, contact_fetcher)
 
     research_results: List[Any] = []
-    for trigger in triggers:
-        for func in researchers or []:
-            if getattr(func, "pro", False) and not feature_flags.ENABLE_PRO_SOURCES:
+    for trig in triggers:
+        for fn in researchers or _default_researchers():
+            if getattr(fn, "pro", False) and not feature_flags.ENABLE_PRO_SOURCES:
                 continue
-            research_results.append(_retry(lambda f=func, t=trigger: f(t)))
+            research_results.append(_retry(lambda f=fn, t=trig: f(t)))
 
+    # Merge results
     consolidated = consolidate_fn(research_results)
 
-    # Skip further processing if the record already exists.
-    if isinstance(consolidated, dict) and duplicate_checker(consolidated, existing_records):
-        return consolidated
+    # Guard against duplicates (best-effort)
+    if duplicate_checker(consolidated, existing_records):
+        return {"status": "duplicate", "meta": consolidated.get("meta", {})}
 
-    output_dir = Path("output/exports")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    pdf_path = output_dir / "report.pdf"
-    csv_path = output_dir / "data.csv"
+    # Export artifacts
+    out_dir = Path(os.getenv("OUTPUT_DIR", "output"))
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    _retry(lambda: pdf_renderer(consolidated, pdf_path))
-    _retry(lambda: csv_exporter(consolidated, csv_path))
+    pdf_path = out_dir / "report.pdf"
+    csv_path = out_dir / "data.csv"
+    pdf_renderer(consolidated, pdf_path)
+    csv_exporter(consolidated, csv_path)
 
+    # CRM + Email
     _retry(lambda: hubspot_upsert(consolidated))
-    if feature_flags.ATTACH_PDF_TO_HUBSPOT:
-        _retry(lambda: hubspot_attach(pdf_path))
+    _retry(lambda: hubspot_attach(pdf_path))
 
-    recipient = os.getenv("MAIL_TO")
-    if recipient:
-        def _send_email() -> None:
-            attachments = [
-                ("report.pdf", pdf_path.read_bytes(), "application/pdf"),
-                ("data.csv", csv_path.read_bytes(), "text/csv"),
-            ]
-            details_path = csv_path.with_name("details.csv")
-            if details_path.exists():
-                attachments.append(
-                    ("details.csv", details_path.read_bytes(), "text/csv")
-                )
-            email_sender.send_email(
-                recipient,
-                "A2A Research Report",
-                "Attached report and data.",
-                attachments,
-            )
+    def _send_email() -> None:
+        sender = (
+            os.getenv("MAIL_FROM")
+            or os.getenv("SMTP_FROM")
+            or (os.getenv("SMTP_USER") or "")
+        )
+        recipient = consolidated.get("creator") or os.getenv("MAIL_TO") or sender
+        subject = f"A2A Research Report"
+        body = "Attached report and data."
+        email_sender.send_email(
+            sender, recipient, subject, body, attachments=[pdf_path, csv_path]
+        )
 
-        _retry(_send_email)
+    _retry(_send_email)
 
     return consolidated
 
 
 __all__ = ["gather_triggers", "run"]
 
-
-if __name__ == "__main__":  # pragma: no cover - manual invocation
+if __name__ == "__main__":  # pragma: no cover
     run()

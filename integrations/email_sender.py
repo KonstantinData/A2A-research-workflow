@@ -1,50 +1,69 @@
-"""Simple SMTP email sender."""
-
+# integrations/email_sender.py
+"""SMTP email sender utility."""
 from __future__ import annotations
 
+from email.message import EmailMessage
+from pathlib import Path
+from typing import Iterable, Optional
+import mimetypes
 import os
 import smtplib
-from email.message import EmailMessage
-from typing import Iterable, Optional, Tuple
 
-Attachment = Tuple[str, bytes, str]
+
+def _env(name: str, default: Optional[str] = None) -> Optional[str]:
+    val = os.getenv(name)
+    return val if val is not None else default
+
+
+def _get_settings() -> dict:
+    host = _env("EMAIL_SMTP_HOST") or _env("SMTP_HOST") or "localhost"
+    port = int(_env("EMAIL_SMTP_PORT") or _env("SMTP_PORT") or "465")
+    user = _env("EMAIL_SMTP_USER") or _env("SMTP_USER")
+    password = _env("EMAIL_SMTP_PASS") or _env("SMTP_PASS")
+    secure = (_env("SMTP_SECURE") or "true").lower() != "false"
+    return {
+        "host": host,
+        "port": port,
+        "user": user,
+        "password": password,
+        "secure": secure,
+    }
 
 
 def send_email(
-    to_address: str,
+    sender: str,
+    recipient: str,
     subject: str,
     body: str,
-    attachments: Optional[Iterable[Attachment]] = None,
+    attachments: Optional[Iterable[Path]] = None,
 ) -> None:
-    """Send an email with optional attachments via SMTP."""
-    host = os.getenv("EMAIL_SMTP_HOST") or os.getenv("MAIL_SMTP_HOST")
-    if not host:
-        raise RuntimeError("MAIL_SMTP_HOST not configured")
-
-    port = int(os.getenv("MAIL_SMTP_PORT", "587"))
-    user = os.getenv("EMAIL_SMTP_USER") or os.getenv("MAIL_USER")
-    password = os.getenv("EMAIL_SMTP_PASS") or os.getenv("MAIL_SMTP_PASS")
-    sender = os.getenv("MAIL_FROM", user or "")
-    secure = os.getenv("MAIL_SMTP_SECURE", "true").lower() == "true"
-
+    """Send an email with optional attachments using SMTP/SSL or STARTTLS based on env settings."""
+    cfg = _get_settings()
     msg = EmailMessage()
     msg["From"] = sender
-    msg["To"] = to_address
+    msg["To"] = recipient
     msg["Subject"] = subject
     msg.set_content(body)
 
-    for filename, content, mimetype in attachments or []:
-        maintype, subtype = mimetype.split("/", 1)
-        msg.add_attachment(content, maintype=maintype, subtype=subtype, filename=filename)
+    for path in attachments or []:
+        p = Path(path)
+        if not p.exists():
+            continue
+        ctype, _ = mimetypes.guess_type(p.name)
+        maintype, subtype = (ctype or "application/octet-stream").split("/", 1)
+        with p.open("rb") as f:
+            msg.add_attachment(
+                f.read(), maintype=maintype, subtype=subtype, filename=p.name
+            )
 
-    if secure:
-        with smtplib.SMTP_SSL(host, port) as smtp:
-            if user:
-                smtp.login(user, password or "")
+    if cfg["secure"]:
+        with smtplib.SMTP_SSL(cfg["host"], cfg["port"]) as smtp:
+            if cfg["user"]:
+                smtp.login(cfg["user"], cfg["password"] or "")
             smtp.send_message(msg)
     else:
-        with smtplib.SMTP(host, port) as smtp:
+        with smtplib.SMTP(cfg["host"], cfg["port"]) as smtp:
             smtp.starttls()
-            if user:
-                smtp.login(user, password or "")
+            if cfg["user"]:
+                smtp.login(cfg["user"], cfg["password"] or "")
             smtp.send_message(msg)

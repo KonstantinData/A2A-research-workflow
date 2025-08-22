@@ -1,41 +1,30 @@
-"""Duplicate detection module with fuzzy matching."""
-
+# core/duplicate_check.py
+"""Very small duplicate check helper."""
 from __future__ import annotations
 
-from difflib import SequenceMatcher
 from typing import Any, Dict, Iterable
 
-Record = Dict[str, Any]
 
-
-def is_duplicate(record: Record, candidates: Iterable[Record] | None = None, *, threshold: float = 0.9) -> bool:
-    """Return ``True`` if ``record`` matches any of the ``candidates``.
-
-    Parameters
-    ----------
-    record:
-        The record to check.  A ``name`` field is looked up and compared.
-    candidates:
-        Iterable of existing records against which to compare.  Only the ``name``
-        field is considered.  If ``None`` (default) no duplicates are detected.
-    threshold:
-        Similarity ratio above which two names are considered identical.  The
-        default of ``0.9`` is a conservative fuzzy match.
-    """
-
-    name = (record.get("name") or "").strip().lower()
-    if not name:
+def is_duplicate(
+    record: Dict[str, Any], existing: Iterable[Dict[str, Any]] | None
+) -> bool:
+    if not existing:
         return False
-
-    candidates = candidates or []
-    for existing in candidates:
-        other = (existing.get("name") or "").strip().lower()
-        if not other:
-            continue
-        ratio = SequenceMatcher(None, name, other).ratio()
-        if ratio >= threshold:
+    name = (record.get("payload") or {}).get("company_name") or (
+        record.get("payload") or {}
+    ).get("name")
+    website = (record.get("payload") or {}).get("website") or (
+        record.get("payload") or {}
+    ).get("domain")
+    for r in existing:
+        rn = (r.get("payload") or {}).get("company_name") or (
+            r.get("payload") or {}
+        ).get("name")
+        rw = (r.get("payload") or {}).get("website") or (r.get("payload") or {}).get(
+            "domain"
+        )
+        if (name and rn and name.lower() == rn.lower()) or (
+            website and rw and website.lower() == rw.lower()
+        ):
             return True
     return False
-
-
-__all__ = ["is_duplicate"]
