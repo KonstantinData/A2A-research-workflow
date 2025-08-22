@@ -9,9 +9,17 @@ on:
   schedule:
     - cron: "*/10 * * * *"   # alle 10 Minuten
 
+permissions:
+  contents: read
+
+concurrency:
+  group: a2a-research-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -34,6 +42,7 @@ jobs:
   run-orchestrator:
     runs-on: ubuntu-latest
     needs: build-and-test
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -83,7 +92,7 @@ jobs:
           EMAIL_SMTP_PASS: ${{ secrets.EMAIL_SMTP_PASS }}
         run: |
           set -e
-          # Optionaler Mini-Debug
+          # Optionaler Mini-Debug (bei Bedarf aktiv lassen)
           python - <<'PY'
 import sys, os
 print("CWD:", os.getcwd())
