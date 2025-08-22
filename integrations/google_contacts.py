@@ -11,9 +11,17 @@ except ImportError:
     Credentials = None  # type: ignore
     build = None  # type: ignore
 
+# 🆕 Trigger-Wörter laden, um frühzeitig auszusteigen, wenn keine konfiguriert sind
+from core.trigger_words import load_trigger_words
+
 
 def fetch_contacts() -> List[Dict[str, Any]]:
     """Fetch contacts from Google People API."""
+    # Early-exit wie in google_calendar: keine Trigger -> nichts zu tun
+    words = load_trigger_words()
+    if not words:
+        return []
+
     if Credentials is None or build is None:
         raise ImportError("google-api-python-client is required")
 
@@ -65,7 +73,7 @@ def scheduled_poll() -> List[Dict[str, Any]]:
     contacts = fetch_contacts()
     normalized = []
     for contact in contacts:
-        # Test-kompatibel (mocked test input)
+        # Test-kompatibel (mocked test input mit emailAddresses)
         email = contact.get("email")
         if not email and "emailAddresses" in contact:
             email_entries = contact.get("emailAddresses", [])
