@@ -30,6 +30,11 @@ jobs:
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
 
+      - name: Set up Google OAuth credentials
+        run: |
+          echo "${{ secrets.GOOGLE_CREDENTIALS_JSON_BASE64 }}" | base64 -d > ${{ github.workspace }}/google_credentials.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=${{ github.workspace }}/google_credentials.json" >> $GITHUB_ENV
+
       - name: Run orchestrator
         run: |
           set -e
