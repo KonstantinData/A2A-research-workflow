@@ -89,8 +89,14 @@ def gather_triggers(
     ] = google_contacts.fetch_contacts,
 ) -> List[Normalized]:
     """Collect triggers from calendar and contacts in one list."""
-    events = _retry(event_fetcher)
-    contacts = _retry(contact_fetcher)
+    try:
+        events = _retry(event_fetcher)
+    except Exception:
+        events = []
+    try:
+        contacts = _retry(contact_fetcher)
+    except Exception:
+        contacts = []
 
     triggers: List[Normalized] = []
     triggers.extend(_normalize_events(events or []))
