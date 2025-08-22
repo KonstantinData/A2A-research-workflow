@@ -1,9 +1,14 @@
 import os
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-# Deine echten Google-OAuth-Daten hier einfügen:
-CLIENT_ID = "HIER_CLIENT_ID_EINFÜGEN"
-CLIENT_SECRET = "HIER_CLIENT_SECRET_EINFÜGEN"
+# Secrets direkt aus Umgebungsvariablen lesen
+CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
+CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
+
+if not CLIENT_ID or not CLIENT_SECRET:
+    raise ValueError(
+        "❌ GOOGLE_CLIENT_ID oder GOOGLE_CLIENT_SECRET fehlt in den Umgebungsvariablen."
+    )
 
 SCOPES = [
     "https://www.googleapis.com/auth/calendar.readonly",
@@ -23,5 +28,5 @@ flow = InstalledAppFlow.from_client_config(
 )
 
 creds = flow.run_local_server(port=8080)
-print("\n✅ Dein refresh_token lautet:")
+print("\n✅ Dein refresh_token lautet:\n")
 print(creds.refresh_token)
