@@ -39,6 +39,8 @@ def send_email(
 ) -> None:
     """Send an email with optional attachments using SMTP/SSL or STARTTLS based on env settings."""
     cfg = _get_settings()
+    if not (os.getenv("EMAIL_SMTP_HOST") or os.getenv("SMTP_HOST")):
+        return
     msg = EmailMessage()
     msg["From"] = sender
     msg["To"] = recipient

@@ -18,6 +18,7 @@ except Exception:  # pragma: no cover - optional in tests
 from core.trigger_words import contains_trigger, load_trigger_words
 
 
+
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 
@@ -57,6 +58,10 @@ def fetch_events(
 
     We fetch a time window around 'now' and then filter using trigger words.
     """
+    words = load_trigger_words()
+    if not words:
+        return []
+
     creds = _credentials()
     if build is None:
         return []  # graceful degradation for environments without google libs
@@ -80,12 +85,33 @@ def fetch_events(
     )
     events: List[Dict[str, Any]] = events_result.get("items", [])
 
-    words = load_trigger_words()
     filtered: List[Dict[str, Any]] = []
     for ev in events:
         summary = ev.get("summary") or ""
         description = ev.get("description") or ""
         content = f"{summary}\n{description}"
-        if not words or contains_trigger(content, words):
+        if contains_trigger(content, words):
             filtered.append(ev)
     return filtered
+
+
+def scheduled_poll() -> List[Dict[str, Any]]:
+    """Fetch and normalize calendar events for the orchestrator."""
+    events = fetch_events()
+    results: List[Dict[str, Any]] = []
+    for ev in events:
+        creator_info = ev.get("creator")
+        creator = (
+            creator_info.get("email")
+            if isinstance(creator_info, dict)
+            else creator_info
+        ) or ev.get("organizer", {}).get("email")
+        results.append(
+            {
+                "creator": creator,
+                "trigger_source": "calendar",
+                "recipient": creator,
+                "payload": ev,
+            }
+        )
+    return results
