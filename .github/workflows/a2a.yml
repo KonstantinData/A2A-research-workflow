@@ -30,11 +30,19 @@ jobs:
       - name: Run orchestrator
         run: |
           set -e
-          # Auto-Discovery: nehme vorhandenen Einstiegspunkt
-          if [ -f scripts/a2a_run.py ]; then python scripts/a2a_run.py; \
-          elif [ -f a2a_run.py ]; then python a2a_run.py; \
-          elif ls -1 **/*orchestrator*.py 2>/dev/null | head -n1 | xargs -r python; \
-          else echo "No entrypoint found"; exit 1; fi
+          if [ -f scripts/a2a_run.py ]; then
+            python scripts/a2a_run.py
+          elif [ -f a2a_run.py ]; then
+            python a2a_run.py
+          else
+            file=$(find . -type f -name "*orchestrator*.py" | head -n1)
+            if [ -n "$file" ]; then
+              python "$file"
+            else
+              echo "No entrypoint found"
+              exit 1
+            fi
+          fi
         env:
           HUBSPOT_ACCESS_TOKEN: ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
           GOOGLE_CLIENT_ID:     ${{ secrets.GOOGLE_CLIENT_ID }}
