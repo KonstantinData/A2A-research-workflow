@@ -1,7 +1,6 @@
 """Google Contacts integration."""
 
 from __future__ import annotations
-
 import os
 from typing import Any, Dict, List
 
@@ -66,7 +65,7 @@ def scheduled_poll() -> List[Dict[str, Any]]:
     contacts = fetch_contacts()
     normalized = []
     for contact in contacts:
-        # Support test-mocks with emailAddresses format
+        # Test-kompatibel (mocked test input)
         email = contact.get("email")
         if not email and "emailAddresses" in contact:
             email_entries = contact.get("emailAddresses", [])
