@@ -14,6 +14,9 @@ except Exception:  # pragma: no cover
     Request = None  # type: ignore
     build = None  # type: ignore
 
+from core.trigger_words import load_trigger_words, contains_trigger
+
+
 SCOPES = ["https://www.googleapis.com/auth/contacts.readonly"]
 
 
@@ -49,6 +52,10 @@ def fetch_contacts(page_size: int = 100) -> List[Dict[str, Any]]:
 
     We return a light-weight structure that the orchestrator will normalize.
     """
+    words = load_trigger_words()
+    if not words:
+        return []
+
     creds = _credentials()
     if build is None:
         return []
@@ -60,8 +67,40 @@ def fetch_contacts(page_size: int = 100) -> List[Dict[str, Any]]:
         .list(
             resourceName="people/me",
             pageSize=page_size,
-            personFields="names,emailAddresses,organizations,metadata",
+            personFields="names,emailAddresses,organizations,metadata,biographies",
         )
         .execute()
     )
-    return result.get("connections", [])
+    contacts: List[Dict[str, Any]] = result.get("connections", [])
+
+    filtered: List[Dict[str, Any]] = []
+    for c in contacts:
+        notes = c.get("notes") or ""
+        for bio in c.get("biographies", []):
+            notes += "\n" + bio.get("value", "")
+        names = " ".join(n.get("displayName", "") for n in c.get("names", []))
+        content = f"{names}\n{notes}"
+        if contains_trigger(content, words):
+            filtered.append(c)
+    return filtered
+
+
+def scheduled_poll() -> List[Dict[str, Any]]:
+    """Fetch and normalize contact triggers for the orchestrator."""
+    contacts = fetch_contacts()
+    results: List[Dict[str, Any]] = []
+    for c in contacts:
+        email = None
+        for item in c.get("emailAddresses", []):
+            if "value" in item:
+                email = item["value"]
+                break
+        results.append(
+            {
+                "creator": email,
+                "trigger_source": "contacts",
+                "recipient": email,
+                "payload": c,
+            }
+        )
+    return results

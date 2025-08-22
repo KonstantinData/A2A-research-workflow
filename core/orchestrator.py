@@ -42,9 +42,13 @@ def _retry(fn: Callable[[], Any], retries: int = 3, delay: float = 2.0) -> Any:
 def _normalize_events(events: Iterable[Dict[str, Any]]) -> List[Normalized]:
     norm: List[Normalized] = []
     for ev in events or []:
-        creator = (ev.get("creator") or {}).get("email") or ev.get("organizer", {}).get(
-            "email"
-        )
+        creator_info = ev.get("creator")
+        if isinstance(creator_info, dict):
+            creator = creator_info.get("email")
+        else:
+            creator = creator_info
+        if not creator:
+            creator = ev.get("organizer", {}).get("email")
         norm.append(
             {
                 "source": "calendar",
@@ -85,8 +89,14 @@ def gather_triggers(
     ] = google_contacts.fetch_contacts,
 ) -> List[Normalized]:
     """Collect triggers from calendar and contacts in one list."""
-    events = _retry(event_fetcher)
-    contacts = _retry(contact_fetcher)
+    try:
+        events = _retry(event_fetcher)
+    except Exception:
+        events = []
+    try:
+        contacts = _retry(contact_fetcher)
+    except Exception:
+        contacts = []
 
     triggers: List[Normalized] = []
     triggers.extend(_normalize_events(events or []))
@@ -156,10 +166,10 @@ def run(
 
     # Guard against duplicates (best-effort)
     if duplicate_checker(consolidated, existing_records):
-        return {"status": "duplicate", "meta": consolidated.get("meta", {})}
+        return consolidated
 
     # Export artifacts
-    out_dir = Path(os.getenv("OUTPUT_DIR", "output"))
+    out_dir = Path(os.getenv("OUTPUT_DIR", "output")) / "exports"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     pdf_path = out_dir / "report.pdf"
@@ -169,7 +179,8 @@ def run(
 
     # CRM + Email
     _retry(lambda: hubspot_upsert(consolidated))
-    _retry(lambda: hubspot_attach(pdf_path))
+    if feature_flags.ATTACH_PDF_TO_HUBSPOT:
+        _retry(lambda: hubspot_attach(pdf_path))
 
     def _send_email() -> None:
         sender = (
@@ -177,7 +188,8 @@ def run(
             or os.getenv("SMTP_FROM")
             or (os.getenv("SMTP_USER") or "")
         )
-        recipient = consolidated.get("creator") or os.getenv("MAIL_TO") or sender
+        data = consolidated if isinstance(consolidated, dict) else {}
+        recipient = data.get("creator") or os.getenv("MAIL_TO") or sender
         subject = f"A2A Research Report"
         body = "Attached report and data."
         email_sender.send_email(

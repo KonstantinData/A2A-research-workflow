@@ -2,7 +2,22 @@
 """Very small duplicate check helper."""
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable
+from typing import Any, Dict, Iterable, Optional
+
+
+def _extract_name(rec: Dict[str, Any]) -> Optional[str]:
+    payload = rec.get("payload") or {}
+    return rec.get("name") or payload.get("company_name") or payload.get("name")
+
+
+def _extract_website(rec: Dict[str, Any]) -> Optional[str]:
+    payload = rec.get("payload") or {}
+    return (
+        rec.get("website")
+        or rec.get("domain")
+        or payload.get("website")
+        or payload.get("domain")
+    )
 
 
 def is_duplicate(
@@ -10,21 +25,13 @@ def is_duplicate(
 ) -> bool:
     if not existing:
         return False
-    name = (record.get("payload") or {}).get("company_name") or (
-        record.get("payload") or {}
-    ).get("name")
-    website = (record.get("payload") or {}).get("website") or (
-        record.get("payload") or {}
-    ).get("domain")
+    name = (_extract_name(record) or "").lower()
+    website = (_extract_website(record) or "").lower()
     for r in existing:
-        rn = (r.get("payload") or {}).get("company_name") or (
-            r.get("payload") or {}
-        ).get("name")
-        rw = (r.get("payload") or {}).get("website") or (r.get("payload") or {}).get(
-            "domain"
-        )
-        if (name and rn and name.lower() == rn.lower()) or (
-            website and rw and website.lower() == rw.lower()
-        ):
+        rn = (_extract_name(r) or "").lower()
+        rw = (_extract_website(r) or "").lower()
+        if name and rn and name == rn:
+            return True
+        if website and rw and website == rw:
             return True
     return False
