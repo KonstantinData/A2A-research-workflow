@@ -1,4 +1,4 @@
-name: A2A Research Workflow CI
+name: A2A Research Workflow
 
 on:
   push:
@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+  schedule:
+    - cron: "*/10 * * * *"   # alle 10 Minuten
 
 jobs:
   build-and-test:
@@ -19,6 +21,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
@@ -40,12 +43,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
+      # Stellt sicher, dass 'import integrations' funktioniert
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
+
+      # Prüft, dass alle benötigten Secrets vorhanden sind (V2-Namen!)
       - name: Preflight env check
         env:
           GOOGLE_CLIENT_ID_V2: ${{ secrets.GOOGLE_CLIENT_ID_V2 }}
@@ -64,6 +73,7 @@ jobs:
 
       - name: Run orchestrator
         env:
+          PYTHONPATH: ${{ env.PYTHONPATH }}
           GOOGLE_CLIENT_ID_V2: ${{ secrets.GOOGLE_CLIENT_ID_V2 }}
           GOOGLE_CLIENT_SECRET_V2: ${{ secrets.GOOGLE_CLIENT_SECRET_V2 }}
           GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
@@ -73,6 +83,14 @@ jobs:
           EMAIL_SMTP_PASS: ${{ secrets.EMAIL_SMTP_PASS }}
         run: |
           set -e
+          # Optionaler Mini-Debug
+          python - <<'PY'
+import sys, os
+print("CWD:", os.getcwd())
+print("PYTHONPATH:", os.getenv("PYTHONPATH"))
+print("sys.path[0]:", sys.path[0])
+PY
+
           if [ -f scripts/a2a_run.py ]; then
             python scripts/a2a_run.py
           elif [ -f a2a_run.py ]; then
@@ -86,3 +104,14 @@ jobs:
               exit 1
             fi
           fi
+
+      # Optional: Artefakte (PDFs/Outputs) sichern
+      - name: Upload outputs (optional)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: outputs
+          path: |
+            output/**
+            **/*.pdf
+          if-no-files-found: ignore
