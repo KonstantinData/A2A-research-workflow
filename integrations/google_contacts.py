@@ -66,9 +66,16 @@ def scheduled_poll() -> List[Dict[str, Any]]:
     contacts = fetch_contacts()
     normalized = []
     for contact in contacts:
+        # Support test-mocks with emailAddresses format
         email = contact.get("email")
+        if not email and "emailAddresses" in contact:
+            email_entries = contact.get("emailAddresses", [])
+            if email_entries and isinstance(email_entries, list):
+                email = email_entries[0].get("value")
+
         if not email:
             continue
+
         normalized.append(
             {
                 "creator": email,
