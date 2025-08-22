@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import json
 from typing import Any, Dict, List
 
 try:
@@ -60,3 +59,22 @@ def fetch_contacts() -> List[Dict[str, Any]]:
                 }
             )
     return contacts
+
+
+def scheduled_poll() -> List[Dict[str, Any]]:
+    """Scheduled poll that returns normalized contact payloads."""
+    contacts = fetch_contacts()
+    normalized = []
+    for contact in contacts:
+        email = contact.get("email")
+        if not email:
+            continue
+        normalized.append(
+            {
+                "creator": email,
+                "trigger_source": "contacts",
+                "recipient": email,
+                "payload": contact,
+            }
+        )
+    return normalized
