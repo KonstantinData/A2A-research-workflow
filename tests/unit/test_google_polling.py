@@ -47,6 +47,24 @@ def test_contacts_scheduled_poll_normalizes(monkeypatch):
     ]
 
 
+def test_contacts_scheduled_poll_summarizes_notes(monkeypatch):
+    """Summary field added when feature flag enabled."""
+    contacts = [
+        {
+            "emailAddresses": [{"value": "bob@example.com"}],
+            "names": [{"displayName": "Bob"}],
+            "notes": "Bob is great. Loves testing.",
+        }
+    ]
+
+    monkeypatch.setattr(google_contacts, "fetch_contacts", lambda: contacts)
+    monkeypatch.setattr(google_contacts.feature_flags, "ENABLE_SUMMARY", True)
+
+    result = google_contacts.scheduled_poll()
+
+    assert result[0]["payload"]["summary"] == "Bob is great"
+
+
 def test_fetch_events_exits_early_when_no_triggers(tmp_path, monkeypatch):
     path = tmp_path / "triggers.txt"
     path.write_text("")

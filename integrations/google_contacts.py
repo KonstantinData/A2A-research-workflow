@@ -15,6 +15,7 @@ except Exception:  # pragma: no cover
     build = None  # type: ignore
 
 from core.trigger_words import load_trigger_words, contains_trigger
+from core import feature_flags, summarize
 
 
 SCOPES = ["https://www.googleapis.com/auth/contacts.readonly"]
@@ -81,7 +82,10 @@ def fetch_contacts(page_size: int = 100) -> List[Dict[str, Any]]:
         names = " ".join(n.get("displayName", "") for n in c.get("names", []))
         content = f"{names}\n{notes}"
         if contains_trigger(content, words):
-            filtered.append(c)
+            contact = dict(c)
+            if feature_flags.ENABLE_SUMMARY:
+                contact["summary"] = summarize.summarize_notes(notes or names)
+            filtered.append(contact)
     return filtered
 
 
@@ -90,6 +94,15 @@ def scheduled_poll() -> List[Dict[str, Any]]:
     contacts = fetch_contacts()
     results: List[Dict[str, Any]] = []
     for c in contacts:
+        # Ensure a summary is available when enabled.  This covers the case
+        # where ``fetch_contacts`` is stubbed in tests and does not add the
+        # summary itself.
+        if feature_flags.ENABLE_SUMMARY and "summary" not in c:
+            notes = c.get("notes") or ""
+            for bio in c.get("biographies", []):
+                notes += "\n" + bio.get("value", "")
+            c = dict(c)
+            c["summary"] = summarize.summarize_notes(notes)
         email = None
         for item in c.get("emailAddresses", []):
             if "value" in item:
