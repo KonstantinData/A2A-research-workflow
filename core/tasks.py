@@ -16,12 +16,26 @@ import sqlite3
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
+import logging
 
 # ---------------------------------------------------------------------------
 # Database setup
 # ---------------------------------------------------------------------------
 DEFAULT_DB_PATH = Path(__file__).with_name('tasks.db')
 DB_PATH = Path(os.getenv('TASKS_DB_PATH', DEFAULT_DB_PATH))
+
+logger = logging.getLogger(__name__)
+
+
+def _log_action(action: str, task: Dict[str, Any]) -> None:
+    payload = {
+        "action": action,
+        "task_id": task.get("id"),
+        "status": task.get("status"),
+        "assigned_to": task.get("employee_email"),
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+    logger.info(json.dumps(payload))
 
 
 def _connect() -> sqlite3.Connection:
@@ -92,7 +106,9 @@ def create_task(
             ),
         )
         conn.commit()
-    return task.to_dict()
+    record = task.to_dict()
+    _log_action("create", record)
+    return record
 
 
 def get_task(task_id: str) -> Optional[Dict[str, Any]]:
@@ -101,7 +117,7 @@ def get_task(task_id: str) -> Optional[Dict[str, Any]]:
         row = cur.fetchone()
         if not row:
             return None
-        return {
+        task = {
             'id': row['id'],
             'trigger': row['trigger'],
             'missing_fields': json.loads(row['missing_fields']),
@@ -110,6 +126,8 @@ def get_task(task_id: str) -> Optional[Dict[str, Any]]:
             'created_at': datetime.fromisoformat(row['created_at']),
             'updated_at': datetime.fromisoformat(row['updated_at']),
         }
+        _log_action("read", task)
+        return task
 
 
 def update_task_status(task_id: str, status: str) -> Optional[Dict[str, Any]]:
@@ -120,14 +138,31 @@ def update_task_status(task_id: str, status: str) -> Optional[Dict[str, Any]]:
             (status, now, task_id),
         )
         conn.commit()
-    return get_task(task_id)
+        cur = conn.execute('SELECT * FROM tasks WHERE id = ?', (task_id,))
+        row = cur.fetchone()
+    if not row:
+        return None
+    task = {
+        'id': row['id'],
+        'trigger': row['trigger'],
+        'missing_fields': json.loads(row['missing_fields']),
+        'employee_email': row['employee_email'],
+        'status': row['status'],
+        'created_at': datetime.fromisoformat(row['created_at']),
+        'updated_at': datetime.fromisoformat(row['updated_at']),
+    }
+    _log_action("update", task)
+    return task
 
 
 def delete_task(task_id: str) -> bool:
     with _connect() as conn:
         cur = conn.execute('DELETE FROM tasks WHERE id = ?', (task_id,))
         conn.commit()
-        return cur.rowcount > 0
+        deleted = cur.rowcount > 0
+    if deleted:
+        _log_action("delete", {"id": task_id, "status": "deleted", "employee_email": None})
+    return deleted
 
 
 def list_tasks() -> Iterable[Dict[str, Any]]:
