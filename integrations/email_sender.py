@@ -8,6 +8,16 @@ from typing import Iterable, Optional
 import mimetypes
 import os
 import smtplib
+import importlib.util
+import pathlib
+
+_notifications_spec = importlib.util.spec_from_file_location(
+    "a2a_notifications",
+    pathlib.Path(__file__).resolve().parents[1] / "logging" / "notifications.py",
+)
+notifications = importlib.util.module_from_spec(_notifications_spec)
+assert _notifications_spec.loader is not None
+_notifications_spec.loader.exec_module(notifications)  # type: ignore[attr-defined]
 
 
 def _env(name: str, default: Optional[str] = None) -> Optional[str]:
@@ -36,8 +46,11 @@ def send_email(
     subject: str,
     body: str,
     attachments: Optional[Iterable[Path]] = None,
+    *,
+    task_id: Optional[str] = None,
 ) -> None:
     """Send an email with optional attachments using SMTP/SSL or STARTTLS based on env settings."""
+    notifications.log_email(sender, recipient, subject, task_id)
     cfg = _get_settings()
     if not (os.getenv("EMAIL_SMTP_HOST") or os.getenv("SMTP_HOST")):
         return
