@@ -39,6 +39,7 @@ def test_send_reminders_records_history(monkeypatch):
     assert calls and calls[0][0] == "user@example.com"
     today = datetime.combine(datetime.now().date(), dtime.min)
     assert task_history.has_event_since(task["id"], "reminder_sent", today)
+    assert tasks.get_task(task["id"])["status"] == "reminded"
 
 
 def test_escalate_tasks_emails_admin(monkeypatch):
@@ -65,3 +66,50 @@ def test_escalate_tasks_emails_admin(monkeypatch):
     assert calls and calls[0]["recipient"] == "admin@condata.io"
     today = datetime.combine(datetime.now().date(), dtime.min)
     assert task_history.has_event_since(task["id"], "escalated", today)
+    assert tasks.get_task(task["id"])["status"] == "escalated"
+
+
+def test_scheduler_run_flow(monkeypatch):
+    reminder_calls = []
+    escalation_calls = []
+
+    def fake_reminder(email, fields, task_id=None):
+        reminder_calls.append(task_id)
+
+    def fake_escalation(sender, recipient, subject, body, attachments=None, task_id=None):
+        escalation_calls.append(task_id)
+
+    monkeypatch.setattr(email_client, "send_email", fake_reminder)
+    monkeypatch.setattr(email_sender, "send_email", fake_escalation)
+
+    task = tasks.create_task("trigger", ["field"], "user@example.com")
+
+    scheduler = ReminderScheduler()
+
+    times = [
+        datetime(2023, 1, 1, 9, 0),
+        datetime(2023, 1, 1, 10, 0),
+        datetime(2023, 1, 1, 15, 0),
+    ]
+
+    def fake_now():
+        if times:
+            return times.pop(0)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(scheduler, "_now", fake_now)
+
+    sleep_calls = []
+
+    def fake_sleep(seconds):
+        sleep_calls.append(seconds)
+
+    monkeypatch.setattr(ReminderScheduler, "_sleep", lambda self, s: fake_sleep(s))
+
+    with pytest.raises(KeyboardInterrupt):
+        scheduler.run_forever()
+
+    assert reminder_calls == [task["id"]]
+    assert escalation_calls == [task["id"]]
+    assert sleep_calls == [3600, 18000]
+    assert tasks.get_task(task["id"])["status"] == "escalated"
