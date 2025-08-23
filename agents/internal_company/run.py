@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from . import fetch, normalize
+from .plugins import INTERNAL_SOURCES
 
 Normalized = Dict[str, Any]
 Raw = Dict[str, Any]
@@ -24,5 +24,14 @@ def run(trigger: Normalized) -> Normalized:
         Structured result following the common schema of ``source``,
         ``creator``, ``recipient`` and ``payload``.
     """
-    raw: Raw = fetch.fetch(trigger)
-    return normalize.normalize(trigger, raw)
+    result: Normalized = {
+        "source": "internal_company_research",
+        "creator": trigger.get("creator"),
+        "recipient": trigger.get("recipient"),
+        "payload": {},
+    }
+    for source in INTERNAL_SOURCES:
+        payload = source.run(trigger).get("payload", {})
+        if isinstance(payload, dict):
+            result["payload"].update(payload)
+    return result
