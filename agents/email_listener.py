@@ -29,7 +29,15 @@ from core import tasks as tasks_db
 # ---------------------------------------------------------------------------
 
 def _get_body(msg) -> str:
-    """Return the plain text body from an ``email.message.Message``."""
+    """Return the plain text body from an ``email.message.Message``.
+
+    E‑mail messages can be multipart (for example containing both a text and an
+    HTML version or file attachments).  Only the ``text/plain`` parts are
+    relevant for the listener, so this helper walks the message tree and
+    extracts the payload from each plain text part.  Attachments and HTML
+    segments are ignored.  The resulting fragments are normalised to UTF‑8 and
+    joined together with newlines.
+    """
     if msg.is_multipart():
         parts = []
         for part in msg.walk():
