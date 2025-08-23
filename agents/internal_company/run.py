@@ -1,12 +1,13 @@
-"""Agent 1 - internal company research."""
+"""Orchestrate internal company research fetch and normalize."""
 
 from __future__ import annotations
 
 from typing import Any, Dict
 
-from agents.internal_company.run import run as internal_run
+from . import fetch, normalize
 
 Normalized = Dict[str, Any]
+Raw = Dict[str, Any]
 
 
 def run(trigger: Normalized) -> Normalized:
@@ -23,4 +24,5 @@ def run(trigger: Normalized) -> Normalized:
         Structured result following the common schema of ``source``,
         ``creator``, ``recipient`` and ``payload``.
     """
-    return internal_run(trigger)
+    raw: Raw = fetch.fetch(trigger)
+    return normalize.normalize(trigger, raw)
