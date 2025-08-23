@@ -43,9 +43,13 @@ def run(trigger: Normalized) -> Normalized:
     try:
         validated = NormalizedInternalCompany(**result)
     except ValueError as exc:
-        missing_fields = _parse_missing_fields(str(exc))
+        # Normalise the missing fields so the same ordered list is used for
+        # task creation and for the notification e-mail.
+        missing_fields = list(_parse_missing_fields(str(exc)))
         employee_email = _extract_email(trigger.get("recipient"))
-        task = create_task("internal_company_research", missing_fields, employee_email)
+        task = create_task(
+            "internal_company_research", missing_fields, employee_email
+        )
         email_client.send_email(employee_email, missing_fields)
         return {
             "source": result["source"],

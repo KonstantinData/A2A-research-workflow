@@ -17,6 +17,10 @@ from . import email_sender
 def send_email(employee_email: str, missing_fields: Iterable[str]) -> None:
     """Send a notification e-mail about missing fields.
 
+    The function composes a short message listing the ``missing_fields``
+    and delegates actual delivery to :mod:`integrations.email_sender` so the
+    existing SMTP configuration is reused.
+
     Parameters
     ----------
     employee_email:
@@ -25,15 +29,22 @@ def send_email(employee_email: str, missing_fields: Iterable[str]) -> None:
         Iterable of field names that are missing from the research
         payload.
     """
+
     sender = (
         os.getenv("MAIL_FROM")
         or os.getenv("SMTP_FROM")
         or (os.getenv("SMTP_USER") or "")
     )
-    fields = ", ".join(missing_fields)
+
+    # Normalise and sort the fields so the e-mail output is deterministic and
+    # easier to read for the recipient.
+    fields_list = sorted({f for f in missing_fields if f})
+    fields = ", ".join(fields_list)
+
     subject = "Missing information for research"
     body = (
         "Please provide the following missing fields: "
-        f"{fields}" if fields else "No fields specified."
+        + (fields if fields else "No fields specified.")
     )
+
     email_sender.send_email(sender, employee_email, subject, body)
