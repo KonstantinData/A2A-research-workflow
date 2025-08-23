@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Any, Dict
 
 from .plugins import INTERNAL_SOURCES
+from .normalize import NormalizedInternalCompany
 
 Normalized = Dict[str, Any]
 Raw = Dict[str, Any]
@@ -34,4 +36,6 @@ def run(trigger: Normalized) -> Normalized:
         payload = source.run(trigger).get("payload", {})
         if isinstance(payload, dict):
             result["payload"].update(payload)
-    return result
+
+    validated = NormalizedInternalCompany(**result)
+    return asdict(validated)
