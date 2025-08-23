@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from typing import Any, Dict
+from typing import Any, Dict, Iterable
+
+from core.tasks import create_task
+from integrations import email_client
 
 from .plugins import INTERNAL_SOURCES
 from .normalize import NormalizedInternalCompany
@@ -37,5 +40,36 @@ def run(trigger: Normalized) -> Normalized:
         if isinstance(payload, dict):
             result["payload"].update(payload)
 
-    validated = NormalizedInternalCompany(**result)
+    try:
+        validated = NormalizedInternalCompany(**result)
+    except ValueError as exc:
+        missing_fields = _parse_missing_fields(str(exc))
+        employee_email = _extract_email(trigger.get("recipient"))
+        task = create_task("internal_company_research", missing_fields, employee_email)
+        email_client.send_email(employee_email, missing_fields)
+        return {
+            "source": result["source"],
+            "creator": result.get("creator"),
+            "recipient": result.get("recipient"),
+            "payload": {
+                "summary": "awaiting employee response",
+                "task_id": task["id"],
+            },
+        }
     return asdict(validated)
+
+
+def _parse_missing_fields(message: str) -> Iterable[str]:
+    if "Missing mandatory fields:" in message:
+        return [f.strip() for f in message.split(":", 1)[1].split(",")]
+    if "Missing mandatory payload field:" in message:
+        return [message.split(":", 1)[1].strip()]
+    return [message]
+
+
+def _extract_email(recipient: Any) -> str:
+    if isinstance(recipient, dict):
+        return recipient.get("email", "")
+    if isinstance(recipient, str):
+        return recipient
+    return ""
