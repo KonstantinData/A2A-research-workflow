@@ -26,8 +26,8 @@ def _db_tmp(monkeypatch, tmp_path):
 def test_send_reminders_records_history(monkeypatch):
     calls = []
 
-    def fake_send(email, fields):
-        calls.append((email, fields))
+    def fake_send(email, fields, task_id=None):
+        calls.append((email, fields, task_id))
 
     monkeypatch.setattr(email_client, "send_email", fake_send)
 
@@ -44,12 +44,13 @@ def test_send_reminders_records_history(monkeypatch):
 def test_escalate_tasks_emails_admin(monkeypatch):
     calls = []
 
-    def fake_send(sender, recipient, subject, body, attachments=None):
+    def fake_send(sender, recipient, subject, body, attachments=None, task_id=None):
         calls.append({
             "sender": sender,
             "recipient": recipient,
             "subject": subject,
             "body": body,
+            "task_id": task_id,
         })
 
     monkeypatch.setenv("MAIL_FROM", "bot@example.com")

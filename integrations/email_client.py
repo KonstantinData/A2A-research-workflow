@@ -8,13 +8,18 @@ an employee.  The actual SMTP sending is delegated to
 """
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, Optional
 import os
 
 from . import email_sender
 
 
-def send_email(employee_email: str, missing_fields: Iterable[str]) -> None:
+def send_email(
+    employee_email: str,
+    missing_fields: Iterable[str],
+    *,
+    task_id: Optional[str] = None,
+) -> None:
     """Send a notification e-mail about missing fields.
 
     The function composes a short message listing the ``missing_fields``
@@ -47,4 +52,7 @@ def send_email(employee_email: str, missing_fields: Iterable[str]) -> None:
         + (fields if fields else "No fields specified.")
     )
 
-    email_sender.send_email(sender, employee_email, subject, body)
+    kwargs = {}
+    if task_id is not None:
+        kwargs["task_id"] = task_id
+    email_sender.send_email(sender, employee_email, subject, body, **kwargs)

@@ -50,7 +50,9 @@ def run(trigger: Normalized) -> Normalized:
         task = create_task(
             "internal_company_research", missing_fields, employee_email
         )
-        email_client.send_email(employee_email, missing_fields)
+        email_client.send_email(
+            employee_email, missing_fields, task_id=task["id"]
+        )
         return {
             "source": result["source"],
             "creator": result.get("creator"),

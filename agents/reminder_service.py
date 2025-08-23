@@ -22,7 +22,9 @@ class ReminderScheduler:
     def send_reminders(self) -> None:
         """Send reminder e-mails for all open tasks and record history."""
         for task in self._open_tasks():
-            email_client.send_email(task["employee_email"], task["missing_fields"])
+            email_client.send_email(
+                task["employee_email"], task["missing_fields"], task_id=task["id"]
+            )
             task_history.record_event(task["id"], "reminder_sent")
 
     def escalate_tasks(self) -> None:
@@ -40,7 +42,9 @@ class ReminderScheduler:
             )
             subject = f"Escalation: no response for task {task['id']}"
             body = "No response was received for the reminder sent at 10:00."
-            email_sender.send_email(sender, "admin@condata.io", subject, body)
+            email_sender.send_email(
+                sender, "admin@condata.io", subject, body, task_id=task["id"]
+            )
             task_history.record_event(task["id"], "escalated")
 
     def run_forever(self) -> None:

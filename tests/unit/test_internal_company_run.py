@@ -17,9 +17,10 @@ def test_run_creates_task_for_missing_creator_and_recipient(monkeypatch):
         captured["employee_email"] = employee_email
         return {"id": "task-1"}
 
-    def fake_send_email(email, fields):
+    def fake_send_email(email, fields, task_id=None):
         captured["email"] = email
         captured["fields_sent"] = list(fields)
+        captured["task_id"] = task_id
 
     monkeypatch.setattr(run_module, "create_task", fake_create_task)
     monkeypatch.setattr(run_module.email_client, "send_email", fake_send_email)
