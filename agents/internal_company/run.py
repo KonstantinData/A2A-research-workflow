@@ -6,7 +6,8 @@ from dataclasses import asdict
 from typing import Any, Dict, Iterable
 
 from core.tasks import create_task
-from integrations import email_client
+from core.feature_flags import ENABLE_GRAPH_STORAGE
+from integrations import email_client, graph_storage
 
 from .plugins import INTERNAL_SOURCES
 from .normalize import NormalizedInternalCompany
@@ -53,7 +54,7 @@ def run(trigger: Normalized) -> Normalized:
         email_client.send_email(
             employee_email, missing_fields, task_id=task["id"]
         )
-        return {
+        final_result = {
             "source": result["source"],
             "creator": result.get("creator"),
             "recipient": result.get("recipient"),
@@ -62,7 +63,13 @@ def run(trigger: Normalized) -> Normalized:
                 "task_id": task["id"],
             },
         }
-    return asdict(validated)
+        if ENABLE_GRAPH_STORAGE:
+            graph_storage.store_result(final_result)
+        return final_result
+    final_result = asdict(validated)
+    if ENABLE_GRAPH_STORAGE:
+        graph_storage.store_result(final_result)
+    return final_result
 
 
 def _parse_missing_fields(message: str) -> Iterable[str]:

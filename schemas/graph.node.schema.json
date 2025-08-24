@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Graph Node Schema",
+  "type": "object",
+  "properties": {
+    "id": {"type": "string"},
+    "type": {"type": "string"},
+    "properties": {"type": "object"}
+  },
+  "required": ["id", "type"]
+}
