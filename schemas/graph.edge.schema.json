@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Graph Edge Schema",
+  "type": "object",
+  "properties": {
+    "source": {"type": "string"},
+    "target": {"type": "string"},
+    "type": {"type": "string"},
+    "properties": {"type": "object"}
+  },
+  "required": ["source", "target", "type"]
+}
