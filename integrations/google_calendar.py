@@ -106,9 +106,52 @@ def _utc_now() -> dt.datetime:
     return dt.datetime.now(dt.timezone.utc)
 
 
+def _int_from_env(name: str, default: int) -> int:
+    """Return ``int(os.getenv(name, default))`` with a safe fallback."""
+    try:
+        return int(os.getenv(name, default))
+    except Exception:
+        return default
+
+
+def _calendar_ids(primary_id: str) -> List[str]:
+    """Return calendar IDs to poll.
+
+    Currently limited to the primary calendar.  TODO: support multiple calendars
+    (e.g. Google Workspace or additional accounts).
+    """
+    return [primary_id]
+
+
+_PROCESSED_PATH = Path("logs") / "processed_events.jsonl"
+
+
+def _already_processed(event_id: str, updated: str) -> bool:
+    """Check ``processed_events.jsonl`` for a matching id+updated pair."""
+    if not _PROCESSED_PATH.exists():
+        return False
+    try:
+        with _PROCESSED_PATH.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    continue
+                if rec.get("id") == event_id and rec.get("updated") == updated:
+                    return True
+    except Exception:
+        return False
+    return False
+
+
+def _mark_processed(event_id: str, updated: str) -> None:
+    """Record an event as processed."""
+    append_jsonl(_PROCESSED_PATH, {"id": event_id, "updated": updated})
+
+
 def fetch_events(
-    minutes_back: int = 30,
-    minutes_forward: int = 120,
+    minutes_back: int | None = None,
+    minutes_forward: int | None = None,
     calendar_id: str = "primary",
     max_results_per_page: int = 250,
 ) -> List[Dict[str, Any]]:
@@ -118,7 +161,20 @@ def fetch_events(
     - Fails hard if trigger words are not configured or Google libs are missing.
     - Paginates through all results within the time window.
     """
+    minutes_back = (
+        minutes_back
+        if minutes_back is not None
+        else _int_from_env("CALENDAR_MINUTES_BACK", 10080)
+    )
+    minutes_forward = (
+        minutes_forward
+        if minutes_forward is not None
+        else _int_from_env("CALENDAR_MINUTES_FWD", 86400)
+    )
+
     filtered: List[Dict[str, Any]] = []
+    total = 0
+    processed = 0
     try:
         words = load_trigger_words()
         if not words:
@@ -127,26 +183,39 @@ def fetch_events(
             )
 
         now = _utc_now()
-        time_min = (now - dt.timedelta(minutes=minutes_back)).isoformat()
-        time_max = (now + dt.timedelta(minutes=minutes_forward)).isoformat()
+        time_min = (
+            now - dt.timedelta(minutes=minutes_back)
+        ).isoformat().replace("+00:00", "Z")
+        time_max = (
+            now + dt.timedelta(minutes=minutes_forward)
+        ).isoformat().replace("+00:00", "Z")
 
         service = _service()
 
-        page_token: Optional[str] = None
-        while True:
-            req = service.events().list(
-                calendarId=calendar_id,
-                timeMin=time_min,
-                timeMax=time_max,
-                singleEvents=True,
-                orderBy="startTime",
-                maxResults=max_results_per_page,
-                pageToken=page_token,
-            )
-            resp = req.execute()
-            items: List[Dict[str, Any]] = resp.get("items", [])  # type: ignore[assignment]
-            for ev in items:
-                if contains_trigger(ev, words):
+        for cid in _calendar_ids(calendar_id):
+            page_token: Optional[str] = None
+            while True:
+                req = service.events().list(
+                    calendarId=cid,
+                    timeMin=time_min,
+                    timeMax=time_max,
+                    singleEvents=True,
+                    orderBy="startTime",
+                    maxResults=max_results_per_page,
+                    pageToken=page_token,
+                )
+                resp = req.execute()
+                items: List[Dict[str, Any]] = resp.get("items", [])  # type: ignore[assignment]
+                total += len(items)
+                for ev in items:
+                    uid = ev.get("id") or ev.get("iCalUID")
+                    updated = ev.get("updated")
+                    if not uid or not updated:
+                        continue
+                    if _already_processed(uid, updated):
+                        continue
+                    if not contains_trigger(ev, words):
+                        continue
                     description = ev.get("description") or ""
                     ev = dict(ev)
                     notes = {
@@ -156,6 +225,8 @@ def fetch_events(
                     }
                     ev["notes_extracted"] = notes
                     filtered.append(ev)
+                    processed += 1
+                    _mark_processed(uid, updated)
                     append_jsonl(
                         _LOG_PATH,
                         {
@@ -165,9 +236,23 @@ def fetch_events(
                             "payload": ev,
                         },
                     )
-            page_token = resp.get("nextPageToken")
-            if not page_token:
-                break
+                page_token = resp.get("nextPageToken")
+                if not page_token:
+                    break
+
+        append_jsonl(
+            _LOG_PATH,
+            {
+                "timestamp": _utc_now().isoformat() + "Z",
+                "source": "calendar",
+                "status": "fetch",
+                "calendar_id": calendar_id,
+                "time_min": time_min,
+                "time_max": time_max,
+                "events_total": total,
+                "events_new": processed,
+            },
+        )
     except Exception as e:
         append_jsonl(
             _LOG_PATH,

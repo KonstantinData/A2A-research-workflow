@@ -186,7 +186,7 @@ def run(
         log_event(
             {
                 "status": "no_triggers",
-                "details": "Polling finished without matches",
+                "message": "No calendar or contact events matched trigger words",
             }
         )
         sys.exit(0)
@@ -196,7 +196,18 @@ def run(
         for fn in (researchers if researchers is not None else _default_researchers()):
             if getattr(fn, "pro", False) and not feature_flags.ENABLE_PRO_SOURCES:
                 continue
-            research_results.append(_retry(lambda f=fn, t=trig: f(t)))
+            res = _retry(lambda f=fn, t=trig: f(t))
+            if isinstance(res, dict) and res.get("status") == "missing_fields":
+                log_event(
+                    {
+                        "status": "pending",
+                        "message": "Task paused until missing fields are provided",
+                        "agent": res.get("agent"),
+                        "missing": res.get("missing"),
+                    }
+                )
+                sys.exit(0)
+            research_results.append(res)
 
     # Merge results
     consolidated = consolidate_fn(research_results)
