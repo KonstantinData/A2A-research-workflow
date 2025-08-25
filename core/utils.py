@@ -8,7 +8,9 @@ def normalize_text(text: str) -> str:
     # Alles klein
     text = text.lower()
     # Alle Varianten von Bindestrichen vereinheitlichen
-    text = text.replace("–", "-").replace("—", "-").replace("‐", "-")
+    dash_variants = ["–", "—", "‐", "‑", "-", "‒", "―"]  # includes U+2011 (non-breaking hyphen)
+    for d in dash_variants:
+        text = text.replace(d, "-")
     # Umlaute vereinheitlichen (optional für bessere Treffer)
     text = (
         text.replace("ä", "ae")
