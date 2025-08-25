@@ -6,11 +6,23 @@ import time
 from datetime import datetime, time as dtime, timedelta
 
 import os
+import importlib.util as _ilu
+from pathlib import Path
 
 import logging
 
 from core import tasks, task_history
 from integrations import email_client, email_sender
+from agents.templates import build_reminder_email
+
+# JSONL logging for reminder notifications
+_JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
+_spec = _ilu.spec_from_file_location("jsonl_sink", _JSONL_PATH)
+_mod = _ilu.module_from_spec(_spec)
+assert _spec and _spec.loader
+_spec.loader.exec_module(_mod)  # type: ignore[attr-defined]
+append_jsonl = _mod.append
+_REMINDER_LOG = Path("logs") / "workflows" / "reminders.jsonl"
 
 
 logger = logging.getLogger(__name__)
@@ -107,4 +119,28 @@ class ReminderScheduler:
         time.sleep(seconds)
 
 
-__all__ = ["ReminderScheduler"]
+def check_and_notify(triggers: list[dict]) -> None:
+    """Send reminder e-mails for triggers missing information."""
+    for trig in triggers:
+        if trig.get("status") == "missing_info":
+            email = build_reminder_email(
+                source=trig["source"],
+                recipient=trig["recipient"],
+                missing=trig["missing"],
+            )
+            email_sender.send(
+                to=email["recipient"],
+                subject=email["subject"],
+                body=email["body"],
+            )
+            log_event = {
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "status": "reminder_sent",
+                "source": trig["source"],
+                "recipient": trig["recipient"],
+                "missing": trig["missing"],
+            }
+            append_jsonl(_REMINDER_LOG, log_event)
+
+
+__all__ = ["ReminderScheduler", "check_and_notify"]

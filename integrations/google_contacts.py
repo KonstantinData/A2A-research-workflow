@@ -2,7 +2,11 @@
 """Google Contacts (People API) integration (LIVE, strict env, no silent fallbacks)."""
 from __future__ import annotations
 
+import datetime as dt
+import importlib.util as _ilu
+import json
 import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 # Google client libs are optional at import time (tests),
@@ -19,7 +23,24 @@ except Exception:  # pragma: no cover
     HttpError = Exception  # type: ignore[assignment]
 
 from core.trigger_words import load_trigger_words, contains_trigger
-from core import feature_flags, summarize
+from core import feature_flags, summarize, parser
+from . import email_sender
+
+# Local JSONL sink
+_JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
+_spec = _ilu.spec_from_file_location("jsonl_sink", _JSONL_PATH)
+_mod = _ilu.module_from_spec(_spec)
+assert _spec and _spec.loader
+_spec.loader.exec_module(_mod)  # type: ignore[attr-defined]
+append_jsonl = _mod.append
+
+_LOG_PATH = Path("logs") / "workflows" / "contacts.jsonl"
+
+
+def _load_required_fields(source: str) -> List[str]:
+    path = Path(__file__).resolve().parents[1] / "config" / "required_fields.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return data.get(source, [])
 
 SCOPES = ["https://www.googleapis.com/auth/contacts.readonly"]
 
@@ -108,18 +129,18 @@ def fetch_contacts(
     - Paginates through connections up to `page_limit` pages.
     - Optionally adds a lightweight summary when ENABLE_SUMMARY is true.
     """
-    words = load_trigger_words()
-    if not words:
-        raise RuntimeError(
-            "Google Contacts: no trigger words configured (core.trigger_words)"
-        )
-
-    service = _service()
-
     filtered: List[Dict[str, Any]] = []
-    page_token: Optional[str] = None
-    pages = 0
     try:
+        words = load_trigger_words()
+        if not words:
+            raise RuntimeError(
+                "Google Contacts: no trigger words configured (core.trigger_words)"
+            )
+
+        service = _service()
+
+        page_token: Optional[str] = None
+        pages = 0
         while True:
             req = (
                 service.people()
@@ -144,12 +165,36 @@ def fetch_contacts(
                     person = dict(p)  # shallow copy
                     if feature_flags.ENABLE_SUMMARY:
                         person["summary"] = summarize.summarize_notes(blob or names)
+                    notes = {
+                        "company": parser.extract_company(blob),
+                        "domain": parser.extract_domain(blob),
+                        "phone": parser.extract_phone(blob),
+                    }
+                    person["notes_extracted"] = notes
                     filtered.append(person)
+                    append_jsonl(
+                        _LOG_PATH,
+                        {
+                            "timestamp": dt.datetime.utcnow().isoformat() + "Z",
+                            "source": "contacts",
+                            "status": "hit",
+                            "payload": person,
+                        },
+                    )
             page_token = resp.get("nextPageToken")
             pages += 1
             if not page_token or pages >= page_limit:
                 break
-    except HttpError as e:
+    except Exception as e:
+        append_jsonl(
+            _LOG_PATH,
+            {
+                "timestamp": dt.datetime.utcnow().isoformat() + "Z",
+                "source": "contacts",
+                "status": "error",
+                "error": str(e),
+            },
+        )
         raise RuntimeError(f"Google Contacts API error: {e}") from e
 
     return filtered
@@ -168,6 +213,7 @@ def scheduled_poll() -> List[Dict[str, Any]]:
       }
     """
     contacts = fetch_contacts()
+    required = _load_required_fields("contacts")
     results: List[Dict[str, Any]] = []
     for c in contacts:
         # Ensure a summary is available when enabled (even if fetch_contacts was mocked)
@@ -178,13 +224,42 @@ def scheduled_poll() -> List[Dict[str, Any]]:
             )
             c["summary"] = summarize.summarize_notes(_notes_blob(c) or names)
 
-        email = _primary_email(c)
+        email = _primary_email(c) or ""
+        notes_blob = _notes_blob(c)
+        notes = c.get("notes_extracted") or {
+            "company": parser.extract_company(notes_blob),
+            "domain": parser.extract_domain(notes_blob),
+            "phone": parser.extract_phone(notes_blob),
+        }
+        names_list = [n.get("displayName") for n in c.get("names", []) if n.get("displayName")]
+        payload: Dict[str, Any] = {
+            "names": names_list,
+            "company": notes.get("company"),
+            "domain": notes.get("domain"),
+            "email": email,
+            "phone": notes.get("phone"),
+            "notes_extracted": notes,
+        }
+        if "summary" in c:
+            payload["summary"] = c["summary"]
+
+        missing = [f for f in required if not payload.get(f)]
+        if missing:
+            body = (
+                "Please provide the following missing fields: " + ", ".join(missing)
+            )
+            email_sender.send(
+                to=email,
+                subject="Information missing for contact entry",
+                body=body,
+            )
+
         results.append(
             {
                 "creator": email,
                 "trigger_source": "contacts",
                 "recipient": email,
-                "payload": c,
+                "payload": payload,
             }
         )
     return results

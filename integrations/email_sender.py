@@ -113,3 +113,25 @@ def send_email(
             if cfg["user"]:
                 smtp.login(cfg["user"], cfg["password"])
             smtp.send_message(msg)
+
+
+def send(
+    *,
+    to: str,
+    subject: str,
+    body: str,
+    sender: Optional[str] = None,
+    attachments: Optional[Iterable[Path]] = None,
+    task_id: Optional[str] = None,
+) -> None:
+    """Convenience wrapper using environment defaults for the sender.
+
+    Parameters are passed to :func:`send_email` after determining the sender
+    address from environment variables (``MAIL_FROM``, ``SMTP_FROM`` or
+    ``SMTP_USER``).
+    """
+
+    sender_addr = sender or os.getenv("MAIL_FROM") or os.getenv("SMTP_FROM") or (
+        os.getenv("SMTP_USER") or ""
+    )
+    send_email(sender_addr, to, subject, body, attachments, task_id=task_id)

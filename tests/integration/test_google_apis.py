@@ -9,8 +9,13 @@ from integrations import google_calendar, google_contacts
 
 
 def test_calendar_scheduled_poll_integration(monkeypatch):
-    events = [{"creator": "alice@example.com", "summary": "Demo"}]
-    monkeypatch.setattr(google_calendar, "fetch_events", lambda: events)
+    event = {
+        "creator": {"email": "alice@example.com"},
+        "summary": "Demo",
+        "description": "Firma DemoCorp\ndemocorp.com\n+49 2222222",
+    }
+    monkeypatch.setattr(google_calendar, "fetch_events", lambda: [event])
+    monkeypatch.setattr(google_calendar.email_sender, "send", lambda *a, **k: None)
 
     result = google_calendar.scheduled_poll()
 
@@ -19,16 +24,31 @@ def test_calendar_scheduled_poll_integration(monkeypatch):
             "creator": "alice@example.com",
             "trigger_source": "calendar",
             "recipient": "alice@example.com",
-            "payload": events[0],
+            "payload": {
+                "title": "Demo",
+                "description": "Firma DemoCorp\ndemocorp.com\n+49 2222222",
+                "company": "DemoCorp",
+                "domain": "democorp.com",
+                "email": "alice@example.com",
+                "phone": "+49 2222222",
+                "notes_extracted": {
+                    "company": "DemoCorp",
+                    "domain": "democorp.com",
+                    "phone": "+49 2222222",
+                },
+            },
         }
     ]
 
 
 def test_contacts_scheduled_poll_integration(monkeypatch):
-    contacts = [
-        {"emailAddresses": [{"value": "bob@example.com"}], "names": [], "notes": ""}
-    ]
-    monkeypatch.setattr(google_contacts, "fetch_contacts", lambda: contacts)
+    contact = {
+        "emailAddresses": [{"value": "bob@example.com"}],
+        "names": [{"displayName": "Bob"}],
+        "notes": "Firma Bar Inc\nbar.com\n+49 3333333",
+    }
+    monkeypatch.setattr(google_contacts, "fetch_contacts", lambda: [contact])
+    monkeypatch.setattr(google_contacts.email_sender, "send", lambda *a, **k: None)
 
     result = google_contacts.scheduled_poll()
 
@@ -37,6 +57,17 @@ def test_contacts_scheduled_poll_integration(monkeypatch):
             "creator": "bob@example.com",
             "trigger_source": "contacts",
             "recipient": "bob@example.com",
-            "payload": contacts[0],
+            "payload": {
+                "names": ["Bob"],
+                "company": "Bar Inc",
+                "domain": "bar.com",
+                "email": "bob@example.com",
+                "phone": "+49 3333333",
+                "notes_extracted": {
+                    "company": "Bar Inc",
+                    "domain": "bar.com",
+                    "phone": "+49 3333333",
+                },
+            },
         }
     ]

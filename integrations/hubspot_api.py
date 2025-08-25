@@ -40,6 +40,28 @@ def upsert_company(data: Dict[str, Any]) -> None:
         pass
 
 
+def check_existing_report(company_id: str) -> Optional[Dict[str, Any]]:
+    """Return latest report file for ``company_id`` if present."""
+    token = _token()
+    if not token:
+        return None
+
+    url = "https://api.hubapi.com/files/v3/files/search"
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = {
+        "filters": [
+            {"propertyName": "name", "operator": "CONTAINS_TOKEN", "value": "report"},
+            {"propertyName": "companyId", "operator": "EQ", "value": company_id},
+        ],
+        "limit": 1,
+        "sorts": ["-createdAt"],
+    }
+    resp = requests.post(url, headers=headers, json=payload, timeout=30)
+    resp.raise_for_status()
+    results = resp.json().get("results", [])
+    return results[0] if results else None
+
+
 def attach_pdf(path: Path, company_id: str) -> Dict[str, str]:
     """Upload ``path`` to HubSpot and associate with a company."""
     token = _token()
