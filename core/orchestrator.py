@@ -179,7 +179,11 @@ def run(
 
     # CRM + Email
     _retry(lambda: hubspot_upsert(consolidated))
-    if feature_flags.ATTACH_PDF_TO_HUBSPOT and os.getenv("HUBSPOT_ACCESS_TOKEN"):
+    if (
+        feature_flags.ATTACH_PDF_TO_HUBSPOT
+        and os.getenv("HUBSPOT_ACCESS_TOKEN")
+        and os.getenv("HUBSPOT_PORTAL_ID")
+    ):
         _retry(lambda: hubspot_attach(pdf_path, "0"))
 
     def _send_email() -> None:

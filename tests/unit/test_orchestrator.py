@@ -35,6 +35,7 @@ def test_run_pipeline_respects_feature_flags(monkeypatch):
     monkeypatch.setattr(feature_flags, "ENABLE_PRO_SOURCES", False)
     monkeypatch.setattr(feature_flags, "ATTACH_PDF_TO_HUBSPOT", True)
     monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "token")
+    monkeypatch.setenv("HUBSPOT_PORTAL_ID", "portal")
 
     events = [{"creator": "carol@example.com"}]
     contacts = []
