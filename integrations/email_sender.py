@@ -1,5 +1,5 @@
 # integrations/email_sender.py
-"""SMTP email sender utility."""
+"""SMTP email sender utility (LIVE, strict env, no silent fallbacks)."""
 from __future__ import annotations
 
 from email.message import EmailMessage
@@ -11,6 +11,7 @@ import smtplib
 import importlib.util
 import pathlib
 
+# Structured notification logging (file-local import to avoid hard deps elsewhere)
 _notifications_spec = importlib.util.spec_from_file_location(
     "a2a_notifications",
     pathlib.Path(__file__).resolve().parents[1] / "logging" / "notifications.py",
@@ -20,17 +21,39 @@ assert _notifications_spec.loader is not None
 _notifications_spec.loader.exec_module(notifications)  # type: ignore[attr-defined]
 
 
-def _env(name: str, default: Optional[str] = None) -> Optional[str]:
-    val = os.getenv(name)
-    return val if val is not None else default
+def _env_required(name: str) -> str:
+    try:
+        return os.environ[name]
+    except KeyError as e:
+        raise RuntimeError(f"Missing required SMTP setting: {name}") from e
+
+
+def _env_optional(name: str, default: Optional[str] = None) -> Optional[str]:
+    v = os.getenv(name)
+    return v if v is not None else default
+
+
+def _bool_from_env(name: str, default_true: bool = True) -> bool:
+    v = os.getenv(name)
+    if v is None:
+        return default_true
+    return str(v).strip().lower() not in {"0", "false", "no", "off"}
 
 
 def _get_settings() -> dict:
-    host = _env("EMAIL_SMTP_HOST") or _env("SMTP_HOST") or "localhost"
-    port = int(_env("EMAIL_SMTP_PORT") or _env("SMTP_PORT") or "465")
-    user = _env("EMAIL_SMTP_USER") or _env("SMTP_USER")
-    password = _env("EMAIL_SMTP_PASS") or _env("SMTP_PASS")
-    secure = (_env("SMTP_SECURE") or "true").lower() != "false"
+    """
+    Strictly read from environment variables (set by GitHub Actions secrets/variables):
+      - SMTP_HOST (required)
+      - SMTP_PORT (required, int)
+      - SMTP_USER (optional)
+      - SMTP_PASS (optional)
+      - SMTP_SECURE (optional, default true → SMTPS; "false" → STARTTLS)
+    """
+    host = _env_required("SMTP_HOST")
+    port = int(_env_required("SMTP_PORT"))
+    user = _env_optional("SMTP_USER")
+    password = _env_optional("SMTP_PASS") or ""
+    secure = _bool_from_env("SMTP_SECURE", default_true=True)
     return {
         "host": host,
         "port": port,
@@ -49,11 +72,16 @@ def send_email(
     *,
     task_id: Optional[str] = None,
 ) -> None:
-    """Send an email with optional attachments using SMTP/SSL or STARTTLS based on env settings."""
-    notifications.log_email(sender, recipient, subject, task_id)
+    """
+    Send an email with optional attachments using SMTPS (default) or STARTTLS.
+
+    Fails hard if required SMTP env settings are missing.
+    """
     cfg = _get_settings()
-    if not (os.getenv("EMAIL_SMTP_HOST") or os.getenv("SMTP_HOST")):
-        return
+
+    # Log intent (no secrets)
+    notifications.log_email(sender, recipient, subject, task_id)
+
     msg = EmailMessage()
     msg["From"] = sender
     msg["To"] = recipient
@@ -63,6 +91,7 @@ def send_email(
     for path in attachments or []:
         p = Path(path)
         if not p.exists():
+            # Fail loudly? For now: skip missing files but could raise if required.
             continue
         ctype, _ = mimetypes.guess_type(p.name)
         maintype, subtype = (ctype or "application/octet-stream").split("/", 1)
@@ -72,13 +101,15 @@ def send_email(
             )
 
     if cfg["secure"]:
+        # SMTPS (implicit TLS, e.g., port 465)
         with smtplib.SMTP_SSL(cfg["host"], cfg["port"]) as smtp:
             if cfg["user"]:
-                smtp.login(cfg["user"], cfg["password"] or "")
+                smtp.login(cfg["user"], cfg["password"])
             smtp.send_message(msg)
     else:
+        # STARTTLS (e.g., port 587)
         with smtplib.SMTP(cfg["host"], cfg["port"]) as smtp:
             smtp.starttls()
             if cfg["user"]:
-                smtp.login(cfg["user"], cfg["password"] or "")
+                smtp.login(cfg["user"], cfg["password"])
             smtp.send_message(msg)
