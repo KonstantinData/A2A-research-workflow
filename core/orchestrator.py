@@ -17,6 +17,10 @@ import importlib.util as _ilu
 import datetime as dt
 import os
 import time
+try:
+    from dateutil import parser
+except Exception:  # pragma: no cover
+    parser = None  # type: ignore[assignment]
 
 from core import consolidate, feature_flags, duplicate_check
 from integrations import google_calendar, google_contacts, hubspot_api, email_sender
@@ -29,9 +33,6 @@ _mod = _ilu.module_from_spec(_spec)
 assert _spec and _spec.loader
 _spec.loader.exec_module(_mod)  # type: ignore[attr-defined]
 append_jsonl = _mod.append
-
-_LOG_PATH = Path("logs") / "workflows" / "reports.jsonl"
-
 
 def log_event(record: Dict[str, Any]) -> None:
     """Write ``record`` to a timestamped JSONL file under ``logs/workflows``."""
@@ -230,9 +231,13 @@ def run(
         if not existing:
             upload_required = True
         else:
-            created_str = existing.get("createdAt", "")
             try:
-                created_at = dt.datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+                if parser:
+                    created_at = parser.parse(existing["createdAt"])
+                else:  # pragma: no cover - fallback when dateutil is missing
+                    created_at = dt.datetime.fromisoformat(
+                        existing["createdAt"].replace("Z", "+00:00")
+                    )
             except Exception:
                 upload_required = True
             else:
@@ -241,23 +246,24 @@ def run(
 
         if upload_required:
             _retry(lambda: hubspot_attach(pdf_path, company_id))
-            append_jsonl(
-                _LOG_PATH,
-                {"status": "report_uploaded", "company_id": company_id, "file": pdf_path.name},
+            log_event(
+                {
+                    "status": "report_uploaded",
+                    "company_id": company_id,
+                    "file": pdf_path.name,
+                }
             )
         else:
-            append_jsonl(
-                _LOG_PATH,
+            log_event(
                 {
                     "status": "report_skipped",
                     "company_id": company_id,
-                    "reason": "existing recent report",
-                },
+                    "reason": "recent_report",
+                }
             )
     else:
-        append_jsonl(
-            _LOG_PATH,
-            {"status": "report_not_uploaded", "reason": "no_company_id_or_report"},
+        log_event(
+            {"status": "report_not_uploaded", "reason": "no_company_id_or_report"}
         )
 
     def _send_email() -> None:
