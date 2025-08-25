@@ -36,6 +36,9 @@ def test_orchestrator_generates_outputs_and_calls_hubspot(tmp_path, monkeypatch,
     def consolidate_fn(results):
         return {"company": company_acme["name"], "meta": {"company": {"source": "researcher", "last_verified_at": "now"}}}
 
+    # Avoid real SMTP by stubbing out email sending.
+    monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
+
     orchestrator.run(
         triggers=triggers,
         researchers=[researcher],

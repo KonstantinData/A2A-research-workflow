@@ -24,4 +24,5 @@ def test_email_client_delegates_to_email_sender(monkeypatch):
 
     assert calls['sender'] == 'bot@example.com'
     assert calls['recipient'] == 'user@example.com'
-    assert 'name, role' in calls['body']
+    assert '- name' in calls['body']
+    assert '- role' in calls['body']
