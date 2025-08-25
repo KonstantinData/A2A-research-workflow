@@ -1,0 +1,4 @@
+{
+  "calendar": ["company", "domain", "email", "phone"],
+  "contacts": ["company", "domain", "email", "phone"]
+}

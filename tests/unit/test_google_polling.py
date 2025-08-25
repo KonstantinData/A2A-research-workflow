@@ -11,8 +11,13 @@ from core import trigger_words  # noqa: E402
 
 
 def test_calendar_scheduled_poll_normalizes(monkeypatch):
-    events = [{"creator": "alice@example.com", "summary": "Test"}]
-    monkeypatch.setattr(google_calendar, "fetch_events", lambda: events)
+    event = {
+        "creator": {"email": "alice@example.com"},
+        "summary": "Meeting",
+        "description": "Firma TestCorp\nwww.testcorp.com\n+49 1234567",
+    }
+    monkeypatch.setattr(google_calendar, "fetch_events", lambda: [event])
+    monkeypatch.setattr(google_calendar.email_sender, "send", lambda *a, **k: None)
 
     result = google_calendar.scheduled_poll()
 
@@ -21,20 +26,31 @@ def test_calendar_scheduled_poll_normalizes(monkeypatch):
             "creator": "alice@example.com",
             "trigger_source": "calendar",
             "recipient": "alice@example.com",
-            "payload": events[0],
+            "payload": {
+                "title": "Meeting",
+                "description": "Firma TestCorp\nwww.testcorp.com\n+49 1234567",
+                "company": "TestCorp",
+                "domain": "www.testcorp.com",
+                "email": "alice@example.com",
+                "phone": "+49 1234567",
+                "notes_extracted": {
+                    "company": "TestCorp",
+                    "domain": "www.testcorp.com",
+                    "phone": "+49 1234567",
+                },
+            },
         }
     ]
 
 
 def test_contacts_scheduled_poll_normalizes(monkeypatch):
-    contacts = [
-        {
-            "emailAddresses": [{"value": "bob@example.com"}],
-            "names": [],
-            "notes": "research",
-        }
-    ]
-    monkeypatch.setattr(google_contacts, "fetch_contacts", lambda: contacts)
+    contact = {
+        "emailAddresses": [{"value": "bob@example.com"}],
+        "names": [{"displayName": "Bob"}],
+        "notes": "Firma ACME Corp\nacme.com\n+49 987654321",
+    }
+    monkeypatch.setattr(google_contacts, "fetch_contacts", lambda: [contact])
+    monkeypatch.setattr(google_contacts.email_sender, "send", lambda *a, **k: None)
 
     result = google_contacts.scheduled_poll()
 
@@ -43,23 +59,33 @@ def test_contacts_scheduled_poll_normalizes(monkeypatch):
             "creator": "bob@example.com",
             "trigger_source": "contacts",
             "recipient": "bob@example.com",
-            "payload": contacts[0],
+            "payload": {
+                "names": ["Bob"],
+                "company": "ACME Corp",
+                "domain": "acme.com",
+                "email": "bob@example.com",
+                "phone": "+49 987654321",
+                "notes_extracted": {
+                    "company": "ACME Corp",
+                    "domain": "acme.com",
+                    "phone": "+49 987654321",
+                },
+            },
         }
     ]
 
 
 def test_contacts_scheduled_poll_summarizes_notes(monkeypatch):
     """Summary field added when feature flag enabled."""
-    contacts = [
-        {
-            "emailAddresses": [{"value": "bob@example.com"}],
-            "names": [{"displayName": "Bob"}],
-            "notes": "Bob is great. Loves testing.",
-        }
-    ]
+    contact = {
+        "emailAddresses": [{"value": "bob@example.com"}],
+        "names": [{"displayName": "Bob"}],
+        "notes": "Bob is great. Loves testing.\nFirma Foo\nfoo.com\n+49 1111111",
+    }
 
-    monkeypatch.setattr(google_contacts, "fetch_contacts", lambda: contacts)
+    monkeypatch.setattr(google_contacts, "fetch_contacts", lambda: [contact])
     monkeypatch.setattr(google_contacts.feature_flags, "ENABLE_SUMMARY", True)
+    monkeypatch.setattr(google_contacts.email_sender, "send", lambda *a, **k: None)
 
     result = google_contacts.scheduled_poll()
 
