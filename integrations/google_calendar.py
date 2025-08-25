@@ -6,6 +6,7 @@ import datetime as dt
 import importlib.util as _ilu
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -23,7 +24,7 @@ except Exception:  # pragma: no cover
     HttpError = Exception  # type: ignore[assignment]
 
 from core.trigger_words import load_trigger_words
-from core.utils import normalize_text
+from core.utils import normalize_text, already_processed, mark_processed
 from core import parser
 from . import email_sender
 
@@ -36,6 +37,20 @@ def contains_trigger(event: dict, trigger_words: list[str]) -> bool:
         if t_norm in title or t_norm in desc:
             return True
     return False
+
+
+def _extract_company_from_title(title: str, trigger_words: list[str]) -> Optional[str]:
+    """If the title starts with a trigger word, return the remaining text as company."""
+    if not title:
+        return None
+    title_norm = normalize_text(title)
+    for t in trigger_words:
+        t_norm = normalize_text(t)
+        if title_norm.startswith(t_norm):
+            rest = title[len(t):].strip(" -:–—")
+            rest = re.sub(r"\b(firma|company)\b", "", rest, flags=re.IGNORECASE).strip()
+            return rest or None
+    return None
 
 # Local JSONL sink without clashing with stdlib logging
 _JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
@@ -126,29 +141,6 @@ def _calendar_ids(primary_id: str) -> List[str]:
 _PROCESSED_PATH = Path("logs") / "processed_events.jsonl"
 
 
-def _already_processed(event_id: str, updated: str) -> bool:
-    """Check ``processed_events.jsonl`` for a matching id+updated pair."""
-    if not _PROCESSED_PATH.exists():
-        return False
-    try:
-        with _PROCESSED_PATH.open("r", encoding="utf-8") as fh:
-            for line in fh:
-                try:
-                    rec = json.loads(line)
-                except Exception:
-                    continue
-                if rec.get("id") == event_id and rec.get("updated") == updated:
-                    return True
-    except Exception:
-        return False
-    return False
-
-
-def _mark_processed(event_id: str, updated: str) -> None:
-    """Record an event as processed."""
-    append_jsonl(_PROCESSED_PATH, {"id": event_id, "updated": updated})
-
-
 def fetch_events(
     minutes_back: int | None = None,
     minutes_forward: int | None = None,
@@ -212,7 +204,17 @@ def fetch_events(
                     updated = ev.get("updated")
                     if not uid or not updated:
                         continue
-                    if _already_processed(uid, updated):
+                    if already_processed(uid, updated, _PROCESSED_PATH):
+                        append_jsonl(
+                            _LOG_PATH,
+                            {
+                                "timestamp": _utc_now().isoformat() + "Z",
+                                "source": "calendar",
+                                "status": "skipped",
+                                "reason": "already_processed",
+                                "id": uid,
+                            },
+                        )
                         continue
                     if not contains_trigger(ev, words):
                         continue
@@ -223,10 +225,13 @@ def fetch_events(
                         "domain": parser.extract_domain(description),
                         "phone": parser.extract_phone(description),
                     }
+                    comp_from_title = _extract_company_from_title(ev.get("summary", ""), words)
+                    if comp_from_title:
+                        notes["company"] = comp_from_title
                     ev["notes_extracted"] = notes
                     filtered.append(ev)
                     processed += 1
-                    _mark_processed(uid, updated)
+                    mark_processed(uid, updated, _PROCESSED_PATH)
                     append_jsonl(
                         _LOG_PATH,
                         {
