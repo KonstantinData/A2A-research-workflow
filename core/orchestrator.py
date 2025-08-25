@@ -194,11 +194,13 @@ def run(
     if company_id is None:
         company_id = _retry(lambda: hubspot_upsert(consolidated))
 
+    report_ready = pdf_path.exists()
     if (
         feature_flags.ATTACH_PDF_TO_HUBSPOT
         and os.getenv("HUBSPOT_ACCESS_TOKEN")
         and os.getenv("HUBSPOT_PORTAL_ID")
         and company_id
+        and report_ready
     ):
         existing = hubspot_check_existing(company_id)
         upload_required = False
@@ -221,7 +223,6 @@ def run(
                 {"status": "report_uploaded", "company_id": company_id, "file": pdf_path.name},
             )
         else:
-            print(f"Skip upload: existing recent report for company {company_id}")
             append_jsonl(
                 _LOG_PATH,
                 {
@@ -230,6 +231,11 @@ def run(
                     "reason": "existing recent report",
                 },
             )
+    else:
+        append_jsonl(
+            _LOG_PATH,
+            {"status": "report_not_uploaded", "reason": "no_company_id_or_report"},
+        )
 
     def _send_email() -> None:
         sender = (

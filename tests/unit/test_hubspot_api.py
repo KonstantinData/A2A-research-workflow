@@ -79,6 +79,7 @@ def _run_base(monkeypatch, tmp_path, check_result):
     monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "tok")
     monkeypatch.setenv("HUBSPOT_PORTAL_ID", "portal")
     monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
+    monkeypatch.setenv("OUTPUT_DIR", str(tmp_path))
 
     called = {"attach": 0}
 
@@ -155,4 +156,44 @@ def test_run_propagates_check_error(monkeypatch, tmp_path):
             hubspot_attach=lambda p, c: None,
             hubspot_check_existing=raise_err,
         )
+
+
+def _run_no_upload(monkeypatch, tmp_path, upsert_return, pdf_write):
+    monkeypatch.setattr(feature_flags, "ATTACH_PDF_TO_HUBSPOT", True)
+    monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "tok")
+    monkeypatch.setenv("HUBSPOT_PORTAL_ID", "portal")
+    monkeypatch.setenv("OUTPUT_DIR", str(tmp_path))
+    monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
+
+    called = {"attach": 0}
+
+    def fake_attach(path: Path, cid: str) -> None:
+        called["attach"] += 1
+
+    def fake_pdf(data, path):
+        if pdf_write:
+            path.write_text("pdf")
+
+    def fake_csv(data, path):
+        path.write_text("csv")
+
+    orchestrator.run(
+        triggers=[],
+        researchers=[],
+        consolidate_fn=lambda x: {},
+        pdf_renderer=fake_pdf,
+        csv_exporter=fake_csv,
+        hubspot_upsert=lambda data: upsert_return,
+        hubspot_attach=fake_attach,
+        hubspot_check_existing=lambda cid: None,
+    )
+    return called["attach"]
+
+
+def test_run_no_upload_without_company_id(monkeypatch, tmp_path):
+    assert _run_no_upload(monkeypatch, tmp_path, None, True) == 0
+
+
+def test_run_no_upload_without_report(monkeypatch, tmp_path):
+    assert _run_no_upload(monkeypatch, tmp_path, "123", False) == 0
 

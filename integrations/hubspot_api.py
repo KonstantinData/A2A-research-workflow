@@ -41,7 +41,7 @@ def upsert_company(data: Dict[str, Any]) -> None:
 
 
 def check_existing_report(company_id: str) -> Optional[Dict[str, Any]]:
-    """Return latest report file for ``company_id`` if present."""
+    """Return latest report (id, name, createdAt) for ``company_id`` if present."""
     token = _token()
     if not token:
         return None
