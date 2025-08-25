@@ -24,7 +24,7 @@ except Exception:  # pragma: no cover
 
 from core.trigger_words import load_trigger_words
 from core import feature_flags, summarize, parser
-from core.utils import normalize_text
+from core.utils import normalize_text, already_processed, mark_processed
 from . import email_sender
 
 
@@ -41,6 +41,7 @@ _spec.loader.exec_module(_mod)  # type: ignore[attr-defined]
 append_jsonl = _mod.append
 
 _LOG_PATH = Path("logs") / "workflows" / "contacts.jsonl"
+_PROCESSED_PATH = Path("logs") / "processed_contacts.jsonl"
 
 
 def _load_required_fields(source: str) -> List[str]:
@@ -163,6 +164,24 @@ def fetch_contacts(
             resp = req.execute()
             people: List[Dict[str, Any]] = resp.get("connections", [])  # type: ignore[assignment]
             for p in people:
+                uid = p.get("resourceName")
+                updated = (
+                    (p.get("metadata") or {}).get("sources") or [{}]
+                )[0].get("updateTime")
+                if not uid or not updated:
+                    continue
+                if already_processed(uid, updated, _PROCESSED_PATH):
+                    append_jsonl(
+                        _LOG_PATH,
+                        {
+                            "timestamp": dt.datetime.utcnow().isoformat() + "Z",
+                            "source": "contacts",
+                            "status": "skipped",
+                            "reason": "already_processed",
+                            "id": uid,
+                        },
+                    )
+                    continue
                 names = " ".join(
                     (n.get("displayName") or "") for n in (p.get("names") or [])
                 )
@@ -178,6 +197,7 @@ def fetch_contacts(
                     }
                     person["notes_extracted"] = notes
                     filtered.append(person)
+                    mark_processed(uid, updated, _PROCESSED_PATH)
                     append_jsonl(
                         _LOG_PATH,
                         {

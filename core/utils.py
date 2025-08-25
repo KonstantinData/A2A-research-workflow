@@ -1,8 +1,16 @@
-import unicodedata
 import json
+import unicodedata
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List
+import importlib.util as _ilu
+
+_JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
+_spec = _ilu.spec_from_file_location("jsonl_sink", _JSONL_PATH)
+_mod = _ilu.module_from_spec(_spec)
+assert _spec and _spec.loader
+_spec.loader.exec_module(_mod)
+append_jsonl = _mod.append
 
 def normalize_text(text: str) -> str:
     if not text:
@@ -36,3 +44,32 @@ def _required_fields() -> Dict[str, List[str]]:
 
 def required_fields(context: str) -> List[str]:
     return _required_fields().get(context, [])
+
+
+def optional_fields() -> List[str]:
+    """Return optional fields applicable to all contexts."""
+    return _required_fields().get("optional", [])
+
+
+def already_processed(item_id: str, updated: str, logfile) -> bool:
+    """Check whether ``item_id`` with ``updated`` is recorded in ``logfile``."""
+    path = Path(logfile)
+    if not path.exists():
+        return False
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    continue
+                if rec.get("id") == item_id and rec.get("updated") == updated:
+                    return True
+    except Exception:
+        return False
+    return False
+
+
+def mark_processed(item_id: str, updated: str, logfile) -> None:
+    """Record ``item_id`` with ``updated`` in ``logfile``."""
+    append_jsonl(Path(logfile), {"id": item_id, "updated": updated})

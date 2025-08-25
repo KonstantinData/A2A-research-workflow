@@ -9,7 +9,7 @@ from typing import Any, Dict, List
 
 from agents.internal_company.run import run as internal_run
 from integrations import email_sender
-from core.utils import required_fields
+from core.utils import optional_fields, required_fields
 
 import importlib.util as _ilu
 
@@ -49,9 +49,12 @@ def _log_workflow(record: Dict[str, Any]) -> None:
     append_jsonl(path, data)
 
 
-def validate_required_fields(data: dict, context: str) -> List[str]:
+def validate_required_fields(data: dict, context: str) -> tuple[List[str], List[str]]:
     req = required_fields(context)
-    return [f for f in req if not data.get(f)]
+    opt = optional_fields()
+    missing_req = [f for f in req if not data.get(f)]
+    missing_opt = [f for f in opt if not data.get(f)]
+    return missing_req, missing_opt
 
 
 def run(trigger: Normalized) -> Normalized:
@@ -64,21 +67,25 @@ def run(trigger: Normalized) -> Normalized:
     payload.setdefault("company_domain", payload.get("domain"))
     payload.setdefault("creator_email", payload.get("email") or trigger.get("creator"))
 
-    missing = validate_required_fields(payload, context)
+    missing_required, missing_optional = validate_required_fields(payload, context)
     creator_email = payload.get("creator_email") or ""
     company = payload.get("company") or payload.get("company_name") or "Unknown"
 
-    if missing:
+    if missing_required:
         sender = os.getenv("MAIL_FROM") or "research-agent@condata.io"
-        subject = f"[Agent: Internal Research] Missing Information – {company}"
+        subject = "Missing Information for Your Research Request"
         body = (
-            f"Hello {creator_email},\n\n"
-            "this is an automated reminder from [Agent: Internal Research].\n\n"
-            f"Your research request for \"{company}\" is missing the following required fields:\n"
-            + "".join(f"- {m.capitalize()}\n" for m in missing)
-            + "\nPlease update the calendar entry or contact record with these details.\n"
-            "Once updated, the process will automatically continue.\n\n"
-            "Thank you,\nresearch-agent@condata.io"
+            f"Hi {creator_email},\n\n"
+            "this is just a quick reminder from your Internal Research Agent.\n\n"
+            f"For your research request regarding \"{company}\", we still need a bit more information:\n\n"
+            "* Company (required)\n"
+            "* Domain (required)\n"
+            "* Email (optional)\n"
+            "* Phone (optional)\n\n"
+            "Could you please update the calendar entry or contact record with these details?\n"
+            "Once the information is added, the process will automatically continue — no further action needed from you.\n\n"
+            "Thanks a lot for your support!\n\n"
+            "– Your Internal Research Agent"
         )
         email_sender.send(to=creator_email, subject=subject, body=body, sender=sender)
         _log_workflow(
@@ -86,7 +93,7 @@ def run(trigger: Normalized) -> Normalized:
                 "status": "missing_fields",
                 "agent": "internal_company_research",
                 "creator": creator_email,
-                "missing": missing,
+                "missing": missing_required,
             }
         )
         _log_workflow(
@@ -94,11 +101,26 @@ def run(trigger: Normalized) -> Normalized:
                 "status": "reminder_sent",
                 "agent": "internal_company_research",
                 "to": creator_email,
-                "missing": missing,
+                "missing": missing_required,
                 "notified_via": sender,
             }
         )
-        return {"status": "missing_fields", "missing": missing, "agent": "internal_company_research"}
+        return {
+            "status": "missing_fields",
+            "agent": "internal_company_research",
+            "creator": trigger.get("creator"),
+            "missing": missing_required,
+        }
+
+    if missing_optional:
+        _log_workflow(
+            {
+                "status": "missing_optional_fields",
+                "agent": "internal_company_research",
+                "creator": creator_email,
+                "missing": missing_optional,
+            }
+        )
 
     company_name = payload.get("company_name") or ""
     company_domain = payload.get("company_domain") or ""

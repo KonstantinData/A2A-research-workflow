@@ -23,7 +23,13 @@ except Exception:  # pragma: no cover
     parser = None  # type: ignore[assignment]
 
 from core import consolidate, feature_flags, duplicate_check
-from integrations import google_calendar, google_contacts, hubspot_api, email_sender
+from integrations import (
+    google_calendar,
+    google_contacts,
+    hubspot_api,
+    email_reader,
+    email_sender,
+)
 from output import pdf_render, csv_export
 
 # Local JSONL sink
@@ -191,6 +197,31 @@ def run(
         )
         sys.exit(0)
 
+    try:
+        replies = _retry(email_reader.fetch_replies)
+    except Exception:
+        replies = []
+    for rep in replies or []:
+        tid = rep.get("task_id")
+        fields = rep.get("fields", {}) or {}
+        creator = rep.get("creator")
+        if not tid or not fields:
+            continue
+        for trig in triggers:
+            payload_id = trig.get("payload", {}).get("id") or trig.get("payload", {}).get("resourceName")
+            if payload_id == tid:
+                trig_payload = trig.get("payload", {})
+                trig_payload.update(fields)
+                log_event(
+                    {
+                        "status": "resumed",
+                        "task_id": tid,
+                        "creator": creator,
+                        "updated_fields": list(fields.keys()),
+                    }
+                )
+                break
+
     research_results: List[Any] = []
     for trig in triggers:
         for fn in (researchers if researchers is not None else _default_researchers()):
@@ -203,6 +234,7 @@ def run(
                         "status": "pending",
                         "message": "Task paused until missing fields are provided",
                         "agent": res.get("agent"),
+                        "creator": res.get("creator"),
                         "missing": res.get("missing"),
                     }
                 )
