@@ -3,6 +3,8 @@
 from pathlib import Path
 import sys
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from core import orchestrator, feature_flags
@@ -58,9 +60,11 @@ def test_run_pipeline_respects_feature_flags(monkeypatch):
 
     def fake_pdf(data, path):
         called["pdf"] += 1
+        path.write_text("pdf")
 
     def fake_csv(data, path):
         called["csv"] += 1
+        path.write_text("csv")
 
     def fake_upsert(data):
         called["upsert"] += 1
@@ -103,15 +107,17 @@ def test_run_skips_intake_when_push_triggers_enabled(monkeypatch):
 
     monkeypatch.setattr(orchestrator, "gather_triggers", fake_gather)
 
-    orchestrator.run(
-        researchers=[],
-        consolidate_fn=lambda x: x,
-        pdf_renderer=lambda d, p: None,
-        csv_exporter=lambda d, p: None,
-        hubspot_upsert=lambda d: None,
-        hubspot_attach=lambda p: None,
-    )
+    with pytest.raises(SystemExit) as exc:
+        orchestrator.run(
+            researchers=[],
+            consolidate_fn=lambda x: x,
+            pdf_renderer=lambda d, p: None,
+            csv_exporter=lambda d, p: None,
+            hubspot_upsert=lambda d: None,
+            hubspot_attach=lambda p: None,
+        )
 
+    assert exc.value.code == 0
     assert not gathered["called"]
 
 

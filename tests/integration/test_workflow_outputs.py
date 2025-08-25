@@ -26,7 +26,14 @@ def test_orchestrator_generates_outputs_and_calls_hubspot(tmp_path, monkeypatch,
     def fake_attach(path, company_id):
         calls["attach"] += 1
 
-    triggers = []
+    triggers = [
+        {
+            "source": "calendar",
+            "creator": "alice@example.com",
+            "recipient": "alice@example.com",
+            "payload": {},
+        }
+    ]
 
     def researcher(trigger):
         return {
