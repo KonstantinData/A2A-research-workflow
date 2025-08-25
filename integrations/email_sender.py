@@ -131,7 +131,11 @@ def send(
     ``SMTP_USER``).
     """
 
-    sender_addr = sender or os.getenv("MAIL_FROM") or os.getenv("SMTP_FROM") or (
-        os.getenv("SMTP_USER") or ""
+    sender_addr = (
+        sender
+        or os.getenv("MAIL_FROM")
+        or os.getenv("SMTP_FROM")
+        or os.getenv("SMTP_USER")
+        or "research-agent@condata.io"
     )
     send_email(sender_addr, to, subject, body, attachments, task_id=task_id)
