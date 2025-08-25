@@ -186,7 +186,7 @@ def run(
         log_event(
             {
                 "status": "no_triggers",
-                "details": "Polling finished without matches",
+                "message": "No calendar or contact events matched trigger words",
             }
         )
         sys.exit(0)
