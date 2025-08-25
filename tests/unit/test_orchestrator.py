@@ -36,6 +36,7 @@ def test_run_pipeline_respects_feature_flags(monkeypatch):
     monkeypatch.setattr(feature_flags, "ATTACH_PDF_TO_HUBSPOT", True)
     monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "token")
     monkeypatch.setenv("HUBSPOT_PORTAL_ID", "portal")
+    monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
 
     events = [{"creator": "carol@example.com"}]
     contacts = []
@@ -90,6 +91,7 @@ def test_run_skips_intake_when_push_triggers_enabled(monkeypatch):
     monkeypatch.setattr(feature_flags, "USE_PUSH_TRIGGERS", True)
     monkeypatch.setattr(feature_flags, "ENABLE_PRO_SOURCES", False)
     monkeypatch.setattr(feature_flags, "ATTACH_PDF_TO_HUBSPOT", False)
+    monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
 
     gathered = {"called": False}
 
@@ -111,7 +113,8 @@ def test_run_skips_intake_when_push_triggers_enabled(monkeypatch):
     assert not gathered["called"]
 
 
-def test_run_skips_processing_when_duplicate():
+def test_run_skips_processing_when_duplicate(monkeypatch):
+    monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
     triggers = [
         {
             "source": "calendar",
@@ -137,6 +140,7 @@ def test_run_skips_processing_when_duplicate():
 
     def fake_attach(path, company_id):
         calls["attach"] += 1
+
 
     result = orchestrator.run(
         triggers=triggers,
