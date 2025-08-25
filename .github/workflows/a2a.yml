@@ -76,7 +76,8 @@ jobs:
           MAIL_FROM:               ${{ secrets.MAIL_FROM }}
         run: |
           set -e
-          for v in GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REFRESH_TOKEN HUBSPOT_ACCESS_TOKEN HUBSPOT_PORTAL_ID SMTP_HOST SMTP_PORT MAIL_FROM; do
+          # GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are optional
+          for v in GOOGLE_REFRESH_TOKEN HUBSPOT_ACCESS_TOKEN HUBSPOT_PORTAL_ID SMTP_HOST SMTP_PORT MAIL_FROM; do
             if [ -z "${!v}" ]; then
               echo "::error::Missing required env $v"
               exit 1
