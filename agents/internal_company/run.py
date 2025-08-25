@@ -1,5 +1,5 @@
-"""Orchestrate internal company research fetch and normalize."""
-
+# agents/internal_company/run.py
+"""Orchestrate internal company research fetch and normalize (LIVE)."""
 from __future__ import annotations
 
 from dataclasses import asdict
@@ -7,7 +7,7 @@ from typing import Any, Dict, Iterable
 
 from core.tasks import create_task
 from core.feature_flags import ENABLE_GRAPH_STORAGE
-from integrations import email_client, graph_storage
+from integrations import graph_storage  # email_client NICHT hier verwenden
 
 from .plugins import INTERNAL_SOURCES
 from .normalize import NormalizedInternalCompany
@@ -17,19 +17,6 @@ Raw = Dict[str, Any]
 
 
 def run(trigger: Normalized) -> Normalized:
-    """Run internal company research.
-
-    Parameters
-    ----------
-    trigger:
-        Normalized trigger dictionary passed from the orchestrator.
-
-    Returns
-    -------
-    Normalized
-        Structured result following the common schema of ``source``,
-        ``creator``, ``recipient`` and ``payload``.
-    """
     result: Normalized = {
         "source": "internal_company_research",
         "creator": trigger.get("creator"),
@@ -44,16 +31,10 @@ def run(trigger: Normalized) -> Normalized:
     try:
         validated = NormalizedInternalCompany(**result)
     except ValueError as exc:
-        # Normalise the missing fields so the same ordered list is used for
-        # task creation and for the notification e-mail.
+        # Keine E-Mail hier; nur Task + sauberer Rückkanal, Wrapper übernimmt Kommunikation
         missing_fields = list(_parse_missing_fields(str(exc)))
         employee_email = _extract_email(trigger.get("recipient"))
-        task = create_task(
-            "internal_company_research", missing_fields, employee_email
-        )
-        email_client.send_email(
-            employee_email, missing_fields, task_id=task["id"]
-        )
+        task = create_task("internal_company_research", missing_fields, employee_email)
         final_result = {
             "source": result["source"],
             "creator": result.get("creator"),
@@ -61,11 +42,18 @@ def run(trigger: Normalized) -> Normalized:
             "payload": {
                 "summary": "awaiting employee response",
                 "task_id": task["id"],
+                # Meta-Felder bewusst leer, damit Wrapper korrekt entscheidet
+                "exists": None,
+                "company_id": None,
+                "last_report_date": None,
+                "last_report_id": None,
+                "neighbors": [],
             },
         }
         if ENABLE_GRAPH_STORAGE:
             graph_storage.store_result(final_result)
         return final_result
+
     final_result = asdict(validated)
     if ENABLE_GRAPH_STORAGE:
         graph_storage.store_result(final_result)
