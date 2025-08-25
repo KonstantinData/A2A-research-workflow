@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Sequence, Optional
+import sys
 import importlib.util as _ilu
 import datetime as dt
 import os
@@ -30,6 +31,18 @@ _spec.loader.exec_module(_mod)  # type: ignore[attr-defined]
 append_jsonl = _mod.append
 
 _LOG_PATH = Path("logs") / "workflows" / "reports.jsonl"
+
+
+def log_event(record: Dict[str, Any]) -> None:
+    """Write ``record`` to a timestamped JSONL file under ``logs/workflows``."""
+    ts = dt.datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%S")
+    path = Path("logs") / "workflows" / f"{ts}_workflow.jsonl"
+    data = dict(record)
+    data.setdefault(
+        "timestamp",
+        dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+    )
+    append_jsonl(path, data)
 
 Normalized = Dict[str, Any]
 
@@ -166,6 +179,16 @@ def run(
             triggers = []
         else:
             triggers = gather_triggers(event_fetcher, contact_fetcher)
+
+    triggers = list(triggers)
+    if not triggers:
+        log_event(
+            {
+                "status": "no_triggers",
+                "details": "Polling finished without matches",
+            }
+        )
+        sys.exit(0)
 
     research_results: List[Any] = []
     for trig in triggers:

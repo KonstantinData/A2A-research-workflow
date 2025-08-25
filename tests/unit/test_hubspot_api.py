@@ -10,6 +10,14 @@ from core import orchestrator, feature_flags
 from integrations import hubspot_api
 
 
+TRIGGER = {
+    "source": "calendar",
+    "creator": "alice@example.com",
+    "recipient": "alice@example.com",
+    "payload": {},
+}
+
+
 class DummyResp:
     def __init__(self, data, status=200):
         self._data = data
@@ -96,7 +104,7 @@ def _run_base(monkeypatch, tmp_path, check_result):
         return "123"
 
     orchestrator.run(
-        triggers=[],
+        triggers=[TRIGGER],
         researchers=[],
         consolidate_fn=lambda x: {},
         pdf_renderer=fake_pdf,
@@ -147,7 +155,7 @@ def test_run_propagates_check_error(monkeypatch, tmp_path):
 
     with pytest.raises(RuntimeError):
         orchestrator.run(
-            triggers=[],
+            triggers=[TRIGGER],
             researchers=[],
             consolidate_fn=lambda x: {},
             pdf_renderer=fake_pdf,
@@ -178,7 +186,7 @@ def _run_no_upload(monkeypatch, tmp_path, upsert_return, pdf_write):
         path.write_text("csv")
 
     orchestrator.run(
-        triggers=[],
+        triggers=[TRIGGER],
         researchers=[],
         consolidate_fn=lambda x: {},
         pdf_renderer=fake_pdf,

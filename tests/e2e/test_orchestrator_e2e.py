@@ -29,5 +29,8 @@ def test_orchestrator_cli(tmp_path):
     subprocess.run(cmd, cwd=tmp_path, env=env, check=True)
 
     out_dir = Path(tmp_path) / "output/exports"
-    assert (out_dir / "report.pdf").exists()
-    assert (out_dir / "data.csv").exists()
+    assert not (out_dir / "report.pdf").exists()
+    assert not (out_dir / "data.csv").exists()
+    log_files = list((Path(tmp_path) / "logs" / "workflows").glob("*_workflow.jsonl"))
+    assert log_files, "log file missing"
+    assert '"status": "no_triggers"' in log_files[0].read_text()
