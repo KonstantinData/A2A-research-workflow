@@ -1,40 +1,53 @@
-name: live-e2e
+ name: live-e2e
 
-on:
-  workflow_dispatch:
+ on:
+-  workflow_dispatch:
++  workflow_dispatch:
++    inputs:
++      confirm:
++        description: "Type RUN to execute live E2E"
++        required: true
++        default: "NO"
 
-jobs:
-  run:
-    runs-on: ubuntu-latest
-    env:
-      TEST_COMPANY_NAME: ACME Sandbox GmbH
-      TEST_COMPANY_DOMAIN: acme.example
-      TEST_CREATOR_EMAIL: konstantin@yourdomain.tld
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install
-        run: pip install -r requirements.txt
-      - name: Run internal search
-        env:
-          HUBSPOT_ACCESS_TOKEN: ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
-          HUBSPOT_PORTAL_ID: ${{ secrets.HUBSPOT_PORTAL_ID }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
-          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
-          MAIL_FROM: ${{ secrets.MAIL_FROM }}
-        run: |
-          python - <<'PY'
-          import os, json
-          from agents.agent_internal_search import run
+ jobs:
+   run:
+     runs-on: ubuntu-latest
++    if: ${{ github.event.inputs.confirm == 'RUN' }}
+     env:
+       TEST_COMPANY_NAME: ACME Sandbox GmbH
+       TEST_COMPANY_DOMAIN: acme.example
+       TEST_CREATOR_EMAIL: konstantin@yourdomain.tld
+     steps:
+       - uses: actions/checkout@v4
++      - uses: actions/setup-python@v5
++        with: { python-version: "3.11" }
+       - name: Install
+         run: pip install -r requirements.txt
++      - name: Sandbox domain gate
++        run: |
++          dom="${{ env.TEST_COMPANY_DOMAIN }}"
++          [[ "$dom" =~ \.example$|\.test$ ]] || { echo "Refusing non-sandbox domain: $dom"; exit 1; }
+       - name: Run internal search
+         env:
+           HUBSPOT_ACCESS_TOKEN: ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
+           HUBSPOT_PORTAL_ID: ${{ secrets.HUBSPOT_PORTAL_ID }}
+           SMTP_HOST: ${{ secrets.SMTP_HOST }}
+           SMTP_PORT: ${{ secrets.SMTP_PORT }}
+           SMTP_USER: ${{ secrets.SMTP_USER }}
+           SMTP_PASS: ${{ secrets.SMTP_PASS }}
+           SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+           MAIL_FROM: ${{ secrets.MAIL_FROM }}
+         run: |
+           python - <<'PY'
+           import os, json
+           from agents.agent_internal_search import run
 
-          payload = {
-              'company_name': os.environ['TEST_COMPANY_NAME'],
-              'company_domain': os.environ['TEST_COMPANY_DOMAIN'],
-              'creator_email': os.environ['TEST_CREATOR_EMAIL'],
-          }
-          res = run({'payload': payload})
-          print(json.dumps(res))
-          assert res['payload']['action'] in {'NOT_IN_CRM','AWAIT_REQUESTOR_DECISION','NEEDS_DETAIL_RESEARCH','DELIVERED_EXISTING'}
-          PY
+           payload = {
+               'company_name': os.environ['TEST_COMPANY_NAME'],
+               'company_domain': os.environ['TEST_COMPANY_DOMAIN'],
+               'creator_email': os.environ['TEST_CREATOR_EMAIL'],
+           }
+           res = run({'payload': payload})
+           print(json.dumps(res, indent=2))
+           assert res['payload']['action'] in {'NOT_IN_CRM','AWAIT_REQUESTOR_DECISION','NEEDS_DETAIL_RESEARCH','DELIVERED_EXISTING'}
+           PY
