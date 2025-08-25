@@ -29,27 +29,24 @@ from core import parser
 from . import email_sender
 
 
-def contains_trigger(event: dict, trigger_words: list[str]) -> bool:
+def contains_trigger(event: dict, trigger_words: list[str]) -> str | None:
     title = normalize_text(event.get("summary", ""))
     desc = normalize_text(event.get("description", ""))
     for t in trigger_words:
         t_norm = normalize_text(t)
         if t_norm in title or t_norm in desc:
-            return True
-    return False
+            return t
+    return None
 
 
-def _extract_company_from_title(title: str, trigger_words: list[str]) -> Optional[str]:
-    """If the title starts with a trigger word, return the remaining text as company."""
-    if not title:
-        return None
-    title_norm = normalize_text(title)
-    for t in trigger_words:
-        t_norm = normalize_text(t)
-        if title_norm.startswith(t_norm):
-            rest = title[len(t):].strip(" -:–—")
-            rest = re.sub(r"\b(firma|company)\b", "", rest, flags=re.IGNORECASE).strip()
-            return rest or None
+def extract_company(title: str, trigger: str) -> Optional[str]:
+    """Extract company name from title based on trigger prefix."""
+    pattern = rf"^{re.escape(trigger)}[ :\-–—]*\s*(.*)"
+    match = re.match(pattern, title, re.IGNORECASE)
+    if match:
+        company = match.group(1).strip()
+        company = re.sub(r"^(Firma|Company)\s+", "", company, flags=re.IGNORECASE)
+        return company if company else None
     return None
 
 # Local JSONL sink without clashing with stdlib logging
@@ -216,7 +213,8 @@ def fetch_events(
                             },
                         )
                         continue
-                    if not contains_trigger(ev, words):
+                    trigger = contains_trigger(ev, words)
+                    if not trigger:
                         continue
                     description = ev.get("description") or ""
                     ev = dict(ev)
@@ -225,10 +223,11 @@ def fetch_events(
                         "domain": parser.extract_domain(description),
                         "phone": parser.extract_phone(description),
                     }
-                    comp_from_title = _extract_company_from_title(ev.get("summary", ""), words)
+                    comp_from_title = extract_company(ev.get("summary", ""), trigger)
                     if comp_from_title:
                         notes["company"] = comp_from_title
                     ev["notes_extracted"] = notes
+                    ev["company_extracted"] = comp_from_title
                     filtered.append(ev)
                     processed += 1
                     mark_processed(uid, updated, _PROCESSED_PATH)
@@ -237,7 +236,8 @@ def fetch_events(
                         {
                             "timestamp": _utc_now().isoformat() + "Z",
                             "source": "calendar",
-                            "status": "hit",
+                            "status": "hit" if comp_from_title else "warning",
+                            "company_extracted": comp_from_title,
                             "payload": ev,
                         },
                     )
