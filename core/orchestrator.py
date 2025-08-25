@@ -10,15 +10,26 @@ special setup beyond the required secrets.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Sequence, Optional
+import importlib.util as _ilu
+import datetime as dt
 import os
 import time
 
 from core import consolidate, feature_flags, duplicate_check
 from integrations import google_calendar, google_contacts, hubspot_api, email_sender
 from output import pdf_render, csv_export
+
+# Local JSONL sink
+_JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
+_spec = _ilu.spec_from_file_location("jsonl_sink", _JSONL_PATH)
+_mod = _ilu.module_from_spec(_spec)
+assert _spec and _spec.loader
+_spec.loader.exec_module(_mod)  # type: ignore[attr-defined]
+append_jsonl = _mod.append
+
+_LOG_PATH = Path("logs") / "workflows" / "reports.jsonl"
 
 Normalized = Dict[str, Any]
 
@@ -139,8 +150,10 @@ def run(
     consolidate_fn: Callable[[Iterable[Any]], Any] = consolidate.consolidate,
     pdf_renderer: Callable[[Any, Path], None] = pdf_render.render_pdf,
     csv_exporter: Callable[[Any, Path], None] = csv_export.export_csv,
-    hubspot_upsert: Callable[[Any], None] = hubspot_api.upsert_company,
+    hubspot_upsert: Callable[[Any], Optional[str]] = hubspot_api.upsert_company,
     hubspot_attach: Callable[[Path, str], None] = hubspot_api.attach_pdf,
+    hubspot_check_existing: Callable[[str], Optional[Dict[str, Any]]] = hubspot_api.check_existing_report,
+    company_id: Optional[str] = None,
     duplicate_checker: Callable[
         [Dict[str, Any], Optional[Iterable[Dict[str, Any]]]], bool
     ] = duplicate_check.is_duplicate,
@@ -178,13 +191,51 @@ def run(
     csv_exporter(consolidated, csv_path)
 
     # CRM + Email
-    _retry(lambda: hubspot_upsert(consolidated))
+    if company_id is None:
+        company_id = _retry(lambda: hubspot_upsert(consolidated))
+
+    report_ready = pdf_path.exists()
     if (
         feature_flags.ATTACH_PDF_TO_HUBSPOT
         and os.getenv("HUBSPOT_ACCESS_TOKEN")
         and os.getenv("HUBSPOT_PORTAL_ID")
+        and company_id
+        and report_ready
     ):
-        _retry(lambda: hubspot_attach(pdf_path, "0"))
+        existing = hubspot_check_existing(company_id)
+        upload_required = False
+        if not existing:
+            upload_required = True
+        else:
+            created_str = existing.get("createdAt", "")
+            try:
+                created_at = dt.datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+            except Exception:
+                upload_required = True
+            else:
+                if (dt.datetime.now(dt.timezone.utc) - created_at).days >= 7:
+                    upload_required = True
+
+        if upload_required:
+            _retry(lambda: hubspot_attach(pdf_path, company_id))
+            append_jsonl(
+                _LOG_PATH,
+                {"status": "report_uploaded", "company_id": company_id, "file": pdf_path.name},
+            )
+        else:
+            append_jsonl(
+                _LOG_PATH,
+                {
+                    "status": "report_skipped",
+                    "company_id": company_id,
+                    "reason": "existing recent report",
+                },
+            )
+    else:
+        append_jsonl(
+            _LOG_PATH,
+            {"status": "report_not_uploaded", "reason": "no_company_id_or_report"},
+        )
 
     def _send_email() -> None:
         sender = (
@@ -194,7 +245,7 @@ def run(
         )
         data = consolidated if isinstance(consolidated, dict) else {}
         recipient = data.get("creator") or os.getenv("MAIL_TO") or sender
-        subject = f"A2A Research Report"
+        subject = "A2A Research Report"
         body = "Attached report and data."
         email_sender.send_email(
             sender, recipient, subject, body, attachments=[pdf_path, csv_path]

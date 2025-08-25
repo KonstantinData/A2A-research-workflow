@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import datetime as dt
+import importlib.util as _ilu
+import json
 import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 # Google client libs are optional at import time (tests),
@@ -20,6 +23,24 @@ except Exception:  # pragma: no cover
     HttpError = Exception  # type: ignore[assignment]
 
 from core.trigger_words import contains_trigger, load_trigger_words
+from core import parser
+from . import email_sender
+
+# Local JSONL sink without clashing with stdlib logging
+_JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
+_spec = _ilu.spec_from_file_location("jsonl_sink", _JSONL_PATH)
+_mod = _ilu.module_from_spec(_spec)
+assert _spec and _spec.loader
+_spec.loader.exec_module(_mod)  # type: ignore[attr-defined]
+append_jsonl = _mod.append
+
+_LOG_PATH = Path("logs") / "workflows" / "calendar.jsonl"
+
+
+def _load_required_fields(source: str) -> List[str]:
+    path = Path(__file__).resolve().parents[1] / "config" / "required_fields.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return data.get(source, [])
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
@@ -86,21 +107,21 @@ def fetch_events(
     - Fails hard if trigger words are not configured or Google libs are missing.
     - Paginates through all results within the time window.
     """
-    words = load_trigger_words()
-    if not words:
-        raise RuntimeError(
-            "Google Calendar: no trigger words configured (core.trigger_words)"
-        )
-
-    now = _utc_now()
-    time_min = (now - dt.timedelta(minutes=minutes_back)).isoformat()
-    time_max = (now + dt.timedelta(minutes=minutes_forward)).isoformat()
-
-    service = _service()
-
     filtered: List[Dict[str, Any]] = []
-    page_token: Optional[str] = None
     try:
+        words = load_trigger_words()
+        if not words:
+            raise RuntimeError(
+                "Google Calendar: no trigger words configured (core.trigger_words)"
+            )
+
+        now = _utc_now()
+        time_min = (now - dt.timedelta(minutes=minutes_back)).isoformat()
+        time_max = (now + dt.timedelta(minutes=minutes_forward)).isoformat()
+
+        service = _service()
+
+        page_token: Optional[str] = None
         while True:
             req = service.events().list(
                 calendarId=calendar_id,
@@ -118,12 +139,36 @@ def fetch_events(
                 description = ev.get("description") or ""
                 content = f"{summary}\n{description}"
                 if contains_trigger(content, words):
+                    ev = dict(ev)
+                    notes = {
+                        "company": parser.extract_company(description),
+                        "domain": parser.extract_domain(description),
+                        "phone": parser.extract_phone(description),
+                    }
+                    ev["notes_extracted"] = notes
                     filtered.append(ev)
+                    append_jsonl(
+                        _LOG_PATH,
+                        {
+                            "timestamp": _utc_now().isoformat() + "Z",
+                            "source": "calendar",
+                            "status": "hit",
+                            "payload": ev,
+                        },
+                    )
             page_token = resp.get("nextPageToken")
             if not page_token:
                 break
-    except HttpError as e:
-        # Surface live errors clearly – no silent degradation
+    except Exception as e:
+        append_jsonl(
+            _LOG_PATH,
+            {
+                "timestamp": _utc_now().isoformat() + "Z",
+                "source": "calendar",
+                "status": "error",
+                "error": str(e),
+            },
+        )
         raise RuntimeError(f"Google Calendar API error: {e}") from e
 
     return filtered
@@ -142,6 +187,7 @@ def scheduled_poll() -> List[Dict[str, Any]]:
       }
     """
     events = fetch_events()
+    required = _load_required_fields("calendar")
     results: List[Dict[str, Any]] = []
     for ev in events:
         creator_info = ev.get("creator")
@@ -155,12 +201,37 @@ def scheduled_poll() -> List[Dict[str, Any]]:
             or organizer.get("email")
             or ""
         )
+        description = ev.get("description") or ""
+        notes = ev.get("notes_extracted") or {
+            "company": parser.extract_company(description),
+            "domain": parser.extract_domain(description),
+            "phone": parser.extract_phone(description),
+        }
+        payload = {
+            "title": ev.get("summary") or "",
+            "description": description,
+            "company": notes.get("company"),
+            "domain": notes.get("domain"),
+            "email": creator_email,
+            "phone": notes.get("phone"),
+            "notes_extracted": notes,
+        }
+        missing = [f for f in required if not payload.get(f)]
+        if missing:
+            body = (
+                "Please provide the following missing fields: " + ", ".join(missing)
+            )
+            email_sender.send(
+                to=creator_email,
+                subject="Information missing for calendar entry",
+                body=body,
+            )
         results.append(
             {
                 "creator": creator_email,
                 "trigger_source": "calendar",
                 "recipient": creator_email,
-                "payload": ev,
+                "payload": payload,
             }
         )
     return results

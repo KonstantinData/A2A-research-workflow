@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
   # Achtung: GitHub Actions läuft in UTC. Diese Cron deckt ca. 07–19 CET / 06–18 CEST ab (Mo–Fr, stündlich).
   schedule:
-    - cron: "0 6-18 * * 1-5"
+    - cron: "0 8-19 * * 1-5"
 
 permissions:
   contents: read
