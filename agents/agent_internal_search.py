@@ -69,13 +69,18 @@ def run(trigger: Normalized) -> Normalized:
 
     missing_required, missing_optional = validate_required_fields(payload, context)
     creator_email = payload.get("creator_email") or ""
+    creator_name = trigger.get("creator_name")
+    if creator_name:
+        greeting = f"Hi {creator_name},"
+    else:
+        greeting = f"Hi {creator_email},"
     company = payload.get("company") or payload.get("company_name") or "Unknown"
 
     if missing_required:
         sender = os.getenv("MAIL_FROM") or "research-agent@condata.io"
         subject = "Missing Information for Your Research Request"
         body = (
-            f"Hi {creator_email},\n\n"
+            f"{greeting}\n\n"
             "this is just a quick reminder from your Internal Research Agent.\n\n"
             f"For your research request regarding \"{company}\", we still need a bit more information:\n\n"
             "* Company (required)\n"
