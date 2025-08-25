@@ -22,9 +22,15 @@ except Exception:  # pragma: no cover
     build = None  # type: ignore[assignment]
     HttpError = Exception  # type: ignore[assignment]
 
-from core.trigger_words import contains_trigger, load_trigger_words
+from core.trigger_words import load_trigger_words
+from core.utils import normalize_text
 from core import parser
 from . import email_sender
+
+
+def contains_trigger(text: str, trigger_words: list[str]) -> bool:
+    text = normalize_text(text)
+    return any(normalize_text(t) in text for t in trigger_words)
 
 # Local JSONL sink without clashing with stdlib logging
 _JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
