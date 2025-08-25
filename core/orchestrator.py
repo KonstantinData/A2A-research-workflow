@@ -114,11 +114,11 @@ def _default_researchers() -> List[Callable[[Normalized], Any]]:
     funcs: List[Callable[[Normalized], Any]] = []
     try:
         from agents import (
-            agent1_internal_company_research as a1,
-            agent2_company_search as a2,
-            agent3_external_branch_research as a3,
-            agent4_external_customer_research as a4,
-            agent5_internal_customer_research as a5,
+            agent_internal_search as a1,
+            agent_external_level1_company_search as a2,
+            agent_external_level2_companies_search as a3,
+            agent_internal_level2_company_search as a4,
+            agent_internal_customer_research as a5,
         )
 
         funcs.extend([a1.run, a2.run, a3.run, a4.run, a5.run])
@@ -140,7 +140,7 @@ def run(
     pdf_renderer: Callable[[Any, Path], None] = pdf_render.render_pdf,
     csv_exporter: Callable[[Any, Path], None] = csv_export.export_csv,
     hubspot_upsert: Callable[[Any], None] = hubspot_api.upsert_company,
-    hubspot_attach: Callable[[Path], None] = hubspot_api.attach_pdf,
+    hubspot_attach: Callable[[Path, str], None] = hubspot_api.attach_pdf,
     duplicate_checker: Callable[
         [Dict[str, Any], Optional[Iterable[Dict[str, Any]]]], bool
     ] = duplicate_check.is_duplicate,
@@ -156,7 +156,7 @@ def run(
 
     research_results: List[Any] = []
     for trig in triggers:
-        for fn in researchers or _default_researchers():
+        for fn in (researchers if researchers is not None else _default_researchers()):
             if getattr(fn, "pro", False) and not feature_flags.ENABLE_PRO_SOURCES:
                 continue
             research_results.append(_retry(lambda f=fn, t=trig: f(t)))
@@ -179,8 +179,8 @@ def run(
 
     # CRM + Email
     _retry(lambda: hubspot_upsert(consolidated))
-    if feature_flags.ATTACH_PDF_TO_HUBSPOT:
-        _retry(lambda: hubspot_attach(pdf_path))
+    if feature_flags.ATTACH_PDF_TO_HUBSPOT and os.getenv("HUBSPOT_ACCESS_TOKEN"):
+        _retry(lambda: hubspot_attach(pdf_path, "0"))
 
     def _send_email() -> None:
         sender = (

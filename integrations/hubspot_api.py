@@ -40,8 +40,28 @@ def upsert_company(data: Dict[str, Any]) -> None:
         pass
 
 
-def attach_pdf(path: Path) -> None:
-    """Attach the generated PDF to a HubSpot object (no-op placeholder)."""
-    # Full implementation would upload the file and associate it with a record.
-    # We keep this a no-op to avoid unnecessary complexity in the example.
-    return
+def attach_pdf(path: Path, company_id: str) -> Dict[str, str]:
+    """Upload ``path`` to HubSpot and associate with a company."""
+    token = _token()
+    portal_id = os.getenv("HUBSPOT_PORTAL_ID")
+    if not token or not portal_id:
+        raise RuntimeError("missing HubSpot credentials")
+
+    headers = {"Authorization": f"Bearer {token}"}
+    upload_url = "https://api.hubapi.com/files/v3/files"
+    data = {"options": json.dumps({"access": "PRIVATE"})}
+    with path.open("rb") as fh:
+        files = {"file": (path.name, fh, "application/pdf")}
+        resp = requests.post(upload_url, headers=headers, files=files, data=data, timeout=10)
+    resp.raise_for_status()
+    file_id = resp.json().get("id")
+
+    assoc_url = (
+        f"https://api.hubapi.com/crm/v3/objects/companies/{company_id}/associations/files/{file_id}"
+    )
+    assoc_payload = {"associationCategory": "HUBSPOT_DEFINED", "associationTypeId": 112}
+    resp2 = requests.put(assoc_url, headers=headers, json=assoc_payload, timeout=10)
+    resp2.raise_for_status()
+    assoc_id = resp2.json().get("id", "")
+
+    return {"file_id": file_id, "association_id": assoc_id}

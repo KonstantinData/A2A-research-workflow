@@ -12,6 +12,7 @@ from output import pdf_render, csv_export
 def test_orchestrator_generates_outputs_and_calls_hubspot(tmp_path, monkeypatch, company_acme):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("USE_PUSH_TRIGGERS", "1")
+    monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "token")
     # reload feature flags to pick up env change
     monkeypatch.setattr(feature_flags, "USE_PUSH_TRIGGERS", True)
 
@@ -20,7 +21,7 @@ def test_orchestrator_generates_outputs_and_calls_hubspot(tmp_path, monkeypatch,
     def fake_upsert(data):
         calls["upsert"] += 1
 
-    def fake_attach(path):
+    def fake_attach(path, company_id):
         calls["attach"] += 1
 
     triggers = []
