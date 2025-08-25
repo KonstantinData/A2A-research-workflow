@@ -86,6 +86,13 @@ jobs:
             fi
           done
 
+          # Fail fast if HubSpot token lacks access
+          if ! curl -sSf -H "Authorization: Bearer $HUBSPOT_ACCESS_TOKEN" \
+            https://api.hubapi.com/integrations/v1/me > /dev/null; then
+            echo "::error::HubSpot authentication failed"
+            exit 1
+          fi
+
       - name: Run orchestrator
         env:
           PYTHONPATH:               ${{ env.PYTHONPATH }}
