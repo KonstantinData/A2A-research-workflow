@@ -4,15 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       recipient:
-        description: info@condata.io
+        description: "Empfänger-Adresse"
         required: true
-        default: research-agent@condata.io
+        default: "konstantin@yourdomain.tld"
       subject:
         description: "Betreff"
         required: false
         default: "SMTP self-test (GitHub Actions)"
       body:
-        description: "Das ist eine Testnachricht um zu sehen ob der E-Mail Versand funktioniert"
+        description: "Nachricht"
         required: false
         default: "✅ SMTP works — sent via A2A workflow."
 
@@ -29,7 +29,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
+        with:
+          python-version: "3.11"
       - run: pip install -r requirements.txt
       - name: Send test mail
         run: |
