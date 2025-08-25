@@ -21,6 +21,7 @@ def test_orchestrator_generates_outputs_and_calls_hubspot(tmp_path, monkeypatch,
 
     def fake_upsert(data):
         calls["upsert"] += 1
+        return "123"
 
     def fake_attach(path, company_id):
         calls["attach"] += 1
@@ -47,6 +48,7 @@ def test_orchestrator_generates_outputs_and_calls_hubspot(tmp_path, monkeypatch,
         csv_exporter=csv_export.export_csv,
         hubspot_upsert=fake_upsert,
         hubspot_attach=fake_attach,
+        hubspot_check_existing=lambda cid: None,
     )
 
     out_dir = Path("output/exports")

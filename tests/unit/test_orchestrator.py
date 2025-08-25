@@ -64,6 +64,7 @@ def test_run_pipeline_respects_feature_flags(monkeypatch):
 
     def fake_upsert(data):
         called["upsert"] += 1
+        return "123"
 
     def fake_attach(path, company_id):
         called["attach"] += 1
@@ -77,6 +78,7 @@ def test_run_pipeline_respects_feature_flags(monkeypatch):
         csv_exporter=fake_csv,
         hubspot_upsert=fake_upsert,
         hubspot_attach=fake_attach,
+        hubspot_check_existing=lambda cid: None,
     )
 
     assert called["basic"] == 1
