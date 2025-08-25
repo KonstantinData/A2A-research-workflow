@@ -28,9 +28,14 @@ from core import parser
 from . import email_sender
 
 
-def contains_trigger(text: str, trigger_words: list[str]) -> bool:
-    text = normalize_text(text)
-    return any(normalize_text(t) in text for t in trigger_words)
+def contains_trigger(event: dict, trigger_words: list[str]) -> bool:
+    title = normalize_text(event.get("summary", ""))
+    desc = normalize_text(event.get("description", ""))
+    for t in trigger_words:
+        t_norm = normalize_text(t)
+        if t_norm in title or t_norm in desc:
+            return True
+    return False
 
 # Local JSONL sink without clashing with stdlib logging
 _JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
@@ -141,10 +146,8 @@ def fetch_events(
             resp = req.execute()
             items: List[Dict[str, Any]] = resp.get("items", [])  # type: ignore[assignment]
             for ev in items:
-                summary = ev.get("summary") or ""
-                description = ev.get("description") or ""
-                content = f"{summary}\n{description}"
-                if contains_trigger(content, words):
+                if contains_trigger(ev, words):
+                    description = ev.get("description") or ""
                     ev = dict(ev)
                     notes = {
                         "company": parser.extract_company(description),
