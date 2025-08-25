@@ -34,6 +34,8 @@ def test_run_pipeline_respects_feature_flags(monkeypatch):
     monkeypatch.setattr(feature_flags, "USE_PUSH_TRIGGERS", False)
     monkeypatch.setattr(feature_flags, "ENABLE_PRO_SOURCES", False)
     monkeypatch.setattr(feature_flags, "ATTACH_PDF_TO_HUBSPOT", True)
+    monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "token")
+    monkeypatch.setenv("HUBSPOT_PORTAL_ID", "portal")
 
     events = [{"creator": "carol@example.com"}]
     contacts = []
@@ -62,7 +64,7 @@ def test_run_pipeline_respects_feature_flags(monkeypatch):
     def fake_upsert(data):
         called["upsert"] += 1
 
-    def fake_attach(path):
+    def fake_attach(path, company_id):
         called["attach"] += 1
 
     orchestrator.run(
@@ -133,7 +135,7 @@ def test_run_skips_processing_when_duplicate():
     def fake_upsert(data):
         calls["upsert"] += 1
 
-    def fake_attach(path):
+    def fake_attach(path, company_id):
         calls["attach"] += 1
 
     result = orchestrator.run(

@@ -1,4 +1,4 @@
-"""Agent 5 - internal customer research."""
+"""Internal customer research agent."""
 
 from __future__ import annotations
 

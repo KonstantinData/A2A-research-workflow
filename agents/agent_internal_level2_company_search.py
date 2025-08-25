@@ -1,4 +1,4 @@
-"""Agent 2 - company search by classification."""
+"""Internal level 2 company search (customer research)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ Normalized = Dict[str, Any]
 
 
 def run(trigger: Normalized) -> Normalized:
-    """Run company search by classification.
+    """Run external customer research.
 
     Parameters
     ----------
@@ -23,10 +23,10 @@ def run(trigger: Normalized) -> Normalized:
         ``payload`` keys.
     """
     return {
-        "source": "company_search",
+        "source": "external_customer_research",
         "creator": trigger.get("creator"),
         "recipient": trigger.get("recipient"),
         "payload": {
-            "companies": [],
+            "customers": [],
         },
     }

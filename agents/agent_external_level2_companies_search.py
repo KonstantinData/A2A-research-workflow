@@ -1,4 +1,4 @@
-"""Agent 3 - external branch research."""
+"""External level 2 companies search (branch research)."""
 
 from __future__ import annotations
 
