@@ -8,7 +8,7 @@ from agents.internal_company import run as run_module
 
 
 def test_run_creates_task_for_missing_creator_and_recipient(monkeypatch):
-    trigger = {}
+    trigger = {"payload": {"company": "Acme"}}
 
     captured = {}
 
@@ -17,20 +17,19 @@ def test_run_creates_task_for_missing_creator_and_recipient(monkeypatch):
         captured["employee_email"] = employee_email
         return {"id": "task-1"}
 
-    def fake_send_email(email, fields, task_id=None):
-        captured["email"] = email
-        captured["fields_sent"] = list(fields)
-        captured["task_id"] = task_id
+    class StubSource:
+        def run(self, trigger):
+            return {"payload": {"summary": "Acme overview"}}
 
+    monkeypatch.setattr(run_module, "INTERNAL_SOURCES", [StubSource()])
     monkeypatch.setattr(run_module, "create_task", fake_create_task)
-    monkeypatch.setattr(run_module.email_client, "send_email", fake_send_email)
 
     result = run_module.run(trigger)
 
     assert result["payload"]["summary"] == "awaiting employee response"
     assert result["payload"]["task_id"] == "task-1"
     assert captured["missing_fields"] == ["creator", "recipient"]
-    assert captured["fields_sent"] == ["creator", "recipient"]
+    assert captured["employee_email"] == ""
 
 
 def test_run_creates_task_when_summary_missing(monkeypatch):
@@ -49,7 +48,6 @@ def test_run_creates_task_when_summary_missing(monkeypatch):
 
     monkeypatch.setattr(run_module, "INTERNAL_SOURCES", [EmptySource()])
     monkeypatch.setattr(run_module, "create_task", fake_create_task)
-    monkeypatch.setattr(run_module.email_client, "send_email", lambda *a, **k: None)
 
     result = run_module.run(trigger)
 

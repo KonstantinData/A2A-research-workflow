@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import sys
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
@@ -71,7 +72,8 @@ def test_fetch_events_exits_early_when_no_triggers(tmp_path, monkeypatch):
     monkeypatch.setenv("TRIGGER_WORDS_FILE", str(path))
     trigger_words.load_trigger_words.cache_clear()
 
-    assert google_calendar.fetch_events() == []
+    with pytest.raises(RuntimeError):
+        google_calendar.fetch_events()
 
 
 def test_fetch_contacts_exits_early_when_no_triggers(tmp_path, monkeypatch):
@@ -80,4 +82,5 @@ def test_fetch_contacts_exits_early_when_no_triggers(tmp_path, monkeypatch):
     monkeypatch.setenv("TRIGGER_WORDS_FILE", str(path))
     trigger_words.load_trigger_words.cache_clear()
 
-    assert google_contacts.fetch_contacts() == []
+    with pytest.raises(RuntimeError):
+        google_contacts.fetch_contacts()

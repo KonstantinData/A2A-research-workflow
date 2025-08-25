@@ -10,8 +10,8 @@ from agents.internal_company import run, fetch
 
 def test_run_success_with_mocked_crm(monkeypatch):
     """run returns CRM summary when data available."""
-    def fake_crm(company: str):
-        return {"summary": f"{company} overview"}
+    def fake_crm(payload: dict):
+        return {"summary": f"{payload.get('company')} overview"}
 
     monkeypatch.setattr(fetch, "_retrieve_from_crm", fake_crm)
     fetch._CACHE.clear()
@@ -28,10 +28,10 @@ def test_run_success_with_mocked_crm(monkeypatch):
 
 
 def test_run_early_exit_when_company_missing(monkeypatch):
-    """CRM is not queried when no company identifier provided."""
+    """Missing company info raises ValueError before CRM lookup."""
     called = {"flag": False}
 
-    def fake_crm(company: str):
+    def fake_crm(payload: dict):
         called["flag"] = True
         return {"summary": "should not be used"}
 
@@ -44,9 +44,9 @@ def test_run_early_exit_when_company_missing(monkeypatch):
         "payload": {},
     }
 
-    result = run.run(trigger)
+    with pytest.raises(ValueError):
+        run.run(trigger)
 
-    assert result["payload"]["summary"] == "No internal company research available."
     assert called["flag"] is False
 
 
