@@ -96,6 +96,40 @@ def test_contacts_scheduled_poll_summarizes_notes(monkeypatch):
     assert result[0]["payload"]["summary"] == "Bob is great"
 
 
+def test_contacts_poll_falls_back_to_admin(monkeypatch):
+    """If a contact has no e-mail address, admin is notified."""
+    contact = {
+        "names": [{"displayName": "Bob"}],
+        "notes": "Firma ACME",  # missing domain triggers reminder
+    }
+    monkeypatch.setattr(google_contacts, "fetch_contacts", lambda: [contact])
+    sent = {}
+    monkeypatch.setattr(google_contacts.email_sender, "send", lambda **k: sent.update(k))
+
+    google_contacts.scheduled_poll()
+
+    assert sent.get("to") == "admin@condata.io"
+
+
+def test_calendar_poll_populates_start_end(monkeypatch):
+    event = {
+        "id": "e1",
+        "creator": {"email": "alice@example.com"},
+        "summary": "Demo",
+        "description": "Firma Demo",
+        "start": {"dateTime": "2024-01-01T10:00:00+00:00"},
+        "end": {"dateTime": "2024-01-01T11:00:00+00:00"},
+    }
+    monkeypatch.setattr(google_calendar, "fetch_events", lambda: [event])
+    monkeypatch.setattr(google_calendar.email_sender, "send_reminder", lambda **k: None)
+
+    result = google_calendar.scheduled_poll()
+
+    payload = result[0]["payload"]
+    assert payload["start_iso"] == "2024-01-01T10:00:00+00:00"
+    assert payload["end_iso"] == "2024-01-01T11:00:00+00:00"
+
+
 def test_fetch_events_exits_early_when_no_triggers(tmp_path, monkeypatch):
     path = tmp_path / "triggers.txt"
     path.write_text("")
