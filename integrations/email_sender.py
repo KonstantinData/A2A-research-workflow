@@ -167,24 +167,30 @@ def send_reminder(
     event_start = event_start or dt.datetime.now()
     event_end = event_end or event_start
     event_date = event_start.date().isoformat()
-    start_time = event_start.strftime("%H:%M")
-    end_time = event_end.strftime("%H:%M")
-    greeting = (
-        f"Hi {creator_name}," if creator_name else f"Hi {creator_email},"
+    start_time_display = event_start.strftime("%H:%M")
+    end_time_display = event_end.strftime("%H:%M")
+    start_time_code = event_start.strftime("%H%M")
+    greeting = f"Hi {creator_name}," if creator_name else "Hi there,"
+    subject = (
+        f"[Research Agent] Missing Information – Event {event_date}_{start_time_code}"
     )
-    subject = f"[Research Agent] Missing Information – Event {event_date}_{start_time}"
-    bullets = "\n".join(f"- {f}" for f in missing_fields)
     body = (
         f"{greeting}\n\n"
         "this is just a quick reminder from your Internal Research Agent.\n\n"
-        f"For your research request regarding \"{event_title}\" on {event_date}, {start_time}–{end_time}, I still need a bit more information:\n\n"
-        f"{bullets}\n\n"
-        "Could you please update the calendar entry or contact record with these details?\n"
-        "Once the information is added, the process will automatically continue — no further action needed from you.\n\n"
+        f"For your research request regarding \"{event_title}\" on {event_date}, {start_time_display}–{end_time_display}, I still need a bit more information:\n\n"
+        "I definitely need the following details (required):\n"
+        "-- Company\n"
+        "-- Web domain\n\n"
+        "If you also have these details, please include them (optional):\n"
+        "-- Email\n"
+        "-- Phone\n\n"
+        "The easiest way: simply reply to this email with the missing information.  \n"
+        "You might also update the calendar entry or contact record with these details.\n\n"
+        "Once I receive the information, the process will automatically continue — no further action needed from you.\n\n"
         "Thanks a lot for your support!\n\n"
         '"Your Internal Research Agent"'
     )
-    task_id = f"{event_date}_{start_time}"
+    task_id = f"{event_date}_{start_time_code}"
     send(to=to, subject=subject, body=body, task_id=task_id)
     append_jsonl(
         _REMINDER_LOG,
@@ -194,5 +200,6 @@ def send_reminder(
             "title": event_title,
             "datetime": event_start.isoformat(),
             "missing_fields": list(missing_fields),
+            "email_sent_to": to,
         },
     )

@@ -323,7 +323,7 @@ def scheduled_poll() -> List[Dict[str, Any]]:
             end_dt = None
 
         normalized = {
-            "title": ev.get("summary") or "",
+            "title": ev.get("summary") or "Unknown",
             "description": description,
             "company": company,
             "domain": notes.get("domain"),
