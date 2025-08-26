@@ -7,6 +7,19 @@ import importlib.util as _ilu
 import json
 import os
 import re
+try:  # pragma: no cover - optional dependency
+    import openai  # type: ignore
+except Exception:  # pragma: no cover
+    class _DummyChatCompletion:
+        @staticmethod
+        def create(*args, **kwargs):  # type: ignore[no-untyped-def]
+            raise RuntimeError("openai package not installed")
+
+    class _DummyOpenAI:
+        ChatCompletion = _DummyChatCompletion
+        api_key: Optional[str] = None
+
+    openai = _DummyOpenAI()  # type: ignore[assignment]
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -27,6 +40,9 @@ from core.trigger_words import load_trigger_words
 from core.utils import normalize_text, already_processed, mark_processed, optional_fields
 from core import parser
 from . import email_sender
+
+if getattr(openai, "api_key", None) is not None:
+    openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
 def contains_trigger(event: dict, trigger_words: list[str]) -> str | None:
@@ -50,6 +66,36 @@ def extract_company(title: str, trigger: str) -> Optional[str]:
     remainder = re.sub(r"^(Firma|Company)\s+", "", remainder, flags=re.IGNORECASE)
     company = remainder.strip()
     return company or None
+
+
+def extract_company_ai(title: str, trigger: str) -> str:
+    """
+    Hybrid extraction for company names:
+    1. Try regex-based extraction.
+    2. If it fails or returns 'Unknown', fallback to OpenAI GPT.
+    """
+    company = extract_company(title, trigger) or "Unknown"
+    if company and company != "Unknown":
+        return company
+
+    prompt = f"""
+    Extract the company name from the following calendar event title.
+    Ignore leading words like 'Firma', 'Company', 'Firma Dr.', 'Client'.
+    Return only the clean company name as plain text (no quotes).
+    If no company is found, return "Unknown".
+
+    Title: "{title}"
+    """
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+        )
+        result = response["choices"][0]["message"]["content"].strip()
+        return result if result else "Unknown"
+    except Exception:
+        return "Unknown"
 
 # Local JSONL sink without clashing with stdlib logging
 _JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
@@ -220,13 +266,14 @@ def fetch_events(
                         continue
                     description = ev.get("description") or ""
                     ev = dict(ev)
+                    ev["detected_trigger"] = trigger
                     notes = {
                         "company": parser.extract_company(description),
                         "domain": parser.extract_domain(description),
                         "phone": parser.extract_phone(description),
                     }
-                    comp_from_title = extract_company(ev.get("summary", ""), trigger)
-                    if comp_from_title:
+                    comp_from_title = extract_company_ai(ev.get("summary", ""), trigger)
+                    if comp_from_title and comp_from_title != "Unknown":
                         notes["company"] = comp_from_title
                     ev["notes_extracted"] = notes
                     ev["company_extracted"] = comp_from_title
@@ -304,13 +351,16 @@ def scheduled_poll() -> List[Dict[str, Any]]:
         creator_name = (
             creator_info.get("displayName") if isinstance(creator_info, dict) else None
         )
+        title = ev.get("summary") or "Untitled"
         description = ev.get("description") or ""
         notes = ev.get("notes_extracted") or {
             "company": parser.extract_company(description),
             "domain": parser.extract_domain(description),
             "phone": parser.extract_phone(description),
         }
-        company = notes.get("company") or None
+        company = extract_company_ai(title, ev.get("detected_trigger", ""))
+        if company == "Unknown":
+            company = notes.get("company") or None
         start_raw = ev.get("start", {}).get("dateTime") or ev.get("start", {}).get("date")
         end_raw = ev.get("end", {}).get("dateTime") or ev.get("end", {}).get("date")
         try:
@@ -323,7 +373,7 @@ def scheduled_poll() -> List[Dict[str, Any]]:
             end_dt = None
 
         normalized = {
-            "title": ev.get("summary") or "Unknown",
+            "title": title,
             "description": description,
             "company": company,
             "domain": notes.get("domain"),
@@ -331,8 +381,8 @@ def scheduled_poll() -> List[Dict[str, Any]]:
             "phone": notes.get("phone"),
             "notes_extracted": notes,
             "event_id": ev.get("id"),
-            "start": start_raw,
-            "end": end_raw,
+            "start_iso": start_raw,
+            "end_iso": end_raw,
         }
         missing_req = [f for f in required if not normalized.get(f)]
         missing_opt = [f for f in optional if not normalized.get(f)]
