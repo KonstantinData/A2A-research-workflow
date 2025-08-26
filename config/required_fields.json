@@ -1,0 +1,5 @@
+{
+  "calendar": ["company", "domain"],
+  "contacts": ["company", "domain"],
+  "optional": ["email", "phone"]
+}

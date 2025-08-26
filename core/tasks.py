@@ -1,0 +1,193 @@
+from __future__ import annotations
+
+"""Simple task persistence layer using SQLite.
+
+This module defines a ``Task`` dataclass and CRUD helpers to create, read,
+update and delete task records. Records persist on disk via SQLite so they
+survive process restarts. The database location can be overridden by setting
+``TASKS_DB_PATH`` before importing this module.
+"""
+
+from dataclasses import dataclass, asdict
+from datetime import datetime
+import json
+import os
+import sqlite3
+import uuid
+from pathlib import Path
+from typing import Any, Dict, Iterable, Optional
+import logging
+
+# ---------------------------------------------------------------------------
+# Database setup
+# ---------------------------------------------------------------------------
+DEFAULT_DB_PATH = Path(__file__).with_name('tasks.db')
+DB_PATH = Path(os.getenv('TASKS_DB_PATH', DEFAULT_DB_PATH))
+
+logger = logging.getLogger(__name__)
+
+
+def _log_action(action: str, task: Dict[str, Any]) -> None:
+    payload = {
+        "action": action,
+        "task_id": task.get("id"),
+        "status": task.get("status"),
+        "assigned_to": task.get("employee_email"),
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+    logger.info(json.dumps(payload))
+
+
+def _connect() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute(
+        '''CREATE TABLE IF NOT EXISTS tasks (
+               id TEXT PRIMARY KEY,
+               trigger TEXT NOT NULL,
+               missing_fields TEXT NOT NULL,
+               employee_email TEXT NOT NULL,
+               status TEXT NOT NULL,
+               created_at TEXT NOT NULL,
+               updated_at TEXT NOT NULL
+           )'''
+    )
+    return conn
+
+
+# ---------------------------------------------------------------------------
+# Dataclass model
+# ---------------------------------------------------------------------------
+@dataclass
+class Task:
+    id: str
+    trigger: str
+    missing_fields: Any
+    employee_email: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = asdict(self)
+        d['missing_fields'] = self.missing_fields
+        return d
+
+
+# ---------------------------------------------------------------------------
+# CRUD helpers
+# ---------------------------------------------------------------------------
+def create_task(
+    trigger: str,
+    missing_fields: Any,
+    employee_email: str,
+) -> Dict[str, Any]:
+    now = datetime.utcnow()
+    task = Task(
+        id=str(uuid.uuid4()),
+        trigger=trigger,
+        missing_fields=missing_fields,
+        employee_email=employee_email,
+        status='pending',
+        created_at=now,
+        updated_at=now,
+    )
+    with _connect() as conn:
+        conn.execute(
+            'INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?, ?)',
+            (
+                task.id,
+                task.trigger,
+                json.dumps(task.missing_fields),
+                task.employee_email,
+                task.status,
+                task.created_at.isoformat(),
+                task.updated_at.isoformat(),
+            ),
+        )
+        conn.commit()
+    record = task.to_dict()
+    _log_action("create", record)
+    return record
+
+
+def get_task(task_id: str) -> Optional[Dict[str, Any]]:
+    with _connect() as conn:
+        cur = conn.execute('SELECT * FROM tasks WHERE id = ?', (task_id,))
+        row = cur.fetchone()
+        if not row:
+            return None
+        task = {
+            'id': row['id'],
+            'trigger': row['trigger'],
+            'missing_fields': json.loads(row['missing_fields']),
+            'employee_email': row['employee_email'],
+            'status': row['status'],
+            'created_at': datetime.fromisoformat(row['created_at']),
+            'updated_at': datetime.fromisoformat(row['updated_at']),
+        }
+        _log_action("read", task)
+        return task
+
+
+def update_task_status(task_id: str, status: str) -> Optional[Dict[str, Any]]:
+    now = datetime.utcnow().isoformat()
+    with _connect() as conn:
+        conn.execute(
+            'UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?',
+            (status, now, task_id),
+        )
+        conn.commit()
+        cur = conn.execute('SELECT * FROM tasks WHERE id = ?', (task_id,))
+        row = cur.fetchone()
+    if not row:
+        return None
+    task = {
+        'id': row['id'],
+        'trigger': row['trigger'],
+        'missing_fields': json.loads(row['missing_fields']),
+        'employee_email': row['employee_email'],
+        'status': row['status'],
+        'created_at': datetime.fromisoformat(row['created_at']),
+        'updated_at': datetime.fromisoformat(row['updated_at']),
+    }
+    _log_action("update", task)
+    return task
+
+
+def delete_task(task_id: str) -> bool:
+    with _connect() as conn:
+        cur = conn.execute('DELETE FROM tasks WHERE id = ?', (task_id,))
+        conn.commit()
+        deleted = cur.rowcount > 0
+    if deleted:
+        _log_action("delete", {"id": task_id, "status": "deleted", "employee_email": None})
+    return deleted
+
+
+def list_tasks() -> Iterable[Dict[str, Any]]:
+    with _connect() as conn:
+        cur = conn.execute('SELECT * FROM tasks')
+        rows = cur.fetchall()
+        return [
+            {
+                'id': r['id'],
+                'trigger': r['trigger'],
+                'missing_fields': json.loads(r['missing_fields']),
+                'employee_email': r['employee_email'],
+                'status': r['status'],
+                'created_at': datetime.fromisoformat(r['created_at']),
+                'updated_at': datetime.fromisoformat(r['updated_at']),
+            }
+            for r in rows
+        ]
+
+
+__all__ = [
+    'create_task',
+    'get_task',
+    'update_task_status',
+    'delete_task',
+    'list_tasks',
+    'Task',
+]

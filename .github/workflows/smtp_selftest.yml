@@ -1,0 +1,47 @@
+name: SMTP Self-Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      recipient:
+        description: "Empfänger-Adresse"
+        required: true
+        default: "konstantin@yourdomain.tld"
+      subject:
+        description: "Betreff"
+        required: false
+        default: "SMTP self-test (GitHub Actions)"
+      body:
+        description: "Nachricht"
+        required: false
+        default: "✅ SMTP works — sent via A2A workflow."
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    env:
+      SMTP_HOST:   ${{ secrets.SMTP_HOST }}
+      SMTP_PORT:   ${{ secrets.SMTP_PORT }}
+      SMTP_USER:   ${{ secrets.SMTP_USER }}
+      SMTP_PASS:   ${{ secrets.SMTP_PASS }}
+      SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+      MAIL_FROM:   ${{ secrets.MAIL_FROM }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Send test mail
+        run: |
+          python - <<'PY'
+          import os
+          from integrations.email_sender import send_email
+          send_email(
+              os.environ["MAIL_FROM"],
+              "${{ github.event.inputs.recipient }}",
+              "${{ github.event.inputs.subject }}",
+              "${{ github.event.inputs.body }}"
+          )
+          print("✅ Mail versendet an:", "${{ github.event.inputs.recipient }}")
+          PY
