@@ -1,4 +1,5 @@
 """Internal search agent runtime."""
+
 from __future__ import annotations
 
 import json
@@ -8,7 +9,6 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from agents.internal_company.run import run as internal_run
-from core import classify
 from integrations import email_sender
 from core import tasks
 from core.utils import optional_fields, required_fields
@@ -25,11 +25,17 @@ append_jsonl = _mod.append
 Normalized = Dict[str, Any]
 
 
-def _log_agent(action: str, domain: str, user_email: str, artifacts: str | None = None) -> None:
+def _log_agent(
+    action: str, domain: str, user_email: str, artifacts: str | None = None
+) -> None:
     """Write a log line for this agent."""
     date = datetime.utcnow()
     path = (
-        Path("logs") / "agent_internal_search" / f"{date:%Y}" / f"{date:%m}" / f"{date:%d}.jsonl"
+        Path("logs")
+        / "agent_internal_search"
+        / f"{date:%Y}"
+        / f"{date:%m}"
+        / f"{date:%d}.jsonl"
     )
     record = {
         "ts_utc": date.isoformat() + "Z",
@@ -47,7 +53,9 @@ def _log_workflow(record: Dict[str, Any]) -> None:
     ts = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%S")
     path = Path("logs") / "workflows" / f"{ts}_workflow.jsonl"
     data = dict(record)
-    data.setdefault("timestamp", datetime.utcnow().replace(microsecond=0).isoformat() + "Z")
+    data.setdefault(
+        "timestamp", datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    )
     append_jsonl(path, data)
 
 
@@ -198,31 +206,17 @@ def run(trigger: Normalized) -> Normalized:
     else:
         action = "NOT_IN_CRM"
 
-    # If the company does not exist or the report is outdated, attempt to enrich
-    # the payload with a basic classification derived from the description or other
-    # available text fields.  This supports downstream neighbour lookup.
-    if action == "NOT_IN_CRM":
-        # Build a text blob from available fields for classification
-        description = payload_res.get("description") or trigger.get("payload", {}).get("description") or ""
-        text_blob = {"description": description}
-        if description:
-            class_result = classify.classify(text_blob)
-            # Use the first WZ2008 code if available
-            wz_codes = class_result.get("wz2008") or []
-            if wz_codes:
-                code = wz_codes[0]
-                # Insert classification and industry label when not already provided
-                if not payload_res.get("classification_number"):
-                    payload_res["classification_number"] = code
-                # The label may be nested; use the German label for the matched code
-                label = class_result.get("labels", {}).get("wz2008", {}).get(code)
-                if label and not payload_res.get("industry"):
-                    payload_res["industry"] = label
-                # Persist the classification number back into the result payload
-                result["payload"] = payload_res
+    # If the company does not exist or the report is outdated, there is no need
+    # to inject classification numbers.  Downstream neighbour searches rely on
+    # industry_group, industry and description only.
+    # Classification codes are inferred later during detail research if required.
 
     artifacts_path: str | None = None
-    if any(payload.get(k) for k in ("classification_number", "industry", "description")):
+    # Emit a small artefact when optional descriptive fields are present.  The
+    # artefact is used by downstream components to seed search for similar
+    # companies.  It now records the industry group and industry rather than
+    # classification numbers.
+    if any(payload.get(k) for k in ("industry_group", "industry", "description")):
         artifacts_path = "artifacts/matching_crm_companies.json"
         Path("artifacts").mkdir(exist_ok=True)
         with open(artifacts_path, "w", encoding="utf-8") as fh:
@@ -231,8 +225,8 @@ def run(trigger: Normalized) -> Normalized:
                     {
                         "company_name": company_name,
                         "company_domain": company_domain,
+                        "industry_group": payload.get("industry_group"),
                         "industry": payload.get("industry"),
-                        "classification_number": payload.get("classification_number"),
                     }
                 ],
                 fh,
@@ -246,4 +240,3 @@ def run(trigger: Normalized) -> Normalized:
         "recipient": trigger.get("recipient"),
         "payload": {"action": action},
     }
-

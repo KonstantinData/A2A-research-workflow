@@ -3,8 +3,61 @@
   "title": "Company Core Schema",
   "type": "object",
   "properties": {
+    "company_name": {
+      "type": "string",
+      "description": "Der offizielle Firmenname."
+    },
+    "domain": {
+      "type": "string",
+      "format": "uri",
+      "description": "Die Web‑Domain des Unternehmens."
+    },
+    "industry_group": {
+      "type": "string",
+      "description": "Ein grobes Branchencluster, z. B. ‘Energy’, ‘Healthcare’, ‘Manufacturing’."
+    },
+    "industry": {
+      "type": "string",
+      "description": "Die konkrete Branche oder das Marktsegment, z. B. ‘Renewable Energy’, ‘MedTech’."
+    },
+    "description": {
+      "type": "string",
+      "description": "Eine Freitext‑Beschreibung des Unternehmens, wie sie aus Kalender‑Notizen, Kontaktinformationen oder Agentenrecherchen extrahiert wird."
+    },
+    "contact_info": {
+      "type": "object",
+      "description": "Kontaktinformationen des Unternehmens, sofern bekannt.",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "phone": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "country": {
+      "type": "string",
+      "description": "Zweistelliger ISO‑3166 Länder‑Code (optional)."
+    },
+    "classification": {
+      "type": "object",
+      "description": "Optionale Abbildung auf amtliche Klassifikationssysteme (z. B. NACE, WZ2008).",
+      "additionalProperties": true
+    },
     "meta": {
-      "type": "object"
+      "type": "object",
+      "description": "Metadaten wie Quelle und Zeitstempel."
     }
-  }
+  },
+  "required": [
+    "company_name",
+    "domain",
+    "industry_group",
+    "industry",
+    "description"
+  ],
+  "additionalProperties": false
 }

@@ -1,5 +1,10 @@
 {
-  "calendar": ["company", "domain"],
-  "contacts": ["company", "domain"],
-  "optional": ["email", "phone"]
+  // Für Kalender und Kontakte werden nur der Firmenname und die Domain als
+  // Pflichtfelder vorausgesetzt.  Die restlichen Informationen wie Branche
+  // oder Beschreibung werden während der Recherche ergänzt.  Die neuen
+  // Felder orientieren sich am flexiblen Datenmodell (industry_group,
+  // industry, description) und ersetzen Klassifikationsnummern.
+  "calendar": ["company_name", "domain"],
+  "contacts": ["company_name", "domain"],
+  "optional": ["email", "phone", "industry_group", "industry", "description"]
 }

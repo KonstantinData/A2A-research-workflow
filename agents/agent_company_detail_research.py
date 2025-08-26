@@ -1,16 +1,22 @@
 """Enrich company information with static details.
 
-This agent performs a lightweight "detail research" step by looking up
+This agent performs a lightweight detail research step by looking up
 company information from a static mapping defined in
-:mod:`agents.company_data`.  In the absence of external APIs or web
-scraping this provides a deterministic, reproducible data source.  The
-returned payload contains core fields such as ``company_name``,
-``company_domain``, ``industry``, ``classification_number``,
-``description`` and ``website``.  A JSON artefact is also emitted into
-the ``artifacts/`` folder for downstream use.  Should ``report_path``
-and ``company_id`` be present in the incoming trigger payload the
-resulting PDF will be attached to the HubSpot company via
-``hubspot_api.attach_pdf``.
+``agents.company_data``.  The data model has been refactored to
+eliminate mandatory classification numbers.  Instead each company
+record surfaces an ``industry_group``, an ``industry`` and a
+free‑form ``description``.  Classification codes are retained only in
+the optional ``classification`` mapping for backward compatibility.
+
+When a company is unknown in the static mapping a generic fallback is
+built from the trigger payload.  The fallback derives a plausible
+domain and website and uses simple heuristics to assign an industry
+group from the provided industry.  A JSON artefact is emitted into
+the ``artifacts/`` directory for downstream reuse.
+
+Should ``report_path`` and ``company_id`` be present in the incoming
+trigger payload the resulting PDF will be attached to the HubSpot
+company via ``hubspot_api.attach_pdf``.
 """
 
 from __future__ import annotations
@@ -49,14 +55,13 @@ def run(trigger: Normalized) -> Normalized:
     Parameters
     ----------
     trigger:
-        Normalized trigger dictionary containing at least ``payload`` and
-        ``company``/``company_name`` fields.
+        Normalized trigger dictionary containing at least a ``payload``.
 
     Returns
     -------
     Normalized
-        Dictionary with ``source``, ``creator``, ``recipient`` and a
-        ``payload`` containing detailed company information.  A JSON
+        Dictionary with ``source``, ``creator`` and ``recipient`` keys and
+        a ``payload`` containing enriched company information.  A JSON
         artefact is persisted into ``artifacts/`` for caching.
     """
     payload = trigger.get("payload", {}) or {}
@@ -78,18 +83,30 @@ def run(trigger: Normalized) -> Normalized:
         or ""
     )
     info = company_data.lookup_company(company_name)
-    # Build a generic fallback when unknown
+    # Build a generic fallback when unknown.  Assign an industry group
+    # based on the provided or default industry.  Unknown values default
+    # to "Other".  No neighbours or customers are included in the fallback.
     if info is None:
-        # Try to derive domain from payload; if missing, normalise name to
-        # a DNS‑like label.  The fallback deliberately omits customers
-        # and neighbours – those will be empty lists.
         domain = payload.get("domain") or payload.get("company_domain")
         if not domain:
             key = company_name.strip().lower().replace(" ", "-") or "unknown"
             domain = f"{key}.example"
         website = payload.get("website") or f"https://{domain}"
         industry = payload.get("industry") or "consulting"
-        classification_number = payload.get("classification_number") or "70.22"
+        # Map basic industries into high level groups.  Unknown values
+        # default to "Other".  Use lower case for matching.
+        _group_map = {
+            "manufacturing": "Manufacturing",
+            "technology": "Technology",
+            "software": "Technology",
+            "consulting": "Services",
+            "retail": "Services",
+            "pharmaceuticals": "Healthcare",
+            "healthcare": "Healthcare",
+            "finance": "Finance",
+            "agriculture": "Agriculture",
+        }
+        industry_group = _group_map.get(industry.lower(), "Other")
         description = (
             f"{company_name or 'The company'} operates in the {industry} sector. "
             f"This is a generic fallback description when no detailed information "
@@ -99,8 +116,8 @@ def run(trigger: Normalized) -> Normalized:
             "company_name": company_name or "Unknown",
             "company_domain": domain,
             "website": website,
+            "industry_group": industry_group,
             "industry": industry,
-            "classification_number": classification_number,
             "description": description,
         }
     else:
@@ -108,10 +125,24 @@ def run(trigger: Normalized) -> Normalized:
             "company_name": info.company_name,
             "company_domain": info.company_domain,
             "website": info.website,
+            "industry_group": info.industry_group,
             "industry": info.industry,
-            "classification_number": info.classification_number,
             "description": info.description,
         }
+        # Include classification mapping when available to preserve backward
+        # compatibility.  The caller may ignore this field.
+        if getattr(info, "classification", None):
+            info_dict["classification"] = dict(info.classification)
+    # Use core.classify to infer classification codes from the description if no
+    # explicit mapping exists.  This yields a dictionary keyed by scheme.
+    try:
+        from core import classify as _classify
+        if "classification" not in info_dict:
+            cls = _classify.classify(info_dict)
+            if cls:
+                info_dict["classification"] = cls
+    except Exception:
+        pass
 
     # Persist artefact for reuse in later agents
     filename = (

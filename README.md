@@ -40,6 +40,103 @@ flowchart LR
 5. Consolidate data and generate PDF/CSV outputs.
 6. Optionally enrich HubSpot with core fields and attach the PDF.
 
+## Data Model
+
+### Two‑Layer Company Model
+
+The research workflow distinguishes between **core company data** and
+**HubSpot‑specific data**.  This separation enables the project to
+remain portable – you can reuse the core model with other CRMs or data
+pipelines – while still populating all available fields in HubSpot.
+
+1. **Core Schema** – The universal, lean representation of a company
+   that is independent of any CRM.  Required fields are:
+
+   | Field | Description |
+   | --- | --- |
+   | `company_name` | Official company name |
+   | `domain` | Company web domain (without protocol) |
+   | `industry_group` | High‑level industry cluster such as “Manufacturing” or “Energy” |
+   | `industry` | Specific sector or market focus, e.g. “Renewable Energy” |
+   | `description` | Free‑text description from notes or agent research |
+
+   Optional fields include `contact_info` (email, phone), `country`
+   (ISO‑3166 code) and `classification` (mapping to WZ/NACE/ISIC).  No
+   sales‑specific fields (owner, revenue, etc.) live in the core model.
+
+2. **HubSpot Mapping Layer** – A separate dictionary of CRM‑specific
+   properties.  When a report is synced to HubSpot, the core fields
+   are mapped onto HubSpot property names (see
+   [`docs/hubspot_mapping.md`](docs/hubspot_mapping.md) for details).
+   Additional fields such as `city`, `postal_code`, `number_of_employees`,
+   `total_revenue`, `lead_status` or `ideal_customer_profile_tier` are
+   optional and can be supplied via this layer.  A set of
+   `company_keywords` is automatically generated from the core
+   `industry` and `description` to aid search in HubSpot.  The mapping
+   occurs exclusively in `integrations/hubspot_api.py` and is decoupled
+   from the agents and orchestrator.
+
+### Rationale for Dropping Classification Numbers
+
+Earlier versions of this project relied on economic classification numbers (e.g. WZ 2008,
+NACE, ÖNACE, NOGA) to categorise companies.  While these codes are useful for
+statistical analysis, they are opaque to most business users, evolve over
+time and differ across jurisdictions.  Maintaining mappings between
+multiple classification systems introduces friction and slows down
+automation.
+
+To simplify the research workflow the core company model has been
+refactored.  Agents that research or compare companies now rely on
+`industry_group`, `industry` and `description` as their primary
+criteria.  The earlier classification numbers are added only when
+needed for backward compatibility via the optional `classification`
+field.
+
+### Example Core & HubSpot Structure
+
+After consolidating the outputs of the research agents you will obtain
+a core record such as:
+
+```json
+{
+  "company_name": "SolarTech GmbH",
+  "domain": "solartech.de",
+  "industry_group": "Energy",
+  "industry": "Renewable Energy",
+  "description": "Solar panel manufacturer with focus on B2B distribution",
+  "contact_info": {"email": "info@solartech.de", "phone": "+49 89 123456"},
+  "country": "DE"
+}
+```
+
+If you wish to enrich HubSpot with additional details you can add a
+`hubspot` section:
+
+```json
+{
+  "core": {
+    "company_name": "SolarTech GmbH",
+    "domain": "solartech.de",
+    "industry_group": "Energy",
+    "industry": "Renewable Energy",
+    "description": "Solar panel manufacturer with focus on B2B distribution"
+  },
+  "hubspot": {
+    "city": "Munich",
+    "postal_code": "80331",
+    "number_of_employees": 250,
+    "total_revenue": "45000000",
+    "lead_status": "Open",
+    "company_owner": "Max Mustermann",
+    "ideal_customer_profile_tier": "Tier 1"
+  }
+}
+```
+
+Only the core section is used to produce the PDF/CSV reports.  The
+`hubspot` section is consumed by `upsert_company()` to feed the HubSpot
+CRM.
+
 ## Example Run
 
 ```bash

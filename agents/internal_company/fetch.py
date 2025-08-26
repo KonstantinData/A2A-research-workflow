@@ -119,27 +119,31 @@ def _latest_report(company_id: str) -> Tuple[Optional[str], Optional[str]]:
 
 
 def _neighbors(
-    classification: Optional[str], industry: Optional[str], description: Optional[str]
+    industry_group: Optional[str], industry: Optional[str], description: Optional[str]
 ) -> List[Dict[str, Any]]:
     """
-    Zusätzliche CRM-Nachbarn für L1/L2-Suche bereitstellen.
-    Erwartet:
-      - find_similar_companies(classification, industry, description) -> iterable
+    Return additional CRM neighbours for level‑1/level‑2 search.
+
+    The refactored data model no longer depends on opaque classification
+    numbers.  Instead this helper uses the industry group, industry
+    and free text description to discover similar companies.  The
+    underlying HubSpot helper ``find_similar_companies`` accepts the
+    same parameters.  At least one hint must be provided; otherwise
+    an empty list is returned.
     """
-    if not (classification or industry or description):
+    if not (industry_group or industry or description):
         return []
-    rows = []
-    for c in (
-        hubspot_api.find_similar_companies(classification, industry, description) or []
-    ):
-        # mind. 2 Pflichtfelder
+    rows: List[Dict[str, Any]] = []
+    # Pass the industry_group as the first argument to preserve call signature;
+    # older implementations may treat this argument as a classification number.
+    for c in hubspot_api.find_similar_companies(industry_group, industry, description) or []:
+        # build a candidate record; require at least two identifying fields
         fields = {
             "company_name": c.get("company_name") or c.get("name"),
             "company_domain": c.get("company_domain") or c.get("domain"),
+            "industry_group": c.get("industry_group"),
             "industry": c.get("industry"),
-            "classification_number": c.get("classification_number")
-            or c.get("nace")
-            or c.get("sic"),
+            "description": c.get("description"),
             "source": "crm",
             "confidence": float(c.get("confidence", 0.0)),
         }
@@ -148,8 +152,8 @@ def _neighbors(
             for k in (
                 "company_name",
                 "company_domain",
+                "industry_group",
                 "industry",
-                "classification_number",
             )
             if fields.get(k)
         )
@@ -172,7 +176,7 @@ def _retrieve_from_crm(payload: Dict[str, Any]) -> Raw:
             "last_report_date": None,
             "last_report_id": None,
             "neighbors": _neighbors(
-                payload.get("classification_number"),
+                payload.get("industry_group"),
                 payload.get("industry"),
                 payload.get("description"),
             ),
@@ -186,10 +190,10 @@ def _retrieve_from_crm(payload: Dict[str, Any]) -> Raw:
         "company_id": company_id,
         "company_name": company.get("properties", {}).get("name") or name,
         "company_domain": company.get("properties", {}).get("domain") or domain,
-        "last_report_date": last_date,  # ISO-8601 erwartet von hubspot_api
+        "last_report_date": last_date,  # ISO-8601 expected from hubspot_api
         "last_report_id": last_id,
         "neighbors": _neighbors(
-            payload.get("classification_number"),
+            payload.get("industry_group"),
             payload.get("industry"),
             payload.get("description"),
         ),

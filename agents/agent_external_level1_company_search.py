@@ -5,7 +5,12 @@ organisation named in the trigger.  It uses the static mapping
 defined in :mod:`agents.company_data` to look up neighbour companies
 and returns a list of suggestions.  The purpose of this step is to
 provide additional research targets for further enrichment and to
-avoid redundant work.  A JSON artefact is written into the
+avoid redundant work.
+
+In the refactored data model the returned neighbour entries surface
+``industry_group``, ``industry`` and ``description``.  A
+``classification`` mapping is included only when available for
+backwards compatibility.  A JSON artefact is written into the
 ``artifacts/`` directory so subsequent steps (or external tools) may
 reuse the neighbour list.
 """
@@ -48,11 +53,12 @@ def run(trigger: Normalized) -> Normalized:
     Returns
     -------
     Normalized
-        Dictionary with ``source``, ``creator``, ``recipient`` and a
+        Dictionary with ``source``, ``creator`` and ``recipient`` keys and a
         ``payload`` containing a ``companies`` list.  Each element in
         ``companies`` is a dictionary with keys ``company_name``,
-        ``company_domain``, ``industry``, ``classification_number`` and
-        ``description``.
+        ``company_domain``, ``industry_group``, ``industry`` and
+        ``description``.  A ``classification`` mapping is present only
+        when provided in the static dataset.
     """
     payload = trigger.get("payload", {}) or {}
     company_name = (
@@ -62,16 +68,19 @@ def run(trigger: Normalized) -> Normalized:
         or ""
     )
     neighbours: List[Dict[str, Any]] = []
-    for info in company_data.neighbours_for(company_name):
-        neighbours.append(
-            {
-                "company_name": info.company_name,
-                "company_domain": info.company_domain,
-                "industry": info.industry,
-                "classification_number": info.classification_number,
-                "description": info.description,
-            }
-        )
+    # Suggest up to five neighbour companies in the same sector.  Slice
+    # the result for clarity but allow fewer entries when less are available.
+    for info in company_data.neighbours_for(company_name)[:5]:
+        entry: Dict[str, Any] = {
+            "company_name": info.company_name,
+            "company_domain": info.company_domain,
+            "industry_group": info.industry_group,
+            "industry": info.industry,
+            "description": info.description,
+        }
+        if getattr(info, "classification", None):
+            entry["classification"] = dict(info.classification)
+        neighbours.append(entry)
     # Emit artefact for downstream consumption
     _write_artifact("neighbor_level1_companies.json", neighbours)
     return {
