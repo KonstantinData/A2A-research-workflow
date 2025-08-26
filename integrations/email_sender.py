@@ -1,6 +1,6 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from .mailer import send_email
+from .mailer import send_email as _send_email  # interne Referenz
 
 
 def _fmt(dt_iso, tz_str):
@@ -49,4 +49,18 @@ Thanks a lot for your support!
 "Your Internal Research Agent"
 """
 
-    send_email(to=creator_email, subject=subject, body=body)
+    _send_email(to=creator_email, subject=subject, body=body)
+
+
+# ---------------------------------------------------------------------------
+# ✅ Kompatibilitäts-Aliase für Tests
+# ---------------------------------------------------------------------------
+
+
+def send(*, to, subject, body, **kwargs):
+    """Alias für Tests (wird in mehreren Testdateien direkt gepatcht)."""
+    return _send_email(to=to, subject=subject, body=body, **kwargs)
+
+
+# expose auch den importierten Namen so, dass Tests `email_sender.send_email` patchen können
+send_email = _send_email

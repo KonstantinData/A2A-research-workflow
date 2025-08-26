@@ -2,6 +2,7 @@ import os
 import re
 import unicodedata
 import logging
+from functools import lru_cache
 
 # Optional: GPT fallback
 try:
@@ -35,31 +36,42 @@ TRIGGERS = [
 ]
 
 
-def load_trigger_words(path: str | None = None) -> list[str]:
-    """
-    Load trigger words from config/trigger_words.txt if available,
-    otherwise return default TRIGGERS.
-    """
-    if path and os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            return [line.strip() for line in f if line.strip()]
-    return TRIGGERS
-
-
 def normalize_text(text: str) -> str:
     """Normalize string for trigger matching (casefold, remove accents)."""
     if not text:
         return ""
+    if not isinstance(text, str):
+        # Falls Tests versehentlich ein dict übergeben (z. B. {"summary": ...})
+        if isinstance(text, dict) and "summary" in text:
+            text = text["summary"]
+        else:
+            text = str(text)
     text = unicodedata.normalize("NFKC", text)
     return text.casefold().strip()
 
 
-def contains_trigger(text: str, triggers: list[str] | None = None) -> str | None:
+@lru_cache(maxsize=1)
+def load_trigger_words() -> list[str]:
+    """
+    Load trigger words from TRIGGER_WORDS_FILE if set, else use defaults.
+    Cached with lru_cache, so Tests können cache_clear() nutzen.
+    """
+    path = os.getenv("TRIGGER_WORDS_FILE")
+    if path and os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return [line.strip() for line in f if line.strip()]
+        except Exception as e:
+            logger.warning(f"Failed to read trigger words file {path}: {e}")
+    return TRIGGERS
+
+
+def contains_trigger(text: str | dict, triggers: list[str] | None = None) -> str | None:
     """Check if any trigger word/phrase is contained in text."""
     if not text:
         return None
     norm = normalize_text(text)
-    for trig in triggers or TRIGGERS:
+    for trig in triggers or load_trigger_words():
         if trig in norm:
             return trig
     return None
@@ -86,7 +98,9 @@ def extract_company(title: str, trigger: str) -> str:
     remainder = title[idx + len(trigger) :].lstrip(" :-–—").strip()
 
     # Remove common prefixes
-    remainder = re.sub(r"^(firma|company)\s+", "", remainder, flags=re.IGNORECASE)
+    remainder = re.sub(
+        r"^(firma|company|client)\s+", "", remainder, flags=re.IGNORECASE
+    )
 
     if remainder:
         return remainder
