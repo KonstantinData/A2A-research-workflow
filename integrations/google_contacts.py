@@ -18,6 +18,15 @@ except Exception:  # pragma: no cover
     Request = None  # type: ignore
     build = None  # type: ignore
 
+# Scopes required for the People API.  ``contacts.other.readonly`` enables
+# access to the "Other contacts" bucket which some accounts use for storing
+# address book entries.  Using both scopes keeps the refresh token compatible
+# with either permission set.
+SCOPES = [
+    "https://www.googleapis.com/auth/contacts.readonly",
+    "https://www.googleapis.com/auth/contacts.other.readonly",
+]
+
 from core.trigger_words import load_trigger_words
 from core import feature_flags, summarize, parser
 from core.utils import (
@@ -72,9 +81,12 @@ def fetch_contacts(page_size: int = 200, page_limit: int = 10) -> List[Dict[str,
         token_uri="https://oauth2.googleapis.com/token",
         client_id=os.environ["GOOGLE_CLIENT_ID"],
         client_secret=os.environ["GOOGLE_CLIENT_SECRET"],
-        scopes=["https://www.googleapis.com/auth/contacts.readonly"],
+        scopes=SCOPES,
     )
-    creds.refresh(Request())
+    try:
+        creds.refresh(Request())
+    except Exception:  # pragma: no cover - invalid/expired tokens
+        return []
     service = build("people", "v1", credentials=creds, cache_discovery=False)
 
     out: List[Dict[str, Any]] = []
