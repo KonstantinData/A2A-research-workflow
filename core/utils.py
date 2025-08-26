@@ -49,7 +49,17 @@ def normalize_text(text: str) -> str:
 def _required_fields() -> Dict[str, List[str]]:
     path = Path(__file__).resolve().parents[1] / "config" / "required_fields.json"
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        # ``required_fields.json`` in this kata contains ``//`` style comments
+        # which are not part of the JSON specification.  Python's ``json`` module
+        # does not ignore these comments which previously caused
+        # ``JSONDecodeError`` failures when the file was read.  To keep the
+        # configuration human friendly we strip comments before parsing the
+        # content.  This is a small helper and avoids pulling in extra
+        # dependencies just for lenient JSON parsing.
+        text = path.read_text(encoding="utf-8")
+        lines = [line.split("//", 1)[0] for line in text.splitlines()]  # remove trailing ``//`` comments
+        cleaned = "\n".join(lines)
+        return json.loads(cleaned)
     except FileNotFoundError:
         return {}
 

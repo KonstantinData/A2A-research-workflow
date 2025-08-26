@@ -134,14 +134,18 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
     for person in contacts:
         email = _primary_email(person) or ""
         notes = _notes_blob(person)
-        # Attempt to derive company and domain from the notes text.  If no
-        # information is found fall back to the contact's display name.  This
-        # helps capture companies when the user puts the trigger and company
-        # name on the same line or inside the person's name field.
-        company = parser.extract_company(notes) or parser.extract_company(" ".join(names) if names else "") or ""
-        domain = parser.extract_domain(notes) or parser.extract_domain(" ".join(names) if names else "") or ""
-        phone = parser.extract_phone(notes) or parser.extract_phone(" ".join(names) if names else "") or ""
+        # Display names are often used by the tests to encode trigger
+        # information.  We therefore collect them up-front so they can be used as
+        # a fall back for the parsing helpers below.
         names = [n.get("displayName") for n in person.get("names", []) if n.get("displayName")]
+        joined_names = " ".join(names)
+        # Attempt to derive company/domain/phone from the notes text.  If no
+        # information is found fall back to the contact's display name.  This
+        # helps capture companies when the user puts the trigger and company name
+        # on the same line or inside the person's name field.
+        company = parser.extract_company(notes) or parser.extract_company(joined_names) or ""
+        domain = parser.extract_domain(notes) or parser.extract_domain(joined_names) or ""
+        phone = parser.extract_phone(notes) or parser.extract_phone(joined_names) or ""
 
         payload: Dict[str, Any] = {
             "names": names,
