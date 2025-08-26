@@ -40,6 +40,21 @@ assert _spec and _spec.loader
 _spec.loader.exec_module(_mod)  # type: ignore[attr-defined]
 append_jsonl = _mod.append
 
+def build_reminder_subject(
+    title: Optional[str],
+    start: Optional[dt.datetime],
+    end: Optional[dt.datetime],
+) -> str:
+    """Compose reminder e-mail subject with graceful fallbacks."""
+    title = title or "Untitled Event"
+    if start:
+        date_s = start.date().isoformat()
+        start_s = start.strftime("%H:%M")
+        end_s = end.strftime("%H:%M") if end else None
+        time_part = f"{start_s}–{end_s}" if end_s else start_s
+        return f'[Research Agent] Missing Information – Event "{title}" on {date_s} {time_part}'
+    return f'[Research Agent] Missing Information – Event "{title}"'
+
 def log_event(record: Dict[str, Any]) -> None:
     """Write ``record`` to a timestamped JSONL file under ``logs/workflows``."""
     ts = dt.datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%S")
@@ -328,7 +343,7 @@ def run(
     return consolidated
 
 
-__all__ = ["gather_triggers", "run"]
+__all__ = ["gather_triggers", "run", "build_reminder_subject"]
 
 if __name__ == "__main__":  # pragma: no cover
     run()
