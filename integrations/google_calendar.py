@@ -46,7 +46,7 @@ def extract_company(title: str, trigger: str) -> Optional[str]:
     idx = title.lower().find(trigger.lower())
     if idx == -1:
         return None
-    remainder = title[idx + len(trigger) :].lstrip(" :\-–—")
+    remainder = title[idx + len(trigger) :].lstrip(" :-–—")
     remainder = re.sub(r"^(Firma|Company)\s+", "", remainder, flags=re.IGNORECASE)
     company = remainder.strip()
     return company or None

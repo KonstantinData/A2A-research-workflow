@@ -73,27 +73,37 @@ def _retry(fn: Callable[[], Any], retries: int = 3, delay: float = 2.0) -> Any:
 def _normalize_events(events: Iterable[Dict[str, Any]]) -> List[Normalized]:
     norm: List[Normalized] = []
     for ev in events or []:
+        if isinstance(ev, dict) and ev.get("source") == "calendar" and "payload" in ev:
+            norm.append(ev)
+            continue
         creator_info = ev.get("creator")
+        creator_name = None
         if isinstance(creator_info, dict):
             creator = creator_info.get("email")
+            creator_name = creator_info.get("displayName")
         else:
             creator = creator_info
+            creator_name = ev.get("creator_name")
         if not creator:
             creator = ev.get("organizer", {}).get("email")
-        norm.append(
-            {
-                "source": "calendar",
-                "creator": creator,
-                "recipient": creator,
-                "payload": ev,
-            }
-        )
+        entry: Normalized = {
+            "source": "calendar",
+            "creator": creator,
+            "recipient": creator,
+            "payload": ev,
+        }
+        if creator_name:
+            entry["creator_name"] = creator_name
+        norm.append(entry)
     return norm
 
 
 def _normalize_contacts(contacts: Iterable[Dict[str, Any]]) -> List[Normalized]:
     norm: List[Normalized] = []
     for c in contacts or []:
+        if isinstance(c, dict) and c.get("source") == "contacts" and "payload" in c:
+            norm.append(c)
+            continue
         email: Optional[str] = None
         for item in c.get("emailAddresses", []):
             if "value" in item:
@@ -130,7 +140,7 @@ def gather_triggers(
         contacts = []
 
     triggers: List[Normalized] = []
-    triggers.extend(events or [])
+    triggers.extend(_normalize_events(events or []))
     triggers.extend(_normalize_contacts(contacts or []))
     return triggers
 
