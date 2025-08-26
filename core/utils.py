@@ -1,3 +1,15 @@
+"""Miscellaneous helper utilities used across the project.
+
+This module intentionally keeps dependencies light so it can be imported in the
+test-suite without requiring any external packages.  Some imports were omitted
+in the kata version of the repository which caused ``NameError`` exceptions when
+the helpers were exercised.  The tests expect ``normalize_text`` to correctly
+handle Unicode dashes and German umlauts and the required/optional field helpers
+to function.  We therefore ensure all standard library imports are present.
+"""
+
+from __future__ import annotations
+
 import json
 import unicodedata
 from functools import lru_cache
