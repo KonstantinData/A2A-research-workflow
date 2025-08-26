@@ -5,6 +5,7 @@ import email
 import imaplib
 import os
 import re
+import time
 from email.header import decode_header
 from pathlib import Path
 from typing import Any, Dict, List
@@ -55,13 +56,13 @@ def fetch_replies() -> List[Dict[str, Any]]:
             continue
         msg = email.message_from_bytes(msg_data[0][1])
         subject = _decode(msg.get("Subject", ""))
-        if not (
-            subject.startswith("[Agent: Internal Research]")
-            or subject.startswith("Missing Information for Your Research Request")
-        ):
+        if "[Research Agent] Missing Information" not in subject:
             continue
+        match = re.search(r"Event (\d{4}-\d{2}-\d{2})_(\d{2}:\d{2})", subject)
+        task_id = ""
+        if match:
+            task_id = f"{match.group(1)}_{match.group(2)}"
         from_addr = email.utils.parseaddr(msg.get("From"))[1]
-        task_id = msg.get("In-Reply-To") or msg.get("References") or ""
 
         body = ""
         if msg.is_multipart():
@@ -108,5 +109,15 @@ def fetch_replies() -> List[Dict[str, Any]]:
     return results
 
 
-__all__ = ["fetch_replies"]
+def poll_replies(interval: int = 600) -> None:
+    """Continuously poll the inbox for replies every ``interval`` seconds."""
+    while True:
+        try:
+            fetch_replies()
+        except Exception as e:
+            append_jsonl(_LOG_PATH, {"status": "error", "error": str(e)})
+        time.sleep(interval)
+
+
+__all__ = ["fetch_replies", "poll_replies"]
 

@@ -12,12 +12,13 @@ from core import trigger_words  # noqa: E402
 
 def test_calendar_scheduled_poll_normalizes(monkeypatch):
     event = {
+        "id": "e1",
         "creator": {"email": "alice@example.com"},
         "summary": "Meeting",
         "description": "Firma TestCorp\nwww.testcorp.com\n+49 1234567",
     }
     monkeypatch.setattr(google_calendar, "fetch_events", lambda: [event])
-    monkeypatch.setattr(google_calendar.email_sender, "send", lambda *a, **k: None)
+    monkeypatch.setattr(google_calendar.email_sender, "send_reminder", lambda **k: None)
 
     result = google_calendar.scheduled_poll()
 
@@ -38,6 +39,9 @@ def test_calendar_scheduled_poll_normalizes(monkeypatch):
                     "domain": "www.testcorp.com",
                     "phone": "+49 1234567",
                 },
+                "event_id": "e1",
+                "start": None,
+                "end": None,
             },
         }
     ]
