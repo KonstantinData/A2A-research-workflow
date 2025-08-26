@@ -10,12 +10,13 @@ from integrations import google_calendar, google_contacts
 
 def test_calendar_scheduled_poll_integration(monkeypatch):
     event = {
+        "id": "e1",
         "creator": {"email": "alice@example.com"},
         "summary": "Demo",
         "description": "Firma DemoCorp\ndemocorp.com\n+49 2222222",
     }
     monkeypatch.setattr(google_calendar, "fetch_events", lambda: [event])
-    monkeypatch.setattr(google_calendar.email_sender, "send", lambda *a, **k: None)
+    monkeypatch.setattr(google_calendar.email_sender, "send_reminder", lambda **k: None)
 
     result = google_calendar.scheduled_poll()
 
@@ -36,6 +37,9 @@ def test_calendar_scheduled_poll_integration(monkeypatch):
                     "domain": "democorp.com",
                     "phone": "+49 2222222",
                 },
+                "event_id": "e1",
+                "start": None,
+                "end": None,
             },
         }
     ]

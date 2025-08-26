@@ -77,22 +77,28 @@ def run(trigger: Normalized) -> Normalized:
     company = payload.get("company") or payload.get("company_name") or "Unknown"
 
     if missing_required:
-        sender = os.getenv("MAIL_FROM") or "research-agent@condata.io"
-        subject = "Missing Information for Your Research Request"
-        body = (
-            f"{greeting}\n\n"
-            "this is just a quick reminder from your Internal Research Agent.\n\n"
-            f"For your research request regarding \"{company}\", we still need a bit more information:\n\n"
-            "* Company (required)\n"
-            "* Domain (required)\n"
-            "* Email (optional)\n"
-            "* Phone (optional)\n\n"
-            "Could you please update the calendar entry or contact record with these details?\n"
-            "Once the information is added, the process will automatically continue — no further action needed from you.\n\n"
-            "Thanks a lot for your support!\n\n"
-            "– Your Internal Research Agent"
+        event_title = payload.get("title") or company
+        start_raw = payload.get("start")
+        end_raw = payload.get("end")
+        try:
+            start_dt = datetime.fromisoformat(start_raw) if start_raw else None
+        except Exception:
+            start_dt = None
+        try:
+            end_dt = datetime.fromisoformat(end_raw) if end_raw else None
+        except Exception:
+            end_dt = None
+        missing = missing_required + missing_optional
+        email_sender.send_reminder(
+            to=creator_email,
+            creator_email=creator_email,
+            creator_name=creator_name,
+            event_id=payload.get("event_id"),
+            event_title=event_title,
+            event_start=start_dt,
+            event_end=end_dt,
+            missing_fields=missing,
         )
-        email_sender.send(to=creator_email, subject=subject, body=body, sender=sender)
         _log_workflow(
             {
                 "status": "missing_fields",
@@ -107,7 +113,6 @@ def run(trigger: Normalized) -> Normalized:
                 "agent": "internal_company_research",
                 "to": creator_email,
                 "missing": missing_required,
-                "notified_via": sender,
             }
         )
         return {

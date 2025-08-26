@@ -2,9 +2,10 @@
 """SMTP email sender utility (LIVE, strict env, no silent fallbacks)."""
 from __future__ import annotations
 
+import datetime as dt
 from email.message import EmailMessage
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Sequence
 import mimetypes
 import os
 import smtplib
@@ -19,6 +20,16 @@ _notifications_spec = importlib.util.spec_from_file_location(
 notifications = importlib.util.module_from_spec(_notifications_spec)
 assert _notifications_spec.loader is not None
 _notifications_spec.loader.exec_module(notifications)  # type: ignore[attr-defined]
+
+# JSONL logging for reminder events
+_JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
+_spec = importlib.util.spec_from_file_location("jsonl_sink", _JSONL_PATH)
+_mod = importlib.util.module_from_spec(_spec)
+assert _spec and _spec.loader
+_spec.loader.exec_module(_mod)  # type: ignore[attr-defined]
+append_jsonl = _mod.append
+
+_REMINDER_LOG = Path("logs") / "workflows" / "reminders.jsonl"
 
 
 def _env_required(name: str) -> str:
@@ -139,3 +150,49 @@ def send(
         or "research-agent@condata.io"
     )
     send_email(sender_addr, to, subject, body, attachments, task_id=task_id)
+
+
+def send_reminder(
+    *,
+    to: str,
+    creator_email: str,
+    creator_name: Optional[str],
+    event_id: Optional[str],
+    event_title: str,
+    event_start: Optional[dt.datetime],
+    event_end: Optional[dt.datetime],
+    missing_fields: Sequence[str],
+) -> None:
+    """Send a formatted reminder e-mail with event context."""
+    event_start = event_start or dt.datetime.now()
+    event_end = event_end or event_start
+    event_date = event_start.date().isoformat()
+    start_time = event_start.strftime("%H:%M")
+    end_time = event_end.strftime("%H:%M")
+    greeting = (
+        f"Hi {creator_name}," if creator_name else f"Hi {creator_email},"
+    )
+    subject = f"[Research Agent] Missing Information – Event {event_date}_{start_time}"
+    bullets = "\n".join(f"- {f}" for f in missing_fields)
+    body = (
+        f"{greeting}\n\n"
+        "this is just a quick reminder from your Internal Research Agent.\n\n"
+        f"For your research request regarding \"{event_title}\" on {event_date}, {start_time}–{end_time}, I still need a bit more information:\n\n"
+        f"{bullets}\n\n"
+        "Could you please update the calendar entry or contact record with these details?\n"
+        "Once the information is added, the process will automatically continue — no further action needed from you.\n\n"
+        "Thanks a lot for your support!\n\n"
+        '"Your Internal Research Agent"'
+    )
+    task_id = f"{event_date}_{start_time}"
+    send(to=to, subject=subject, body=body, task_id=task_id)
+    append_jsonl(
+        _REMINDER_LOG,
+        {
+            "status": "reminder_sent",
+            "event_id": event_id,
+            "title": event_title,
+            "datetime": event_start.isoformat(),
+            "missing_fields": list(missing_fields),
+        },
+    )

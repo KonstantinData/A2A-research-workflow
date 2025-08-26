@@ -24,7 +24,7 @@ except Exception:  # pragma: no cover
     HttpError = Exception  # type: ignore[assignment]
 
 from core.trigger_words import load_trigger_words
-from core.utils import normalize_text, already_processed, mark_processed
+from core.utils import normalize_text, already_processed, mark_processed, optional_fields
 from core import parser
 from . import email_sender
 
@@ -40,14 +40,16 @@ def contains_trigger(event: dict, trigger_words: list[str]) -> str | None:
 
 
 def extract_company(title: str, trigger: str) -> Optional[str]:
-    """Extract company name from title based on trigger prefix."""
-    pattern = rf"^{re.escape(trigger)}[ :\-–—]*\s*(.*)"
-    match = re.match(pattern, title, re.IGNORECASE)
-    if match:
-        company = match.group(1).strip()
-        company = re.sub(r"^(Firma|Company)\s+", "", company, flags=re.IGNORECASE)
-        return company if company else None
-    return None
+    """Extract company name from ``title`` following the ``trigger``."""
+    if not title or not trigger:
+        return None
+    idx = title.lower().find(trigger.lower())
+    if idx == -1:
+        return None
+    remainder = title[idx + len(trigger) :].lstrip(" :\-–—")
+    remainder = re.sub(r"^(Firma|Company)\s+", "", remainder, flags=re.IGNORECASE)
+    company = remainder.strip()
+    return company or None
 
 # Local JSONL sink without clashing with stdlib logging
 _JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
@@ -287,18 +289,20 @@ def scheduled_poll() -> List[Dict[str, Any]]:
     """
     events = fetch_events()
     required = _load_required_fields("calendar")
+    optional = optional_fields()
     results: List[Dict[str, Any]] = []
     for ev in events:
         creator_info = ev.get("creator")
         organizer = ev.get("organizer") or {}
         creator_email = (
             (
-                creator_info.get("email")
-                if isinstance(creator_info, dict)
-                else creator_info
+                creator_info.get("email") if isinstance(creator_info, dict) else creator_info
             )
             or organizer.get("email")
             or ""
+        )
+        creator_name = (
+            creator_info.get("displayName") if isinstance(creator_info, dict) else None
         )
         description = ev.get("description") or ""
         notes = ev.get("notes_extracted") or {
@@ -306,31 +310,50 @@ def scheduled_poll() -> List[Dict[str, Any]]:
             "domain": parser.extract_domain(description),
             "phone": parser.extract_phone(description),
         }
-        payload = {
+        company = notes.get("company") or None
+        start_raw = ev.get("start", {}).get("dateTime") or ev.get("start", {}).get("date")
+        end_raw = ev.get("end", {}).get("dateTime") or ev.get("end", {}).get("date")
+        try:
+            start_dt = dt.datetime.fromisoformat(start_raw) if start_raw else None
+        except Exception:
+            start_dt = None
+        try:
+            end_dt = dt.datetime.fromisoformat(end_raw) if end_raw else None
+        except Exception:
+            end_dt = None
+
+        normalized = {
             "title": ev.get("summary") or "",
             "description": description,
-            "company": notes.get("company"),
+            "company": company,
             "domain": notes.get("domain"),
             "email": creator_email,
             "phone": notes.get("phone"),
             "notes_extracted": notes,
+            "event_id": ev.get("id"),
+            "start": start_raw,
+            "end": end_raw,
         }
-        missing = [f for f in required if not payload.get(f)]
+        missing_req = [f for f in required if not normalized.get(f)]
+        missing_opt = [f for f in optional if not normalized.get(f)]
+        missing = missing_req + missing_opt
         if missing:
-            body = (
-                "Please provide the following missing fields: " + ", ".join(missing)
-            )
-            email_sender.send(
+            email_sender.send_reminder(
                 to=creator_email,
-                subject="Information missing for calendar entry",
-                body=body,
+                creator_name=creator_name,
+                creator_email=creator_email,
+                event_id=ev.get("id"),
+                event_title=normalized.get("title") or "",
+                event_start=start_dt,
+                event_end=end_dt,
+                missing_fields=missing,
             )
         results.append(
             {
                 "creator": creator_email,
                 "trigger_source": "calendar",
                 "recipient": creator_email,
-                "payload": payload,
+                "payload": normalized,
             }
         )
     return results
