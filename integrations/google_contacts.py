@@ -32,6 +32,7 @@ def contains_trigger(text: str, trigger_words: list[str]) -> bool:
     text = normalize_text(text)
     return any(normalize_text(t) in text for t in trigger_words)
 
+
 # Local JSONL sink
 _JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
 _spec = _ilu.spec_from_file_location("jsonl_sink", _JSONL_PATH)
@@ -48,6 +49,7 @@ def _load_required_fields(source: str) -> List[str]:
     path = Path(__file__).resolve().parents[1] / "config" / "required_fields.json"
     data = json.loads(path.read_text(encoding="utf-8"))
     return data.get(source, [])
+
 
 SCOPES = ["https://www.googleapis.com/auth/contacts.readonly"]
 
@@ -165,9 +167,9 @@ def fetch_contacts(
             people: List[Dict[str, Any]] = resp.get("connections", [])  # type: ignore[assignment]
             for p in people:
                 uid = p.get("resourceName")
-                updated = (
-                    (p.get("metadata") or {}).get("sources") or [{}]
-                )[0].get("updateTime")
+                updated = ((p.get("metadata") or {}).get("sources") or [{}])[0].get(
+                    "updateTime"
+                )
                 if not uid or not updated:
                     continue
                 if already_processed(uid, updated, _PROCESSED_PATH):
@@ -257,7 +259,9 @@ def scheduled_poll() -> List[Dict[str, Any]]:
             "domain": parser.extract_domain(notes_blob),
             "phone": parser.extract_phone(notes_blob),
         }
-        names_list = [n.get("displayName") for n in c.get("names", []) if n.get("displayName")]
+        names_list = [
+            n.get("displayName") for n in c.get("names", []) if n.get("displayName")
+        ]
         payload: Dict[str, Any] = {
             "names": names_list,
             "company": notes.get("company"),
@@ -271,10 +275,8 @@ def scheduled_poll() -> List[Dict[str, Any]]:
 
         missing = [f for f in required if not payload.get(f)]
         if missing:
-            body = (
-                "Please provide the following missing fields: " + ", ".join(missing)
-            )
-            email_sender.send(
+            body = "Please provide the following missing fields: " + ", ".join(missing)
+            email_sender.send_email(
                 to=email,
                 subject="Information missing for contact entry",
                 body=body,

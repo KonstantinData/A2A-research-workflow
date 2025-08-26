@@ -1,22 +1,20 @@
+# integrations/google_calendar.py
 import os
 import openai
 from datetime import datetime, timezone
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
-from core.trigger_words import extract_company
-import integrations.email_sender as email_sender  # ✅ für Tests, die email_sender patchen
 
-# OpenAI Konfiguration
+from core.trigger_words import extract_company  # nur noch hier zentral
+import logging
+
+logger = logging.getLogger(__name__)
+
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
-# ✅ Tests erwarten diese Hilfsfunktion, die sie monkeypatchen können
-def _utc_now() -> datetime:
-    return datetime.utcnow().replace(tzinfo=timezone.utc)
-
-
 def _dt(s):
-    """Parse datetime or date-only dicts from Google Calendar API event objects."""
+    """Helper: Parse Google Calendar date or dateTime into datetime object."""
     if not s:
         return None
     if "dateTime" in s:
@@ -24,15 +22,24 @@ def _dt(s):
     return datetime.fromisoformat(s["date"] + "T00:00:00+00:00")
 
 
+def _utc_now():
+    """Wrapper so Tests (monkeypatch) can override current UTC time."""
+    return datetime.utcnow().replace(tzinfo=timezone.utc)
+
+
 def extract_company_ai(title: str, trigger: str) -> str:
     """
     Hybrid extraction for company names:
     1. Run regex-based rule extraction.
-    2. If result is 'Unknown', fallback to OpenAI GPT.
+    2. If result is 'Unknown', fallback to OpenAI GPT (if available).
     """
     company = extract_company(title, trigger)
     if company and company != "Unknown":
         return company
+
+    # GPT fallback
+    if not openai.api_key:
+        return "Unknown"
 
     prompt = f"""
     Extract the company name from the following calendar event title.
@@ -50,12 +57,13 @@ def extract_company_ai(title: str, trigger: str) -> str:
         )
         result = response["choices"][0]["message"]["content"].strip()
         return result if result else "Unknown"
-    except Exception:
+    except Exception as e:
+        logger.warning(f"GPT fallback failed: {e}")
         return "Unknown"
 
 
 def normalize_event(ev, detected_trigger=None, creator_email=None, creator_name=None):
-    """Normalize raw Google Calendar API event into a flat dict for processing."""
+    """Normalize a raw Google Calendar event into internal schema."""
     title = ev.get("summary") or "Untitled"
     start_dt = _dt(ev.get("start", {}))
     end_dt = _dt(ev.get("end", {}))
@@ -63,7 +71,7 @@ def normalize_event(ev, detected_trigger=None, creator_email=None, creator_name=
     company = extract_company_ai(title, detected_trigger or "")
 
     normalized = {
-        "event_id": ev.get("id"),
+        "event_id": ev.get("id", "unknown"),
         "ical_uid": ev.get("iCalUID"),
         "title": title,
         "company": company,
@@ -77,7 +85,7 @@ def normalize_event(ev, detected_trigger=None, creator_email=None, creator_name=
 
 
 def fetch_events():
-    """Fetch today's events from Google Calendar using OAuth2 credentials."""
+    """Fetch today's events from Google Calendar API."""
     creds = Credentials(
         None,
         refresh_token=os.getenv("GOOGLE_REFRESH_TOKEN"),
@@ -102,4 +110,5 @@ def fetch_events():
         )
         .execute()
     )
-    return events_result.get("items", [])
+    events = events_result.get("items", [])
+    return events
