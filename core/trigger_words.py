@@ -1,24 +1,25 @@
+import logging
 import os
 import re
-import unicodedata
-import logging
 from functools import lru_cache
+from typing import List, Optional
 
-# Optional: GPT fallback
-try:
-    import openai
+from core.utils import normalize_text as _normalize_text
 
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-    if OPENAI_API_KEY:
-        openai.api_key = OPENAI_API_KEY
-    else:
-        openai = None
-except ImportError:
-    openai = None
+try:  # Optional OpenAI integration
+    import openai as _openai  # type: ignore
+    if not os.getenv("OPENAI_API_KEY"):
+        # Without an API key the library would fail on first use; keep it None so
+        # tests run in offline environments.
+        _openai = None  # type: ignore
+except Exception:  # pragma: no cover - openai not installed
+    _openai = None  # type: ignore
+
+openai = _openai
 
 logger = logging.getLogger(__name__)
 
-TRIGGERS = [
+TRIGGERS: List[str] = [
     "research",
     "meeting preparation",
     "business customer",
@@ -37,94 +38,87 @@ TRIGGERS = [
 
 
 def normalize_text(text: str) -> str:
-    """Normalize string for trigger matching (casefold, remove accents)."""
-    if not text:
-        return ""
-    if not isinstance(text, str):
-        # Falls Tests versehentlich ein dict übergeben (z. B. {"summary": ...})
-        if isinstance(text, dict) and "summary" in text:
-            text = text["summary"]
-        else:
-            text = str(text)
-    text = unicodedata.normalize("NFKC", text)
-    return text.casefold().strip()
+    """Delegate to :func:`core.utils.normalize_text` for full normalisation."""
+    if isinstance(text, dict):
+        text = text.get("summary") or ""
+    return _normalize_text(text)
 
 
 @lru_cache(maxsize=1)
-def load_trigger_words() -> list[str]:
-    """
-    Load trigger words from TRIGGER_WORDS_FILE if set, else use defaults.
-    Cached with lru_cache, so Tests können cache_clear() nutzen.
-    """
+def load_trigger_words() -> List[str]:
+    """Return trigger words from an optional file or the built-in defaults."""
     path = os.getenv("TRIGGER_WORDS_FILE")
-    if path and os.path.exists(path):
+    if path and os.path.exists(path):  # pragma: no cover - trivial file IO
         try:
-            with open(path, "r", encoding="utf-8") as f:
-                return [line.strip() for line in f if line.strip()]
-        except Exception as e:
-            logger.warning(f"Failed to read trigger words file {path}: {e}")
+            with open(path, "r", encoding="utf-8") as fh:
+                return [line.strip() for line in fh if line.strip()]
+        except Exception as exc:  # pragma: no cover - logging only
+            logger.warning("Failed to read trigger words file %s: %s", path, exc)
     return TRIGGERS
 
 
-def contains_trigger(text: str | dict, triggers: list[str] | None = None) -> str | None:
-    """Check if any trigger word/phrase is contained in text."""
+def contains_trigger(text: str | dict, triggers: Optional[List[str]] = None) -> bool:
+    """Return ``True`` when any trigger word is contained in ``text``.
+
+    The function is intentionally tolerant and accepts dictionaries as they are
+    often used to represent calendar events.  Normalisation handles case folding,
+    various Unicode dash characters and common German umlauts.
+    """
     if not text:
-        return None
+        return False
     norm = normalize_text(text)
     for trig in triggers or load_trigger_words():
-        if trig in norm:
-            return trig
-    return None
+        if _normalize_text(trig) in norm:
+            return True
+    return False
 
 
 def extract_company(title: str, trigger: str) -> str:
-    """
-    Extract company name from an event title.
-    1. Look for trigger, then take remainder of string.
-    2. Strip prefixes like 'Firma', 'Company'.
-    3. If nothing found, optionally call GPT if available.
+    """Extract the company name from an event ``title``.
+
+    The implementation first applies a small rule based approach.  When no
+    company can be determined and the optional ``openai`` dependency is
+    available, a minimal GPT prompt is used as a fall-back.  The function always
+    returns a string and never raises errors so tests can run without network
+    access.
     """
     if not title or not trigger:
         return "Unknown"
 
     norm_title = normalize_text(title)
     norm_trigger = normalize_text(trigger)
-
     idx = norm_title.find(norm_trigger)
     if idx == -1:
         return "Unknown"
 
-    # Take remainder after trigger
     remainder = title[idx + len(trigger) :].lstrip(" :-–—").strip()
-
-    # Remove common prefixes
-    remainder = re.sub(
-        r"^(firma|company|client)\s+", "", remainder, flags=re.IGNORECASE
-    )
-
+    remainder = re.sub(r"^(firma|company|client)\s+", "", remainder, flags=re.IGNORECASE)
     if remainder:
         return remainder
 
-    # GPT fallback
-    if openai:
-        prompt = f"""
-        Extract the company name from the following calendar event title.
-        Ignore leading words like 'Firma', 'Company', 'Firma Dr.', 'Client'.
-        Return only the clean company name as plain text (no quotes, no punctuation).
-        If no company is found, return "Unknown".
-
-        Title: "{title}"
-        """
+    if openai is not None:  # pragma: no cover - requires network
+        prompt = (
+            "Extract the company name from the calendar event title below. "
+            "Ignore words like 'Firma', 'Company', 'Client'. "
+            'Return only the plain company name, no quotes. If none, return "Unknown".\n\n'
+            f'Title: "{title}"'
+        )
         try:
-            response = openai.ChatCompletion.create(
+            resp = openai.ChatCompletion.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0,
             )
-            result = response["choices"][0]["message"]["content"].strip()
-            return result if result else "Unknown"
-        except Exception as e:
-            logger.warning(f"GPT fallback failed: {e}")
+            text = resp["choices"][0]["message"]["content"].strip()
+            return text or "Unknown"
+        except Exception:  # pragma: no cover - defensive
             return "Unknown"
-
     return "Unknown"
+
+
+__all__ = [
+    "normalize_text",
+    "load_trigger_words",
+    "contains_trigger",
+    "extract_company",
+]

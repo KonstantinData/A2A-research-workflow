@@ -6,7 +6,7 @@ import datetime as dt
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Callable
 
 # Google libs optional in Tests
 try:  # pragma: no cover
@@ -18,9 +18,24 @@ except Exception:  # pragma: no cover
     Request = None  # type: ignore
     build = None  # type: ignore
 
+# Scopes required for the People API.  ``contacts.other.readonly`` enables
+# access to the "Other contacts" bucket which some accounts use for storing
+# address book entries.  Using both scopes keeps the refresh token compatible
+# with either permission set.
+SCOPES = [
+    "https://www.googleapis.com/auth/contacts.readonly",
+    "https://www.googleapis.com/auth/contacts.other.readonly",
+]
+
 from core.trigger_words import load_trigger_words
 from core import feature_flags, summarize, parser
-from core.utils import normalize_text, already_processed, mark_processed
+from core.utils import (
+    normalize_text,
+    already_processed,
+    mark_processed,
+    required_fields,
+    optional_fields,
+)
 from . import email_sender
 
 
@@ -66,9 +81,12 @@ def fetch_contacts(page_size: int = 200, page_limit: int = 10) -> List[Dict[str,
         token_uri="https://oauth2.googleapis.com/token",
         client_id=os.environ["GOOGLE_CLIENT_ID"],
         client_secret=os.environ["GOOGLE_CLIENT_SECRET"],
-        scopes=["https://www.googleapis.com/auth/contacts.readonly"],
+        scopes=SCOPES,
     )
-    creds.refresh(Request())
+    try:
+        creds.refresh(Request())
+    except Exception:  # pragma: no cover - invalid/expired tokens
+        return []
     service = build("people", "v1", credentials=creds, cache_discovery=False)
 
     out: List[Dict[str, Any]] = []
@@ -98,3 +116,56 @@ def fetch_contacts(page_size: int = 200, page_limit: int = 10) -> List[Dict[str,
 
 # Für orchestrator.gather_triggers wird nur fetch_contacts gebraucht.
 # Wenn du später eine Normalisierung brauchst, kannst du hier eine Funktion ergänzen.
+
+
+def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None) -> List[Dict[str, Any]]:
+    """Fetch contacts and normalise them into trigger records.
+
+    The function extracts basic fields from the contact's notes and sends a
+    friendly e-mail when required fields are missing.  It returns a list of
+    dictionaries compatible with the orchestrator's trigger format used in the
+    tests.
+    """
+
+    if fetch_fn is None:
+        fetch_fn = fetch_contacts
+    contacts = fetch_fn() or []
+    triggers: List[Dict[str, Any]] = []
+    for person in contacts:
+        email = _primary_email(person) or ""
+        notes = _notes_blob(person)
+        company = parser.extract_company(notes) or ""
+        domain = parser.extract_domain(notes) or ""
+        phone = parser.extract_phone(notes) or ""
+        names = [n.get("displayName") for n in person.get("names", []) if n.get("displayName")]
+
+        payload: Dict[str, Any] = {
+            "names": names,
+            "company": company,
+            "domain": domain,
+            "email": email,
+            "phone": phone,
+            "notes_extracted": {"company": company, "domain": domain, "phone": phone},
+        }
+        if feature_flags.ENABLE_SUMMARY:
+            payload["summary"] = summarize.summarize_notes(notes)
+
+        missing_req = [f for f in required_fields("contacts") if not payload.get(f)]
+        missing_opt = [f for f in optional_fields() if not payload.get(f)]
+        if missing_req:
+            body = (
+                "Please provide the following information:\n" +
+                "\n".join(f"{f}:" for f in missing_req + missing_opt)
+            )
+            email_sender.send(to=email, subject="[Research Agent] Missing contact information", body=body)
+
+        triggers.append(
+            {
+                "creator": email,
+                "trigger_source": "contacts",
+                "recipient": email,
+                "payload": payload,
+            }
+        )
+
+    return triggers
