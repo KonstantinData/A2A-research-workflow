@@ -78,27 +78,19 @@ def run(trigger: Normalized) -> Normalized:
 
     if missing_required:
         event_title = payload.get("title") or company
-        start_raw = payload.get("start")
-        end_raw = payload.get("end")
-        try:
-            start_dt = datetime.fromisoformat(start_raw) if start_raw else None
-        except Exception:
-            start_dt = None
-        try:
-            end_dt = datetime.fromisoformat(end_raw) if end_raw else None
-        except Exception:
-            end_dt = None
+        start_iso = payload.get("start")
+        end_iso = payload.get("end")
         missing = missing_required + missing_optional
-        email_sender.send_reminder(
-            to=creator_email,
-            creator_email=creator_email,
-            creator_name=creator_name,
-            event_id=payload.get("event_id"),
-            event_title=event_title,
-            event_start=start_dt,
-            event_end=end_dt,
-            missing_fields=missing,
-        )
+        trig = {
+            "creator": creator_email,
+            "creator_name": creator_name,
+            "event_id": payload.get("event_id"),
+            "event_title": event_title,
+            "start_iso": start_iso,
+            "end_iso": end_iso,
+            "timezone": payload.get("timezone"),
+        }
+        email_sender.send_reminder(trigger=trig, missing_fields=missing)
         _log_workflow(
             {
                 "status": "missing_fields",

@@ -68,6 +68,7 @@ def test_env_override(monkeypatch, stub_time, tmp_path):
 def test_duplicate_event_skipped(monkeypatch, stub_time, tmp_path):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(google_calendar, "load_trigger_words", lambda: ["hit"])
+    monkeypatch.setattr(google_calendar.email_sender, "send_reminder", lambda **k: None)
     event = {"id": "1", "updated": "2021-01-01T00:00:00Z", "summary": "hit"}
     call_rec = _setup_service(monkeypatch, [event])
     first = google_calendar.fetch_events()
@@ -80,6 +81,7 @@ def test_duplicate_event_skipped(monkeypatch, stub_time, tmp_path):
 def test_event_updated_reprocessed(monkeypatch, stub_time, tmp_path):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(google_calendar, "load_trigger_words", lambda: ["hit"])
+    monkeypatch.setattr(google_calendar.email_sender, "send_reminder", lambda **k: None)
     event = {"id": "1", "updated": "2021-01-01T00:00:00Z", "summary": "hit"}
     call_rec = _setup_service(monkeypatch, [event])
     first = google_calendar.fetch_events()

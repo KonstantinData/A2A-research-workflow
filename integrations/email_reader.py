@@ -56,12 +56,13 @@ def fetch_replies() -> List[Dict[str, Any]]:
             continue
         msg = email.message_from_bytes(msg_data[0][1])
         subject = _decode(msg.get("Subject", ""))
-        if "[Research Agent] Missing Information" not in subject:
+        match = re.search(
+            r"\[Research Agent\] Missing Information – Event (\d{4}-\d{2}-\d{2})_(\d{4})",
+            subject,
+        )
+        if not match:
             continue
-        match = re.search(r"Event (\d{4}-\d{2}-\d{2})_(\d{4})", subject)
-        event_id = ""
-        if match:
-            event_id = f"{match.group(1)}_{match.group(2)}"
+        event_id = f"{match.group(1)}_{match.group(2)}"
         from_addr = email.utils.parseaddr(msg.get("From"))[1]
 
         body = ""
@@ -97,7 +98,7 @@ def fetch_replies() -> List[Dict[str, Any]]:
         if mail_match:
             fields["email"] = mail_match.group(0)
 
-        if fields:
+        if fields.get("company") and fields.get("domain"):
             results.append(
                 {
                     "creator": from_addr,

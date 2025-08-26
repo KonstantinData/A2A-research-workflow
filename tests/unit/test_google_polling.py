@@ -10,41 +10,13 @@ from integrations import google_calendar, google_contacts  # noqa: E402
 from core import trigger_words  # noqa: E402
 
 
-def test_calendar_scheduled_poll_normalizes(monkeypatch):
-    event = {
-        "id": "e1",
-        "creator": {"email": "alice@example.com"},
-        "summary": "Meeting",
-        "description": "Firma TestCorp\nwww.testcorp.com\n+49 1234567",
-    }
-    monkeypatch.setattr(google_calendar, "fetch_events", lambda: [event])
-    monkeypatch.setattr(google_calendar.email_sender, "send_reminder", lambda **k: None)
+def test_calendar_scheduled_poll_passthrough(monkeypatch):
+    trig = {"event_title": "Meeting"}
+    monkeypatch.setattr(google_calendar, "fetch_events", lambda: [trig])
 
     result = google_calendar.scheduled_poll()
 
-    assert result == [
-        {
-            "creator": "alice@example.com",
-            "trigger_source": "calendar",
-            "recipient": "alice@example.com",
-            "payload": {
-                "title": "Meeting",
-                "description": "Firma TestCorp\nwww.testcorp.com\n+49 1234567",
-                "company": "TestCorp",
-                "domain": "www.testcorp.com",
-                "email": "alice@example.com",
-                "phone": "+49 1234567",
-                "notes_extracted": {
-                    "company": "TestCorp",
-                    "domain": "www.testcorp.com",
-                    "phone": "+49 1234567",
-                },
-                "event_id": "e1",
-                "start": None,
-                "end": None,
-            },
-        }
-    ]
+    assert result == [trig]
 
 
 def test_contacts_scheduled_poll_normalizes(monkeypatch):

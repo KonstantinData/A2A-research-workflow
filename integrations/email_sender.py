@@ -1,16 +1,16 @@
 # integrations/email_sender.py
 """SMTP email sender utility (LIVE, strict env, no silent fallbacks)."""
 from __future__ import annotations
-
-import datetime as dt
 from email.message import EmailMessage
 from pathlib import Path
-from typing import Iterable, Optional, Sequence
+from typing import Iterable, Optional, Sequence, Dict, Any
 import mimetypes
 import os
 import smtplib
 import importlib.util
 import pathlib
+from zoneinfo import ZoneInfo
+from datetime import datetime
 
 # Structured notification logging (file-local import to avoid hard deps elsewhere)
 _notifications_spec = importlib.util.spec_from_file_location(
@@ -152,54 +152,57 @@ def send(
     send_email(sender_addr, to, subject, body, attachments, task_id=task_id)
 
 
+def _fmt(dt_iso: Optional[str], tz_str: Optional[str]) -> tuple[str, str]:
+    if not dt_iso:
+        return "", ""
+    tz = ZoneInfo(tz_str) if tz_str else ZoneInfo("UTC")
+    dt = datetime.fromisoformat(dt_iso).astimezone(tz)
+    return dt.strftime("%Y-%m-%d"), dt.strftime("%H:%M")
+
+
 def send_reminder(
     *,
-    to: str,
-    creator_email: str,
-    creator_name: Optional[str],
-    event_id: Optional[str],
-    event_title: str,
-    event_start: Optional[dt.datetime],
-    event_end: Optional[dt.datetime],
+    trigger: Dict[str, Any],
     missing_fields: Sequence[str],
 ) -> None:
     """Send a formatted reminder e-mail with event context."""
-    event_start = event_start or dt.datetime.now()
-    event_end = event_end or event_start
-    event_date = event_start.date().isoformat()
-    start_time_display = event_start.strftime("%H:%M")
-    end_time_display = event_end.strftime("%H:%M")
-    start_time_code = event_start.strftime("%H%M")
+
+    creator_email = trigger.get("creator")
+    creator_name = trigger.get("creator_name")
     greeting = f"Hi {creator_name}," if creator_name else "Hi there,"
-    subject = (
-        f"[Research Agent] Missing Information – Event {event_date}_{start_time_code}"
-    )
+
+    title = trigger.get("event_title") or "Untitled"
+    date_s, start_s = _fmt(trigger.get("start_iso"), trigger.get("timezone"))
+    _, end_s = _fmt(trigger.get("end_iso"), trigger.get("timezone"))
+
+    subject = f"[Research Agent] Missing Information – Event {date_s}_{start_s}"
     body = (
         f"{greeting}\n\n"
         "this is just a quick reminder from your Internal Research Agent.\n\n"
-        f"For your research request regarding \"{event_title}\" on {event_date}, {start_time_display}–{end_time_display}, I still need a bit more information:\n\n"
+        f"For your research request regarding \"{title}\" on {date_s}, {start_s}–{end_s}, I still need a bit more information:\n\n"
         "I definitely need the following details (required):\n"
         "-- Company\n"
         "-- Web domain\n\n"
         "If you also have these details, please include them (optional):\n"
         "-- Email\n"
         "-- Phone\n\n"
-        "The easiest way: simply reply to this email with the missing information.  \n"
-        "You might also update the calendar entry or contact record with these details.\n\n"
+        "Beantworte die Fragen bitte direkt durch Beantwortung dieser E-Mail.  \n"
+        "(Optionally: You might also update the calendar entry or contact record with these details.)\n\n"
         "Once I receive the information, the process will automatically continue — no further action needed from you.\n\n"
         "Thanks a lot for your support!\n\n"
         '"Your Internal Research Agent"'
     )
-    task_id = f"{event_date}_{start_time_code}"
-    send(to=to, subject=subject, body=body, task_id=task_id)
+    task_id = f"{date_s}_{start_s}"
+    send(to=creator_email, subject=subject, body=body, task_id=task_id)
     append_jsonl(
         _REMINDER_LOG,
         {
             "status": "reminder_sent",
-            "event_id": event_id,
-            "title": event_title,
-            "datetime": event_start.isoformat(),
+            "event_id": trigger.get("event_id"),
+            "title": title,
+            "start_iso": trigger.get("start_iso"),
+            "end_iso": trigger.get("end_iso"),
             "missing_fields": list(missing_fields),
-            "email_sent_to": to,
+            "email_sent_to": creator_email,
         },
     )

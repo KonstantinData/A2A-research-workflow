@@ -163,9 +163,11 @@ def fetch_events(
         else _int_from_env("CALENDAR_MINUTES_FWD", 86400)
     )
 
-    filtered: List[Dict[str, Any]] = []
+    triggers: List[Dict[str, Any]] = []
     total = 0
     processed = 0
+    required = _load_required_fields("calendar")
+    optional = optional_fields()
     try:
         words = load_trigger_words()
         if not words:
@@ -215,34 +217,98 @@ def fetch_events(
                             },
                         )
                         continue
-                    trigger = contains_trigger(ev, words)
-                    if not trigger:
+                    detected_trigger = contains_trigger(ev, words)
+                    if not detected_trigger:
                         continue
                     description = ev.get("description") or ""
                     ev = dict(ev)
+
+                    def _dt(s: Dict[str, Any]) -> Optional[dt.datetime]:
+                        if not s:
+                            return None
+                        if "dateTime" in s:
+                            return dt.datetime.fromisoformat(s["dateTime"].replace("Z", "+00:00"))
+                        if "date" in s:
+                            return dt.datetime.fromisoformat(s["date"] + "T00:00:00+00:00")
+                        return None
+
+                    title = ev.get("summary") or "Untitled"
+                    start_dt = _dt(ev.get("start", {}))
+                    end_dt = _dt(ev.get("end", {}))
+                    normalized = {
+                        "event_id": ev.get("id"),
+                        "ical_uid": ev.get("iCalUID"),
+                        "title": title,
+                        "start_iso": start_dt.isoformat() if start_dt else None,
+                        "end_iso": end_dt.isoformat() if end_dt else None,
+                        "timezone": ev.get("start", {}).get("timeZone") or ev.get("timeZone"),
+                    }
+
                     notes = {
                         "company": parser.extract_company(description),
                         "domain": parser.extract_domain(description),
                         "phone": parser.extract_phone(description),
                     }
-                    comp_from_title = extract_company(ev.get("summary", ""), trigger)
-                    if comp_from_title:
-                        notes["company"] = comp_from_title
-                    ev["notes_extracted"] = notes
-                    ev["company_extracted"] = comp_from_title
-                    filtered.append(ev)
-                    processed += 1
+                    company = extract_company(title, detected_trigger)
+                    if company:
+                        notes["company"] = company
+                    normalized["company"] = notes.get("company")
+
+                    creator_info = ev.get("creator")
+                    organizer = ev.get("organizer") or {}
+                    creator_email = (
+                        (
+                            creator_info.get("email") if isinstance(creator_info, dict) else creator_info
+                        )
+                        or organizer.get("email")
+                        or ""
+                    )
+                    creator_name = (
+                        creator_info.get("displayName") if isinstance(creator_info, dict) else None
+                    )
+
+                    trig = {
+                        "source": "calendar",
+                        "trigger_word": detected_trigger,
+                        "event_title": normalized["title"],
+                        "company": normalized.get("company"),
+                        "start_iso": normalized.get("start_iso"),
+                        "end_iso": normalized.get("end_iso"),
+                        "timezone": normalized.get("timezone"),
+                        "creator": creator_email,
+                        "creator_name": creator_name,
+                        "event_id": normalized.get("event_id"),
+                        "ical_uid": normalized.get("ical_uid"),
+                    }
+
+                    missing_req = [f for f in required if not normalized.get(f)]
+                    missing_opt = [f for f in optional if not normalized.get(f)]
+                    missing = missing_req + missing_opt
+                    if missing:
+                        email_sender.send_reminder(trigger=trig, missing_fields=missing)
+
                     mark_processed(uid, updated, _PROCESSED_PATH)
                     append_jsonl(
                         _LOG_PATH,
                         {
                             "timestamp": _utc_now().isoformat() + "Z",
                             "source": "calendar",
-                            "status": "hit" if comp_from_title else "warning",
-                            "company_extracted": comp_from_title,
+                            "status": "hit" if company else "warning",
+                            "company_extracted": company,
                             "payload": ev,
                         },
                     )
+                    append_jsonl(
+                        _LOG_PATH,
+                        {
+                            "dbg": "trigger_payload",
+                            "event_title": normalized["title"],
+                            "start_iso": normalized.get("start_iso"),
+                            "end_iso": normalized.get("end_iso"),
+                        },
+                    )
+                    triggers.append(trig)
+                    processed += 1
                 page_token = resp.get("nextPageToken")
                 if not page_token:
                     break
@@ -272,88 +338,8 @@ def fetch_events(
         )
         raise RuntimeError(f"Google Calendar API error: {e}") from e
 
-    return filtered
+    return triggers
 
 
 def scheduled_poll() -> List[Dict[str, Any]]:
-    """
-    Fetch and normalize calendar events for the orchestrator.
-
-    Output shape per event:
-      {
-        "creator": "<email>",
-        "trigger_source": "calendar",
-        "recipient": "<email>",
-        "payload": <raw google event dict>
-      }
-    """
-    events = fetch_events()
-    required = _load_required_fields("calendar")
-    optional = optional_fields()
-    results: List[Dict[str, Any]] = []
-    for ev in events:
-        creator_info = ev.get("creator")
-        organizer = ev.get("organizer") or {}
-        creator_email = (
-            (
-                creator_info.get("email") if isinstance(creator_info, dict) else creator_info
-            )
-            or organizer.get("email")
-            or ""
-        )
-        creator_name = (
-            creator_info.get("displayName") if isinstance(creator_info, dict) else None
-        )
-        description = ev.get("description") or ""
-        notes = ev.get("notes_extracted") or {
-            "company": parser.extract_company(description),
-            "domain": parser.extract_domain(description),
-            "phone": parser.extract_phone(description),
-        }
-        company = notes.get("company") or None
-        start_raw = ev.get("start", {}).get("dateTime") or ev.get("start", {}).get("date")
-        end_raw = ev.get("end", {}).get("dateTime") or ev.get("end", {}).get("date")
-        try:
-            start_dt = dt.datetime.fromisoformat(start_raw) if start_raw else None
-        except Exception:
-            start_dt = None
-        try:
-            end_dt = dt.datetime.fromisoformat(end_raw) if end_raw else None
-        except Exception:
-            end_dt = None
-
-        normalized = {
-            "title": ev.get("summary") or "Unknown",
-            "description": description,
-            "company": company,
-            "domain": notes.get("domain"),
-            "email": creator_email,
-            "phone": notes.get("phone"),
-            "notes_extracted": notes,
-            "event_id": ev.get("id"),
-            "start": start_raw,
-            "end": end_raw,
-        }
-        missing_req = [f for f in required if not normalized.get(f)]
-        missing_opt = [f for f in optional if not normalized.get(f)]
-        missing = missing_req + missing_opt
-        if missing:
-            email_sender.send_reminder(
-                to=creator_email,
-                creator_name=creator_name,
-                creator_email=creator_email,
-                event_id=ev.get("id"),
-                event_title=normalized.get("title") or "",
-                event_start=start_dt,
-                event_end=end_dt,
-                missing_fields=missing,
-            )
-        results.append(
-            {
-                "creator": creator_email,
-                "trigger_source": "calendar",
-                "recipient": creator_email,
-                "payload": normalized,
-            }
-        )
-    return results
+    return fetch_events()

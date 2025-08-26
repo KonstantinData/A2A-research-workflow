@@ -130,7 +130,7 @@ def gather_triggers(
         contacts = []
 
     triggers: List[Normalized] = []
-    triggers.extend(_normalize_events(events or []))
+    triggers.extend(events or [])
     triggers.extend(_normalize_contacts(contacts or []))
     return triggers
 
@@ -223,6 +223,7 @@ def run(
                 break
 
     research_results: List[Any] = []
+    pending = False
     for trig in triggers:
         for fn in (researchers if researchers is not None else _default_researchers()):
             if getattr(fn, "pro", False) and not feature_flags.ENABLE_PRO_SOURCES:
@@ -238,8 +239,11 @@ def run(
                         "missing": res.get("missing"),
                     }
                 )
-                sys.exit(0)
-            research_results.append(res)
+                pending = True
+            else:
+                research_results.append(res)
+    if pending:
+        sys.exit(0)
 
     # Merge results
     consolidated = consolidate_fn(research_results)
