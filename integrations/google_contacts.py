@@ -18,9 +18,9 @@ except Exception:  # pragma: no cover
     Request = None  # type: ignore
     build = None  # type: ignore
 
-# Scopes required for the People API.  ``contacts.other.readonly`` enables
+# Scopes required for the People API. ``contacts.other.readonly`` enables
 # access to the "Other contacts" bucket which some accounts use for storing
-# address book entries.  Using both scopes keeps the refresh token compatible
+# address book entries. Using both scopes keeps the refresh token compatible
 # with either permission set.
 SCOPES = [
     "https://www.googleapis.com/auth/contacts.readonly",
@@ -122,7 +122,7 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
     """Fetch contacts and normalise them into trigger records.
 
     The function extracts basic fields from the contact's notes and sends a
-    friendly e-mail when required fields are missing.  It returns a list of
+    friendly e-mail when required fields are missing. It returns a list of
     dictionaries compatible with the orchestrator's trigger format used in the
     tests.
     """
@@ -154,12 +154,11 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
         missing_opt = [f for f in optional_fields() if not payload.get(f)]
         if missing_req:
             body = (
-                "Please provide the following information:\n" +
-                "\n".join(f"{f}:" for f in missing_req + missing_opt)
+                "Please provide the following information:\n"
+                + "\n".join(f"{f}:" for f in missing_req + missing_opt)
             )
-            to_addr = email or "admin@condata.io"
             email_sender.send(
-                to=to_addr,
+                to=email or "admin@condata.io",
                 subject="[Research Agent] Missing contact information",
                 body=body,
             )

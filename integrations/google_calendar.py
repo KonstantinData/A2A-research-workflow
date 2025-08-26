@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Optional, Callable
 try:
     import openai as _openai  # type: ignore
 except Exception:  # keine Lib installiert -> Dummy mit ChatCompletion.create
-
     class _Dummy:
         class ChatCompletion:
             @staticmethod
