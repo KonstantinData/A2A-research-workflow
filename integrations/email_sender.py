@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from .mailer import send_email as _send_email  # interne Referenz
+from typing import Optional, Sequence
+
+from .mailer import send_email  # tatsächlicher SMTP/Provider-Client
 
 
-def _fmt(dt_iso, tz_str):
+def _fmt(dt_iso: Optional[str], tz_str: Optional[str]) -> tuple[str, str]:
     if not dt_iso:
         return "", ""
     tz = ZoneInfo(tz_str) if tz_str else ZoneInfo("UTC")
@@ -11,7 +15,29 @@ def _fmt(dt_iso, tz_str):
     return dt.strftime("%Y-%m-%d"), dt.strftime("%H:%M")
 
 
-def send_missing_info_reminder(trigger):
+def send(
+    *,
+    to: str,
+    subject: str,
+    body: str,
+    sender: Optional[str] = None,
+    attachments: Optional[Sequence[str]] = None,
+    task_id: Optional[str] = None,
+) -> None:
+    """
+    Generische Send-Funktion, die Tests monkeypatchen.
+    """
+    send_email(
+        to=to,
+        subject=subject,
+        body=body,
+        sender=sender,
+        attachments=attachments,
+        task_id=task_id,
+    )
+
+
+def send_missing_info_reminder(trigger: dict) -> None:
     creator_email = trigger.get("creator")
     creator_name = trigger.get("creator_name")
     greeting = f"Hi {creator_name}," if creator_name else "Hi there,"
@@ -27,6 +53,9 @@ def send_missing_info_reminder(trigger):
     if date_s and start_s and end_s:
         subject += f" on {date_s}, {start_s}–{end_s}"
 
+    req_lines = "\n".join([f"{f}:" for f in missing_required])
+    opt_lines = "\n".join([f"{f}:" for f in missing_optional])
+
     body = f"""{greeting}
 
 this is just a quick reminder from your Internal Research Agent.
@@ -34,10 +63,10 @@ this is just a quick reminder from your Internal Research Agent.
 For your research request regarding "{title}" on {date_s}, {start_s}–{end_s}, I still need a bit more information:
 
 I definitely need the following details (required):
-{chr(10).join([f"{f}:" for f in missing_required])}
+{req_lines}
 
 If you also have these details, please include them (optional):
-{chr(10).join([f"{f}:" for f in missing_optional])}
+{opt_lines}
 
 Please reply to this email directly with the missing information.
 You might also update the calendar entry or contact record with these details.
@@ -49,18 +78,4 @@ Thanks a lot for your support!
 "Your Internal Research Agent"
 """
 
-    _send_email(to=creator_email, subject=subject, body=body)
-
-
-# ---------------------------------------------------------------------------
-# ✅ Kompatibilitäts-Aliase für Tests
-# ---------------------------------------------------------------------------
-
-
-def send(*, to, subject, body, **kwargs):
-    """Alias für Tests (wird in mehreren Testdateien direkt gepatcht)."""
-    return _send_email(to=to, subject=subject, body=body, **kwargs)
-
-
-# expose auch den importierten Namen so, dass Tests `email_sender.send_email` patchen können
-send_email = _send_email
+    send_email(to=creator_email, subject=subject, body=body)
