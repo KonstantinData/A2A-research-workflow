@@ -40,6 +40,36 @@ assert _spec and _spec.loader
 _spec.loader.exec_module(_mod)  # type: ignore[attr-defined]
 append_jsonl = _mod.append
 
+def build_reminder_subject(
+    title: Optional[str],
+    start: Optional[dt.datetime],
+    end: Optional[dt.datetime],
+) -> str:
+    """Compose reminder e-mail subject with graceful fallbacks."""
+    title = title or "Untitled Event"
+    parts = []
+    if start:
+        date_s = start.date().isoformat()
+        parts.append(date_s)
+        start_s = start.strftime("%H:%M")
+    else:
+        start_s = None
+    end_s = end.strftime("%H:%M") if end else None
+    time_part = None
+    if start_s and end_s:
+        time_part = f"{start_s}–{end_s}"
+    elif start_s:
+        time_part = start_s
+    elif end_s:
+        time_part = end_s
+    if time_part:
+        parts.append(time_part)
+    event_info = ", ".join(parts)
+    subject = f'[Research Agent] Missing Information – Event "{title}"'
+    if event_info:
+        subject += f" on {event_info}"
+    return subject
+
 def log_event(record: Dict[str, Any]) -> None:
     """Write ``record`` to a timestamped JSONL file under ``logs/workflows``."""
     ts = dt.datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%S")
@@ -328,7 +358,7 @@ def run(
     return consolidated
 
 
-__all__ = ["gather_triggers", "run"]
+__all__ = ["gather_triggers", "run", "build_reminder_subject"]
 
 if __name__ == "__main__":  # pragma: no cover
     run()
