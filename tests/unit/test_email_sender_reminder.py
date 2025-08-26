@@ -33,8 +33,11 @@ def test_send_reminder_formats_subject_and_body(monkeypatch):
     assert 'Demo' in captured['subject']
     assert '2024-05-17' in captured['subject']
     assert '09:00–10:00' in captured['subject']
+    assert 'Unknown' not in captured['subject']
+    assert '_' not in captured['subject']
 
     body = captured['body']
     for field in ['Company:', 'Web domain:', 'Email:', 'Phone:']:
         assert field in body
     assert 'You might also update the calendar entry or contact record with these details.' in body
+    assert 'Unknown' not in body

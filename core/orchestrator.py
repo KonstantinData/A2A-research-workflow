@@ -17,6 +17,7 @@ import importlib.util as _ilu
 import datetime as dt
 import os
 import time
+import logging
 try:
     from dateutil import parser
 except Exception:  # pragma: no cover
@@ -39,6 +40,8 @@ _mod = _ilu.module_from_spec(_spec)
 assert _spec and _spec.loader
 _spec.loader.exec_module(_mod)  # type: ignore[attr-defined]
 append_jsonl = _mod.append
+
+logger = logging.getLogger(__name__)
 
 def build_reminder_subject(
     title: Optional[str],
@@ -219,6 +222,7 @@ def run(
     for rep in replies or []:
         tid = rep.get("task_id")
         fields = rep.get("fields", {}) or {}
+        fields = {k: v for k, v in fields.items() if not (k == "company" and v == "Unknown")}
         creator = rep.get("creator")
         if not tid or not fields:
             continue
@@ -239,6 +243,16 @@ def run(
 
     research_results: List[Any] = []
     for trig in triggers:
+        payload = trig.get("payload", {})
+        logger.info(
+            {
+                "dbg": "trigger_payload",
+                "event_title": payload.get("title"),
+                "company": payload.get("company"),
+                "start_iso": payload.get("start_iso"),
+                "end_iso": payload.get("end_iso"),
+            }
+        )
         for fn in (researchers if researchers is not None else _default_researchers()):
             if getattr(fn, "pro", False) and not feature_flags.ENABLE_PRO_SOURCES:
                 continue

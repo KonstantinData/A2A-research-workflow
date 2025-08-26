@@ -38,8 +38,8 @@ def test_calendar_scheduled_poll_integration(monkeypatch):
                     "phone": "+49 2222222",
                 },
                 "event_id": "e1",
-                "start": None,
-                "end": None,
+                "start_iso": None,
+                "end_iso": None,
             },
         }
     ]

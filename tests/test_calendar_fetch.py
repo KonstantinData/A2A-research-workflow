@@ -102,3 +102,36 @@ def test_orchestrator_no_triggers(monkeypatch, tmp_path):
         records[0]["message"]
         == "No calendar or contact events matched trigger words"
     )
+
+
+def test_extract_company_regex_success(monkeypatch):
+    def fake_regex(title, trigger):
+        return "Dr. Willmar Schwabe"
+
+    monkeypatch.setattr(google_calendar, "extract_company", fake_regex)
+
+    result = google_calendar.extract_company_ai(
+        "Meeting-Vorbereitung Firma Dr. Willmar Schwabe",
+        "meeting-vorbereitung",
+    )
+    assert result == "Dr. Willmar Schwabe"
+
+
+def test_extract_company_gpt_fallback(monkeypatch):
+    def fake_regex(title, trigger):
+        return "Unknown"
+
+    monkeypatch.setattr(google_calendar, "extract_company", fake_regex)
+
+    def fake_openai_call(*args, **kwargs):
+        return {"choices": [{"message": {"content": "Dr. Willmar Schwabe"}}]}
+
+    monkeypatch.setattr(
+        google_calendar.openai.ChatCompletion, "create", fake_openai_call
+    )
+
+    result = google_calendar.extract_company_ai(
+        "Meeting-Vorbereitung Firma Dr. Willmar Schwabe",
+        "meeting-vorbereitung",
+    )
+    assert result == "Dr. Willmar Schwabe"

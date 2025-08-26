@@ -169,19 +169,16 @@ def send_reminder(
     start_s = event_start.strftime("%H:%M") if event_start else None
     end_s = event_end.strftime("%H:%M") if event_end else None
 
-    parts = []
+    event_parts = []
     if date_s:
-        parts.append(date_s)
-    time_part = None
-    if start_s and end_s:
-        time_part = f"{start_s}–{end_s}"
-    elif start_s:
-        time_part = start_s
+        event_parts.append(date_s)
+    if start_s:
+        time_part = f"{start_s}–{end_s}" if end_s else start_s
+        event_parts.append(time_part)
     elif end_s:
-        time_part = end_s
-    if time_part:
-        parts.append(time_part)
-    event_info = ", ".join(parts)
+        event_parts.append(end_s)
+    event_info = ", ".join(event_parts)
+
     subject = f'[Research Agent] Missing Information – Event "{title}"'
     if event_info:
         subject += f" on {event_info}"

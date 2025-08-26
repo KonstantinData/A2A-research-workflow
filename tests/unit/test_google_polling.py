@@ -40,8 +40,8 @@ def test_calendar_scheduled_poll_normalizes(monkeypatch):
                     "phone": "+49 1234567",
                 },
                 "event_id": "e1",
-                "start": None,
-                "end": None,
+                "start_iso": None,
+                "end_iso": None,
             },
         }
     ]
