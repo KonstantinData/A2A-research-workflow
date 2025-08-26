@@ -35,6 +35,17 @@ TRIGGERS = [
 ]
 
 
+def load_trigger_words(path: str | None = None) -> list[str]:
+    """
+    Load trigger words from config/trigger_words.txt if available,
+    otherwise return default TRIGGERS.
+    """
+    if path and os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return [line.strip() for line in f if line.strip()]
+    return TRIGGERS
+
+
 def normalize_text(text: str) -> str:
     """Normalize string for trigger matching (casefold, remove accents)."""
     if not text:
@@ -43,12 +54,12 @@ def normalize_text(text: str) -> str:
     return text.casefold().strip()
 
 
-def contains_trigger(text: str) -> str | None:
+def contains_trigger(text: str, triggers: list[str] | None = None) -> str | None:
     """Check if any trigger word/phrase is contained in text."""
     if not text:
         return None
     norm = normalize_text(text)
-    for trig in TRIGGERS:
+    for trig in triggers or TRIGGERS:
         if trig in norm:
             return trig
     return None

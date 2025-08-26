@@ -1,11 +1,19 @@
 import os
-import openai
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
-from core.trigger_words import extract_company  # ✅ Korrektur: richtiger Import
+from core.trigger_words import extract_company, contains_trigger  # ✅ both exports
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Optional: OpenAI
+try:
+    import openai
+
+    if os.getenv("OPENAI_API_KEY"):
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+    else:
+        openai = None
+except ImportError:
+    openai = None
 
 
 def _dt(s):
@@ -19,12 +27,15 @@ def _dt(s):
 def extract_company_ai(title: str, trigger: str) -> str:
     """
     Hybrid extraction for company names:
-    1. Run regex-based rule extraction.
-    2. If result is 'Unknown', fallback to OpenAI GPT.
+    1. Try regex-based extract_company.
+    2. If result is 'Unknown', fallback to OpenAI GPT (if configured).
     """
     company = extract_company(title, trigger)
     if company and company != "Unknown":
         return company
+
+    if not openai:
+        return "Unknown"
 
     prompt = f"""
     Extract the company name from the following calendar event title.
@@ -78,8 +89,8 @@ def fetch_events():
     service = build("calendar", "v3", credentials=creds)
 
     now = datetime.utcnow().replace(tzinfo=timezone.utc)
-    time_min = (now.replace(hour=0, minute=0, second=0, microsecond=0)).isoformat()
-    time_max = (now.replace(hour=23, minute=59, second=59, microsecond=0)).isoformat()
+    time_min = (now - timedelta(days=7)).isoformat()
+    time_max = (now + timedelta(days=60)).isoformat()
 
     events_result = (
         service.events()
@@ -92,5 +103,4 @@ def fetch_events():
         )
         .execute()
     )
-    events = events_result.get("items", [])
-    return events
+    return events_result.get("items", [])
