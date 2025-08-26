@@ -9,6 +9,20 @@ from typing import Any, Dict, Tuple, Optional, List
 
 from integrations import hubspot_api  # erwartet: echte Implementierung
 
+# Import the static company dataset.  The internal company search
+# should not rely on HubSpot’s search API.  Instead we look up
+# companies directly in our own dataset.  The hubspot_api module
+# exposes ``lookup_company`` and ``all_company_names`` when the
+# agents package is available.  If the import fails the variables
+# below will be ``None`` which simply results in no static match.
+try:
+    # pylint: disable=unused-import
+    from agents.company_data import lookup_company as _lookup_company  # type: ignore
+    from agents.company_data import all_company_names as _all_company_names  # type: ignore
+except Exception:
+    _lookup_company = None  # type: ignore
+    _all_company_names = lambda: []  # type: ignore
+
 Normalized = Dict[str, Any]
 Raw = Dict[str, Any]
 
@@ -38,24 +52,50 @@ def _pick_company_key(payload: Dict[str, Any]) -> Tuple[str, str]:
 
 def _find_company(name: str, domain: str) -> Dict[str, Any]:
     """
-    HubSpot-gestützte Suche:
-      1) exakte Domain
-      2) sonst case-insensitive Name
-    Erwartet, dass hubspot_api die folgenden Helfer anbietet:
-      - find_company_by_domain(domain) -> {id, properties, ...} | None
-      - find_company_by_name(name) -> List[{id, updatedAt, ...}]
+    Search for a company in the static in‑memory dataset.
+
+    According to the project requirements, the internal company lookup must
+    not query HubSpot for companies.  Instead this helper inspects the
+    static dataset defined in :mod:`agents.company_data`.  The lookup
+    first tries to match the domain against the ``company_domain`` field
+    of each known company.  If no domain match is found it falls back
+    to a case‑insensitive name match.  If a company is located the
+    returned dictionary mimics a minimal HubSpot company object with
+    ``id`` and ``properties`` keys.  When no match is available an
+    empty dictionary is returned.
+
+    Parameters
+    ----------
+    name: str
+        The company name to search for.
+    domain: str
+        The company domain (lowercase) to search for.
+
+    Returns
+    -------
+    Dict[str, Any]
+        A minimal record representing the company if found, otherwise
+        an empty dictionary.
     """
-    if domain:
-        hit = hubspot_api.find_company_by_domain(domain)
-        if hit:
-            return hit
-    if name:
-        cands = hubspot_api.find_company_by_name(name)
-        if cands:
-            # wähle jüngsten Eintrag
-            cands = sorted(cands, key=lambda c: c.get("updatedAt") or "", reverse=True)
-            return cands[0]
-    return {}  # not found
+    # Prefer domain match when provided
+    if domain and _lookup_company and _all_company_names:
+        for comp_name in _all_company_names():
+            ci = _lookup_company(comp_name)
+            if ci and ci.company_domain.lower() == domain.strip().lower():
+                return {
+                    "id": f"static-{ci.company_domain}",
+                    "properties": {"name": ci.company_name, "domain": ci.company_domain},
+                }
+    # Fall back to name match
+    if name and _lookup_company:
+        ci = _lookup_company(name)
+        if ci:
+            return {
+                "id": f"static-{ci.company_domain}",
+                "properties": {"name": ci.company_name, "domain": ci.company_domain},
+            }
+    # Nothing found
+    return {}
 
 
 def _latest_report(company_id: str) -> Tuple[Optional[str], Optional[str]]:

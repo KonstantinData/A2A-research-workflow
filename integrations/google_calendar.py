@@ -218,9 +218,14 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
     for ev in events:
         creator = (ev.get("creator") or {}).get("email") or ev.get("creatorEmail") or ""
         description = ev.get("description") or ""
-        company = parser.extract_company(description) or ""
-        domain = parser.extract_domain(description) or ""
-        phone = parser.extract_phone(description) or ""
+        title = ev.get("summary") or ""
+        # Try to extract company/domain/phone from the description first.  If
+        # nothing is found fall back to the event title.  The title often
+        # contains both the trigger word and the company name on the same line.
+        # Using parser.extract_* on the title helps capture these cases.
+        company = parser.extract_company(description) or parser.extract_company(title) or ""
+        domain = parser.extract_domain(description) or parser.extract_domain(title) or ""
+        phone = parser.extract_phone(description) or parser.extract_phone(title) or ""
         notes = {"company": company, "domain": domain, "phone": phone}
 
         start_dt = _dt(ev.get("start"))

@@ -8,7 +8,9 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from agents.internal_company.run import run as internal_run
+from core import classify
 from integrations import email_sender
+from core import tasks
 from core.utils import optional_fields, required_fields
 
 import importlib.util as _ilu
@@ -89,6 +91,13 @@ def run(trigger: Normalized) -> Normalized:
         except Exception:
             end_dt = None
         missing = missing_required + missing_optional
+        # Create a pending task with a unique ID so replies can be matched
+        task = tasks.create_task(
+            trigger=str(payload.get("event_id") or event_title),
+            missing_fields=missing,
+            employee_email=creator_email or "",
+        )
+        # Include the task ID in the reminder for correlation
         email_sender.send_reminder(
             to=creator_email,
             creator_email=creator_email,
@@ -98,6 +107,7 @@ def run(trigger: Normalized) -> Normalized:
             event_start=start_dt,
             event_end=end_dt,
             missing_fields=missing,
+            task_id=task.get("id"),
         )
         _log_workflow(
             {
@@ -136,22 +146,80 @@ def run(trigger: Normalized) -> Normalized:
     company_domain = payload.get("company_domain") or ""
 
     result = internal_run(trigger)
-    action = "NOT_IN_CRM" if not result.get("payload") else "AWAIT_REQUESTOR_DECISION"
+    payload_res = result.get("payload", {}) or {}
 
-    # Simple e-mail notification when a recent report exists
-    if action == "AWAIT_REQUESTOR_DECISION":
-        first_name = creator_email.split("@", 1)[0]
-        subject = f"Quick check: report for {company_name}"
-        body = (
-            f"Hi {first_name},\n\n"
-            f"good news — we already have a report for {company_name}.\n"
-            f"The latest version is from ??.\n\n"
-            f"What should I do next?\n\n"
-            f"Reply with I USE THE EXISTING — I'll send you the PDF, and you'll also find it in HubSpot under Company → Attachments.\n\n"
-            f"Reply with NEW REPORT — I'll refresh the report, add new findings, and highlight changes.\n\n"
-            "Best Regards,\nagent_internal_search"
-        )
-        email_sender.send_email(to=creator_email, subject=subject, body=body)
+    # Determine if the company already exists and whether a previous report is still current.
+    exists = payload_res.get("exists")
+    last_report_date = payload_res.get("last_report_date")
+    # Parse the last report date into a datetime object; treat None or parse failures as very old
+    days_since_report: int | None = None
+    last_dt: datetime | None = None
+    if last_report_date:
+        try:
+            # Expect ISO-8601 with or without trailing Z; convert to naive UTC
+            lr = last_report_date.replace("Z", "+00:00")
+            last_dt = datetime.fromisoformat(str(lr))
+            # Compare against current UTC time
+            days_since_report = (datetime.utcnow() - last_dt.replace(tzinfo=None)).days
+        except Exception:
+            days_since_report = None
+            last_dt = None
+
+    # If the company exists and the report is younger than 361 days, ask the employee whether to reuse it.
+    # Otherwise proceed as if the company is new or the report is outdated.
+    if exists:
+        if days_since_report is not None and days_since_report <= 361:
+            action = "AWAIT_REQUESTOR_DECISION"
+            # Send a friendly email with the last report date included
+            first_name = creator_email.split("@", 1)[0]
+            # Format the date in a human‑readable way; fall back to ISO string if parsing fails
+            # Format the date in a human‑readable way; fall back to ISO string if parsing fails
+            if last_dt:
+                try:
+                    date_display = last_dt.strftime("%Y-%m-%d")
+                except Exception:
+                    date_display = last_report_date
+            else:
+                date_display = last_report_date or "unknown"
+            subject = f"Quick check: report for {company_name}"
+            body = (
+                f"Hi {first_name},\n\n"
+                f"good news — we already have a report for {company_name}.\n"
+                f"The latest version is from {date_display}.\n\n"
+                f"What should I do next?\n\n"
+                f"Reply with I USE THE EXISTING — I'll send you the PDF, and you'll also find it in HubSpot under Company → Attachments.\n\n"
+                f"Reply with NEW REPORT — I'll refresh the report, add new findings, and highlight changes.\n\n"
+                "Best regards,\nYour Internal Research Agent"
+            )
+            email_sender.send_email(to=creator_email, subject=subject, body=body)
+        else:
+            # Older report or unknown date – treat as no existing report
+            action = "NOT_IN_CRM"
+    else:
+        action = "NOT_IN_CRM"
+
+    # If the company does not exist or the report is outdated, attempt to enrich
+    # the payload with a basic classification derived from the description or other
+    # available text fields.  This supports downstream neighbour lookup.
+    if action == "NOT_IN_CRM":
+        # Build a text blob from available fields for classification
+        description = payload_res.get("description") or trigger.get("payload", {}).get("description") or ""
+        text_blob = {"description": description}
+        if description:
+            class_result = classify.classify(text_blob)
+            # Use the first WZ2008 code if available
+            wz_codes = class_result.get("wz2008") or []
+            if wz_codes:
+                code = wz_codes[0]
+                # Insert classification and industry label when not already provided
+                if not payload_res.get("classification_number"):
+                    payload_res["classification_number"] = code
+                # The label may be nested; use the German label for the matched code
+                label = class_result.get("labels", {}).get("wz2008", {}).get(code)
+                if label and not payload_res.get("industry"):
+                    payload_res["industry"] = label
+                # Persist the classification number back into the result payload
+                result["payload"] = payload_res
 
     artifacts_path: str | None = None
     if any(payload.get(k) for k in ("classification_number", "industry", "description")):

@@ -46,21 +46,25 @@ def send_reminder(
     event_start: Optional[datetime],
     event_end: Optional[datetime],
     missing_fields: Sequence[str],
+    task_id: Optional[str] = None,
 ) -> None:
     """Send a reminder requesting missing information.
 
-    Only a tiny subset of the production functionality is required for the
-    tests: a nicely formatted subject and body listing required and optional
-    fields.  The message is sent via the generic :func:`send` helper which can be
-    monkeypatched in the tests.
+    In addition to the existing parameters, an optional ``task_id`` may be
+    provided.  When present the task identifier is included in the subject
+    line so that replies can be correlated to pending tasks.  The message
+    content remains friendly and lists required and optional fields.
     """
 
     start_s = event_start.strftime("%Y-%m-%d, %H:%M") if event_start else ""
     end_s = event_end.strftime("%H:%M") if event_end else ""
 
-    subject = f'[Research Agent] Missing Information – Event "{event_title}"'
+    # Build subject: include event title and optionally the task identifier
+    subject = f'[Research Agent] Missing Information – "{event_title}"'
     if start_s and end_s:
         subject += f" on {start_s.split(',')[0]}, {start_s.split(', ')[1]}–{end_s}"
+    if task_id:
+        subject += f" – Task {task_id}"
 
     req_lines = "\n".join(f"{f}:" for f in missing_fields)
     opt_lines = "\n".join(f"{f}:" for f in ["Email", "Phone"])
@@ -95,7 +99,7 @@ Thanks a lot for your support!
         body=body,
         sender=None,
         attachments=None,
-        task_id=event_id,
+        task_id=task_id or event_id,
     )
 
 

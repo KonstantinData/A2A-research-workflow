@@ -58,10 +58,16 @@ def fetch_replies() -> List[Dict[str, Any]]:
         subject = _decode(msg.get("Subject", ""))
         if "[Research Agent] Missing Information" not in subject:
             continue
-        match = re.search(r"Event (\d{4}-\d{2}-\d{2})_(\d{4})", subject)
+        # Extract a task identifier when present (e.g. "Task 123e4567-e89b-12d3-a456-426655440000")
+        task_match = re.search(r"Task ([A-Fa-f0-9-]{36})", subject)
+        # Fallback: extract event ID pattern from older subjects
+        event_match = re.search(r"Event (\d{4}-\d{2}-\d{2})_(\d{4})", subject)
+        task_id = ""
         event_id = ""
-        if match:
-            event_id = f"{match.group(1)}_{match.group(2)}"
+        if task_match:
+            task_id = task_match.group(1)
+        if event_match:
+            event_id = f"{event_match.group(1)}_{event_match.group(2)}"
         from_addr = email.utils.parseaddr(msg.get("From"))[1]
 
         body = ""
@@ -101,7 +107,7 @@ def fetch_replies() -> List[Dict[str, Any]]:
             results.append(
                 {
                     "creator": from_addr,
-                    "task_id": event_id,
+                    "task_id": task_id or event_id,
                     "event_id": event_id,
                     "fields": fields,
                 }
@@ -111,6 +117,7 @@ def fetch_replies() -> List[Dict[str, Any]]:
                 {
                     "status": "reply_received",
                     "event_id": event_id,
+                    "task_id": task_id or event_id,
                     "fields_completed": list(fields.keys()),
                     "source": "email",
                 },
