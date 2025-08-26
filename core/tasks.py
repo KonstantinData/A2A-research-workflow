@@ -4,8 +4,11 @@ from __future__ import annotations
 
 This module defines a ``Task`` dataclass and CRUD helpers to create, read,
 update and delete task records. Records persist on disk via SQLite so they
-survive process restarts. The database location can be overridden by setting
-``TASKS_DB_PATH`` before importing this module.
+survive process restarts.  Historically the configuration used a
+``TASKS_DB_PATH`` environment variable but parts of the codebase (and the
+tests in this kata) expect a ``TASKS_DB_URL`` style variable.  To remain
+compatible with both we honour ``TASKS_DB_URL`` when present and fall back to
+``TASKS_DB_PATH`` otherwise.
 """
 
 from dataclasses import dataclass, asdict
@@ -21,8 +24,15 @@ import logging
 # ---------------------------------------------------------------------------
 # Database setup
 # ---------------------------------------------------------------------------
+# Determine database location.  ``TASKS_DB_URL`` is expected to contain a
+# ``sqlite:///`` style URL while ``TASKS_DB_PATH`` points directly to a file.  We
+# normalise both to a simple ``Path`` for ``sqlite3``.
 DEFAULT_DB_PATH = Path(__file__).with_name('tasks.db')
-DB_PATH = Path(os.getenv('TASKS_DB_PATH', DEFAULT_DB_PATH))
+_db_url = os.getenv('TASKS_DB_URL')
+if _db_url:
+    DB_PATH = Path(_db_url.replace('sqlite:///', '', 1))
+else:
+    DB_PATH = Path(os.getenv('TASKS_DB_PATH', DEFAULT_DB_PATH))
 
 logger = logging.getLogger(__name__)
 
