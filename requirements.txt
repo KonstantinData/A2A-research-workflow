@@ -1,8 +1,20 @@
+# Google APIs
 google-api-python-client
 google-auth
 google-auth-oauthlib
+
+# OpenAI
+openai>=1.0.0
+
+# PDF / Report rendering
 weasyprint>=65.0
+
+# HTTP client
+requests
+
+# Linters
 ruff
 flake8
+
+# Testing
 pytest
-requests
