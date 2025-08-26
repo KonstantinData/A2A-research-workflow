@@ -20,7 +20,7 @@ assert _spec and _spec.loader
 _spec.loader.exec_module(_mod)
 append_jsonl = _mod.append
 
-_LOG_PATH = Path("logs") / "workflows" / "email_reader.jsonl"
+_REPLY_LOG = Path("logs") / "workflows" / "replies.jsonl"
 
 
 def _decode(value: str) -> str:
@@ -58,10 +58,10 @@ def fetch_replies() -> List[Dict[str, Any]]:
         subject = _decode(msg.get("Subject", ""))
         if "[Research Agent] Missing Information" not in subject:
             continue
-        match = re.search(r"Event (\d{4}-\d{2}-\d{2})_(\d{2}:\d{2})", subject)
-        task_id = ""
+        match = re.search(r"Event (\d{4}-\d{2}-\d{2})_(\d{4})", subject)
+        event_id = ""
         if match:
-            task_id = f"{match.group(1)}_{match.group(2)}"
+            event_id = f"{match.group(1)}_{match.group(2)}"
         from_addr = email.utils.parseaddr(msg.get("From"))[1]
 
         body = ""
@@ -98,10 +98,22 @@ def fetch_replies() -> List[Dict[str, Any]]:
             fields["email"] = mail_match.group(0)
 
         if fields:
-            results.append({"creator": from_addr, "task_id": task_id, "fields": fields})
+            results.append(
+                {
+                    "creator": from_addr,
+                    "task_id": event_id,
+                    "event_id": event_id,
+                    "fields": fields,
+                }
+            )
             append_jsonl(
-                _LOG_PATH,
-                {"status": "read", "from": from_addr, "task_id": task_id},
+                _REPLY_LOG,
+                {
+                    "status": "reply_received",
+                    "event_id": event_id,
+                    "fields_completed": list(fields.keys()),
+                    "source": "email",
+                },
             )
         imap.store(msg_id, "+FLAGS", "(\\Seen)")
 
@@ -115,7 +127,7 @@ def poll_replies(interval: int = 600) -> None:
         try:
             fetch_replies()
         except Exception as e:
-            append_jsonl(_LOG_PATH, {"status": "error", "error": str(e)})
+            append_jsonl(_REPLY_LOG, {"status": "error", "error": str(e)})
         time.sleep(interval)
 
 
