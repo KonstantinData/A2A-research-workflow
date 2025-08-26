@@ -1,15 +1,14 @@
 import os
 import openai
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
-from .trigger_words import extract_company
+from googleapiclient.discovery import build
+from google.oauth2.credentials import Credentials
+from core.trigger_words import extract_company  # ✅ Korrektur: richtiger Import
 
-# OpenAI Key
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
 def _dt(s):
-    """Parse RFC3339 datetime or all-day date into datetime."""
     if not s:
         return None
     if "dateTime" in s:
@@ -20,8 +19,8 @@ def _dt(s):
 def extract_company_ai(title: str, trigger: str) -> str:
     """
     Hybrid extraction for company names:
-    1. Regex-based extraction
-    2. Fallback: OpenAI GPT
+    1. Run regex-based rule extraction.
+    2. If result is 'Unknown', fallback to OpenAI GPT.
     """
     company = extract_company(title, trigger)
     if company and company != "Unknown":
@@ -35,7 +34,6 @@ def extract_company_ai(title: str, trigger: str) -> str:
 
     Title: "{title}"
     """
-
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
@@ -48,14 +46,14 @@ def extract_company_ai(title: str, trigger: str) -> str:
         return "Unknown"
 
 
-def normalize_event(ev, detected_trigger, creator_email, creator_name):
+def normalize_event(ev, detected_trigger=None, creator_email=None, creator_name=None):
     title = ev.get("summary") or "Untitled"
     start_dt = _dt(ev.get("start", {}))
     end_dt = _dt(ev.get("end", {}))
 
-    company = extract_company_ai(title, detected_trigger)
+    company = extract_company_ai(title, detected_trigger or "")
 
-    return {
+    normalized = {
         "event_id": ev["id"],
         "ical_uid": ev.get("iCalUID"),
         "title": title,
@@ -66,3 +64,33 @@ def normalize_event(ev, detected_trigger, creator_email, creator_name):
         "creator": creator_email,
         "creator_name": creator_name,
     }
+    return normalized
+
+
+def fetch_events():
+    creds = Credentials(
+        None,
+        refresh_token=os.getenv("GOOGLE_REFRESH_TOKEN"),
+        client_id=os.getenv("GOOGLE_CLIENT_ID"),
+        client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+        token_uri="https://oauth2.googleapis.com/token",
+    )
+    service = build("calendar", "v3", credentials=creds)
+
+    now = datetime.utcnow().replace(tzinfo=timezone.utc)
+    time_min = (now.replace(hour=0, minute=0, second=0, microsecond=0)).isoformat()
+    time_max = (now.replace(hour=23, minute=59, second=59, microsecond=0)).isoformat()
+
+    events_result = (
+        service.events()
+        .list(
+            calendarId="primary",
+            timeMin=time_min,
+            timeMax=time_max,
+            singleEvents=True,
+            orderBy="startTime",
+        )
+        .execute()
+    )
+    events = events_result.get("items", [])
+    return events
