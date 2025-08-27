@@ -1,0 +1,11 @@
+labels:
+  - name: bug
+    color: cc0000
+  - name: auto-created
+    color: ffffff
+  - name: error:reminder
+    color: d73a4a
+  - name: error:mail
+    color: d73a4a
+  - name: error:report
+    color: d73a4a

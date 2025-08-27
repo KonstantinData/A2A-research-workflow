@@ -186,6 +186,7 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
                 "contacts",
                 "reminder_error",
                 {"contact_id": contact_id, "error": str(e)},
+                severity="critical",
             )
 
         log_step(
