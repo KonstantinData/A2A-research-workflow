@@ -288,6 +288,7 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
                 "calendar",
                 "reminder_error",
                 {"event_id": payload.get("event_id"), "error": str(e)},
+                severity="critical",
             )
 
         log_step(

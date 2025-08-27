@@ -134,7 +134,10 @@ def poll_replies(interval: int = 600) -> None:
         try:
             fetch_replies()
         except Exception as e:
-            append_jsonl(_REPLY_LOG, {"status": "error", "error": str(e)})
+            append_jsonl(
+                _REPLY_LOG,
+                {"status": "error", "error": str(e), "severity": "warning"},
+            )
         time.sleep(interval)
 
 

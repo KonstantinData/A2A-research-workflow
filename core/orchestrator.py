@@ -13,6 +13,7 @@ from core.utils import (
     optional_fields,
     log_step,
     finalize_summary,
+    get_workflow_id,
 )  # noqa: F401  # required_fields/optional_fields imported for completeness
 from integrations.google_calendar import fetch_events
 from integrations.google_contacts import fetch_contacts
@@ -44,6 +45,8 @@ def log_event(record: Dict[str, Any]) -> None:
     path = Path("logs") / "workflows" / f"{ts}_workflow.jsonl"
     record = dict(record)
     record.setdefault("timestamp", datetime.utcnow().replace(microsecond=0).isoformat() + "Z")
+    record.setdefault("severity", "info")
+    record.setdefault("workflow_id", get_workflow_id())
     append_jsonl(path, record)
 
 
@@ -173,15 +176,25 @@ def run(
     out_dir.mkdir(parents=True, exist_ok=True)
     pdf_path = out_dir / "report.pdf"
     csv_path = out_dir / "data.csv"
-    pdf_renderer and pdf_renderer(consolidated, pdf_path)
-    csv_exporter and csv_exporter(consolidated, csv_path)
-    if pdf_renderer:
-        first_id = (triggers or [{}])[0].get("payload", {}).get("event_id")
+    first_id = (triggers or [{}])[0].get("payload", {}).get("event_id")
+    try:
+        pdf_renderer and pdf_renderer(consolidated, pdf_path)
+        csv_exporter and csv_exporter(consolidated, csv_path)
+        if pdf_renderer:
+            log_step(
+                "orchestrator",
+                "report_generated",
+                {"event_id": first_id, "path": str(pdf_path)},
+            )
+    except Exception as e:
         log_step(
             "orchestrator",
-            "report_generated",
-            {"event_id": first_id, "path": str(pdf_path)},
+            "report_error",
+            {"event_id": first_id, "error": str(e)},
+            severity="critical",
         )
+        finalize_summary()
+        raise
 
     if company_id is None and hubspot_upsert:
         company_id = hubspot_upsert(consolidated)
@@ -192,10 +205,33 @@ def run(
         and pdf_path.exists()
         and hubspot_attach
     ):
-        hubspot_attach(pdf_path, company_id)
-        log_event({"status": "report_uploaded"})
+        try:
+            hubspot_attach(pdf_path, company_id)
+            log_event({"status": "report_uploaded"})
+        except Exception as e:
+            log_step(
+                "orchestrator",
+                "report_error",
+                {"event_id": first_id, "error": str(e)},
+                severity="critical",
+            )
+            log_event({"status": "report_not_uploaded"})
+            log_step(
+                "orchestrator",
+                "report_not_uploaded",
+                {"event_id": first_id},
+                severity="warning",
+            )
+            finalize_summary()
+            raise
     else:
         log_event({"status": "report_not_uploaded"})
+        log_step(
+            "orchestrator",
+            "report_not_uploaded",
+            {"event_id": first_id},
+            severity="warning",
+        )
 
     finalize_summary()
     return consolidated

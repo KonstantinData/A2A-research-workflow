@@ -41,7 +41,8 @@ def send(
         log_step(
             "orchestrator",
             "mail_error",
-            {"to": to, "subject": subject, "error": str(e)},
+            {"to": to, "subject": subject, "error": str(e), "event_id": task_id},
+            severity="critical",
         )
         raise
 
@@ -70,7 +71,8 @@ def send_email(
         log_step(
             "orchestrator",
             "mail_error",
-            {"to": to, "subject": subject, "error": str(e)},
+            {"to": to, "subject": subject, "error": str(e), "event_id": task_id},
+            severity="critical",
         )
         raise
 

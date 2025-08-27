@@ -43,11 +43,12 @@ def get_workflow_id() -> str:
             "reports_generated": 0,
             "mails_sent": 0,
             "errors": 0,
+            "warnings": 0,
         }
     return WORKFLOW_ID
 
 
-def _update_summary(source: str, stage: str) -> None:
+def _update_summary(source: str, stage: str, severity: str) -> None:
     global SUMMARY
     if stage == "trigger_detected":
         if source == "calendar":
@@ -60,15 +61,18 @@ def _update_summary(source: str, stage: str) -> None:
         SUMMARY["mails_sent"] += 1
     if source == "orchestrator" and stage == "report_generated":
         SUMMARY["reports_generated"] += 1
-    if "error" in stage:
+    if severity == "critical":
         SUMMARY["errors"] += 1
+    elif severity == "warning":
+        SUMMARY["warnings"] += 1
 
 
-def log_step(source: str, stage: str, data: Dict[str, Any]) -> None:
+def log_step(source: str, stage: str, data: Dict[str, Any], *, severity: str = "info") -> None:
     payload = {
         "workflow_id": get_workflow_id(),
         "trigger_source": source,
         "status": stage,
+        "severity": severity,
         **data,
     }
     try:
@@ -76,7 +80,7 @@ def log_step(source: str, stage: str, data: Dict[str, Any]) -> None:
     except Exception as e:  # pragma: no cover - logging shouldn't break tests
         getLogger(__name__).warning("Logging failed: %s", e)
     else:
-        _update_summary(source, stage)
+        _update_summary(source, stage, severity)
 
 
 def finalize_summary() -> None:
