@@ -42,11 +42,23 @@ jobs:
           from agents.agent_internal_search import run
 
           payload = {
-              'company_name': os.environ['TEST_COMPANY_NAME'],
-              'company_domain': os.environ['TEST_COMPANY_DOMAIN'],
-              'creator_email': os.environ['TEST_CREATOR_EMAIL'],
+              "company_name": os.environ["TEST_COMPANY_NAME"],
+              "company_domain": os.environ["TEST_COMPANY_DOMAIN"],
+              "creator_email": os.environ["TEST_CREATOR_EMAIL"],
           }
-          res = run({'payload': payload})
+          trigger = {
+              "source": "manual",
+              "trigger_source": "manual",
+              "creator": os.environ["TEST_CREATOR_EMAIL"],
+              "recipient": os.environ["TEST_CREATOR_EMAIL"],
+              "payload": payload,
+          }
+          res = run(trigger)
           print(json.dumps(res, indent=2))
-          assert res['payload']['action'] in {'NOT_IN_CRM','AWAIT_REQUESTOR_DECISION','NEEDS_DETAIL_RESEARCH','DELIVERED_EXISTING'}
+          assert res["payload"]["action"] in {
+              "NOT_IN_CRM",
+              "AWAIT_REQUESTOR_DECISION",
+              "NEEDS_DETAIL_RESEARCH",
+              "DELIVERED_EXISTING",
+          }
           PY
