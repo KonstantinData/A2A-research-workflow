@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from email.mime.text import MIMEText
 import smtplib
 import ssl
 
@@ -27,19 +28,22 @@ def send_email(
     secure: ``"ssl"`` or ``"tls"`` (STARTTLS).
     """
 
-    msg = f"From: {mail_from}\r\nTo: {to}\r\nSubject: {subject}\r\n\r\n{body}"
+    msg = MIMEText(body, "plain", "utf-8")
+    msg["From"] = mail_from
+    msg["To"] = to
+    msg["Subject"] = subject
 
     try:
         if secure == "ssl":
             context = ssl.create_default_context()
             with smtplib.SMTP_SSL(host, port, context=context) as smtp:
                 smtp.login(user, password)
-                smtp.sendmail(mail_from, [to], msg)
+                smtp.sendmail(mail_from, [to], msg.as_string())
         elif secure == "tls":
             with smtplib.SMTP(host, port) as smtp:
                 smtp.starttls(context=ssl.create_default_context())
                 smtp.login(user, password)
-                smtp.sendmail(mail_from, [to], msg)
+                smtp.sendmail(mail_from, [to], msg.as_string())
         else:  # pragma: no cover - defensive programming
             raise ValueError(f"Unsupported secure mode: {secure}")
     except Exception as exc:  # pragma: no cover - network errors
