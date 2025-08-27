@@ -5,7 +5,6 @@ from __future__ import annotations
 import time
 from datetime import datetime, time as dtime, timedelta
 
-import os
 import importlib.util as _ilu
 from pathlib import Path
 
@@ -69,15 +68,13 @@ class ReminderScheduler:
                     continue
                 if task_history.has_event_since(task["id"], "escalated", today_start):
                     continue
-                sender = (
-                    os.getenv("MAIL_FROM")
-                    or os.getenv("SMTP_FROM")
-                    or (os.getenv("SMTP_USER") or "")
-                )
                 subject = f"Escalation: no response for task {task['id']}"
                 body = "No response was received for the reminder sent at 10:00."
                 email_sender.send_email(
-                    sender, "admin@condata.io", subject, body, task_id=task["id"]
+                    to="admin@condata.io",
+                    subject=subject,
+                    body=body,
+                    task_id=task["id"],
                 )
                 task_history.record_event(task["id"], "escalated")
                 tasks.update_task_status(task["id"], "escalated")

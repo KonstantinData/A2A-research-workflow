@@ -32,9 +32,6 @@ def send(
             to=to,
             subject=subject,
             body=body,
-            sender=sender,
-            attachments=attachments,
-            task_id=task_id,
         )
         log_step("orchestrator", "mail_sent", {"to": to, "subject": subject})
     except Exception as e:  # pragma: no cover - network errors
@@ -62,9 +59,6 @@ def send_email(
             to=to,
             subject=subject,
             body=body,
-            sender=sender,
-            attachments=attachments,
-            task_id=task_id,
         )
         log_step("orchestrator", "mail_sent", {"to": to, "subject": subject})
     except Exception as e:  # pragma: no cover - network errors
@@ -138,8 +132,6 @@ Thanks a lot for your support!
         to=to,
         subject=subject,
         body=body,
-        sender=None,
-        attachments=None,
         task_id=task_id or event_id,
     )
 

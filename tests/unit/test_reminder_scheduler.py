@@ -45,10 +45,10 @@ def test_send_reminders_records_history(monkeypatch):
 def test_escalate_tasks_emails_admin(monkeypatch):
     calls = []
 
-    def fake_send(sender, recipient, subject, body, attachments=None, task_id=None):
+    def fake_send(*, to, subject, body, sender=None, attachments=None, task_id=None):
         calls.append({
             "sender": sender,
-            "recipient": recipient,
+            "recipient": to,
             "subject": subject,
             "body": body,
             "task_id": task_id,
@@ -76,7 +76,7 @@ def test_scheduler_run_flow(monkeypatch):
     def fake_reminder(email, fields, task_id=None):
         reminder_calls.append(task_id)
 
-    def fake_escalation(sender, recipient, subject, body, attachments=None, task_id=None):
+    def fake_escalation(*, to, subject, body, sender=None, attachments=None, task_id=None):
         escalation_calls.append(task_id)
 
     monkeypatch.setattr(email_client, "send_email", fake_reminder)
