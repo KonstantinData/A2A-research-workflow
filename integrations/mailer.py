@@ -1,34 +1,49 @@
 # integrations/mailer.py
+"""Low level SMTP helper supporting SSL and STARTTLS connections."""
+
+from __future__ import annotations
+
 import smtplib
-from email.mime.text import MIMEText
-from email.utils import formataddr
-import os
+import ssl
 
 
-def send_email(to, subject, body):
+def send_email(
+    host: str,
+    port: int,
+    user: str,
+    password: str,
+    mail_from: str,
+    to: str,
+    subject: str,
+    body: str,
+    secure: str = "ssl",
+) -> None:
+    """Send an e-mail via SMTP using the selected security mode.
+
+    Parameters
+    ----------
+    host, port, user, password, mail_from: SMTP connection details.
+    to, subject, body: Message details.
+    secure: ``"ssl"`` or ``"tls"`` (STARTTLS).
     """
-    Send an email via SMTP using credentials from environment variables.
-    """
 
-    host = os.getenv("SMTP_HOST")
-    port = int(os.getenv("SMTP_PORT", 587))
-    user = os.getenv("SMTP_USER")
-    password = os.getenv("SMTP_PASS")
-    secure = os.getenv("SMTP_SECURE", "starttls").lower()
-    mail_from = os.getenv("MAIL_FROM", user)
+    msg = f"From: {mail_from}\r\nTo: {to}\r\nSubject: {subject}\r\n\r\n{body}"
 
-    msg = MIMEText(body, "plain", "utf-8")
-    msg["Subject"] = subject
-    msg["From"] = formataddr(("Internal Research Agent", mail_from))
-    msg["To"] = to
+    try:
+        if secure == "ssl":
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL(host, port, context=context) as smtp:
+                smtp.login(user, password)
+                smtp.sendmail(mail_from, [to], msg)
+        elif secure == "tls":
+            with smtplib.SMTP(host, port) as smtp:
+                smtp.starttls(context=ssl.create_default_context())
+                smtp.login(user, password)
+                smtp.sendmail(mail_from, [to], msg)
+        else:  # pragma: no cover - defensive programming
+            raise ValueError(f"Unsupported secure mode: {secure}")
+    except Exception as exc:  # pragma: no cover - network errors
+        raise RuntimeError(
+            f"Failed to send email via {host}:{port} using {secure}"
+        ) from exc
 
-    if secure == "ssl":
-        smtp = smtplib.SMTP_SSL(host, port)
-    else:
-        smtp = smtplib.SMTP(host, port)
-        if secure == "starttls":
-            smtp.starttls()
-
-    smtp.login(user, password)
-    smtp.sendmail(mail_from, [to], msg.as_string())
-    smtp.quit()
