@@ -119,5 +119,6 @@ jobs:
           name: outputs
           path: |
             output/**
+            logs/workflows/**
             **/*.pdf
           if-no-files-found: ignore
