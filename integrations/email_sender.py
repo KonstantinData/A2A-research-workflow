@@ -10,9 +10,21 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional, Sequence
+import os
 
 from .mailer import send_email as _send_email  # tatsächlicher SMTP/Provider-Client
 from core.utils import log_step
+
+
+def _deliver(to: str, subject: str, body: str) -> None:
+    """Send message using environment configured SMTP credentials."""
+    host = os.environ.get("SMTP_HOST")
+    port = int(os.environ.get("SMTP_PORT", 587))
+    user = os.environ.get("SMTP_USER")
+    password = os.environ.get("SMTP_PASS")
+    mail_from = os.environ.get("MAIL_FROM", user)
+    secure = os.environ.get("SMTP_SECURE", "ssl").lower()
+    _send_email(host, port, user, password, mail_from, to, subject, body, secure=secure)
 
 
 def send(
@@ -28,11 +40,7 @@ def send(
     Generische Send-Funktion, die Tests monkeypatchen.
     """
     try:
-        _send_email(
-            to=to,
-            subject=subject,
-            body=body,
-        )
+        _deliver(to, subject, body)
         log_step("orchestrator", "mail_sent", {"to": to, "subject": subject})
     except Exception as e:  # pragma: no cover - network errors
         log_step(
@@ -55,11 +63,7 @@ def send_email(
 ) -> None:
     """Wrapper around the low level mailer with logging."""
     try:
-        _send_email(
-            to=to,
-            subject=subject,
-            body=body,
-        )
+        _deliver(to, subject, body)
         log_step("orchestrator", "mail_sent", {"to": to, "subject": subject})
     except Exception as e:  # pragma: no cover - network errors
         log_step(
