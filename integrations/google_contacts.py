@@ -35,6 +35,7 @@ from core.utils import (
     mark_processed,
     required_fields,
     optional_fields,
+    log_step,
 )
 from . import email_sender
 
@@ -130,19 +131,23 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
     if fetch_fn is None:
         fetch_fn = fetch_contacts
     contacts = fetch_fn() or []
+    trigger_words = [t.lower() for t in load_trigger_words()]
     triggers: List[Dict[str, Any]] = []
     for person in contacts:
         email = _primary_email(person) or ""
         notes = _notes_blob(person)
-        # Display names are often used by the tests to encode trigger
-        # information.  We therefore collect them up-front so they can be used as
-        # a fall back for the parsing helpers below.
         names = [n.get("displayName") for n in person.get("names", []) if n.get("displayName")]
         joined_names = " ".join(names)
-        # Attempt to derive company/domain/phone from the notes text.  If no
-        # information is found fall back to the contact's display name.  This
-        # helps capture companies when the user puts the trigger and company name
-        # on the same line or inside the person's name field.
+        summary_text = f"{notes} {joined_names}".lower()
+        matched_trigger = next((t for t in trigger_words if t in summary_text), None)
+        contact_id = person.get("resourceName") or person.get("id") or ""
+        if matched_trigger:
+            log_step(
+                "contacts",
+                "trigger_detected",
+                {"contact_id": contact_id, "name": joined_names, "trigger": matched_trigger},
+            )
+
         company = parser.extract_company(notes) or parser.extract_company(joined_names) or ""
         domain = parser.extract_domain(notes) or parser.extract_domain(joined_names) or ""
         phone = parser.extract_phone(notes) or parser.extract_phone(joined_names) or ""
@@ -160,16 +165,43 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
 
         missing_req = [f for f in required_fields("contacts") if not payload.get(f)]
         missing_opt = [f for f in optional_fields() if not payload.get(f)]
-        if missing_req:
-            body = (
-                "Please provide the following information:\n"
-                + "\n".join(f"{f}:" for f in missing_req + missing_opt)
+        try:
+            if missing_req:
+                body = (
+                    "Please provide the following information:\n"
+                    + "\n".join(f"{f}:" for f in missing_req + missing_opt)
+                )
+                email_sender.send(
+                    to=email or "admin@condata.io",
+                    subject="[Research Agent] Missing contact information",
+                    body=body,
+                )
+                log_step(
+                    "contacts",
+                    "reminder_sent",
+                    {"contact_id": contact_id, "missing_fields": missing_req},
+                )
+        except Exception as e:
+            log_step(
+                "contacts",
+                "reminder_error",
+                {"contact_id": contact_id, "error": str(e)},
             )
-            email_sender.send(
-                to=email or "admin@condata.io",
-                subject="[Research Agent] Missing contact information",
-                body=body,
-            )
+
+        log_step(
+            "contacts",
+            "contacts_payload",
+            {
+                "contact_id": contact_id,
+                "name": joined_names,
+                "company": company,
+                "domain": domain,
+                "email": email,
+                "phone": phone,
+                "missing_required": missing_req,
+                "missing_optional": missing_opt,
+            },
+        )
 
         triggers.append(
             {
@@ -178,6 +210,12 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
                 "recipient": email,
                 "payload": payload,
             }
+        )
+
+        log_step(
+            "contacts",
+            "handoff",
+            {"contact_id": contact_id, "agent": "agent1_internal_company_research"},
         )
 
     return triggers

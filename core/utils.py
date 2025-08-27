@@ -12,9 +12,12 @@ from __future__ import annotations
 
 import json
 import unicodedata
+import uuid
+from datetime import datetime
 from functools import lru_cache
+from logging import getLogger
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 import importlib.util as _ilu
 
 _JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
@@ -23,6 +26,65 @@ _mod = _ilu.module_from_spec(_spec)
 assert _spec and _spec.loader
 _spec.loader.exec_module(_mod)
 append_jsonl = _mod.append
+
+WORKFLOW_ID: str | None = None
+SUMMARY: Dict[str, int] = {}
+
+
+def get_workflow_id() -> str:
+    """Return a unique workflow identifier for the current run."""
+    global WORKFLOW_ID, SUMMARY
+    if WORKFLOW_ID is None:
+        WORKFLOW_ID = f"wf-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
+        SUMMARY = {
+            "events_detected": 0,
+            "contacts_detected": 0,
+            "reminders_sent": 0,
+            "reports_generated": 0,
+            "mails_sent": 0,
+            "errors": 0,
+        }
+    return WORKFLOW_ID
+
+
+def _update_summary(source: str, stage: str) -> None:
+    global SUMMARY
+    if stage == "trigger_detected":
+        if source == "calendar":
+            SUMMARY["events_detected"] += 1
+        elif source == "contacts":
+            SUMMARY["contacts_detected"] += 1
+    if stage == "reminder_sent":
+        SUMMARY["reminders_sent"] += 1
+    if stage == "mail_sent":
+        SUMMARY["mails_sent"] += 1
+    if source == "orchestrator" and stage == "report_generated":
+        SUMMARY["reports_generated"] += 1
+    if "error" in stage:
+        SUMMARY["errors"] += 1
+
+
+def log_step(source: str, stage: str, data: Dict[str, Any]) -> None:
+    payload = {
+        "workflow_id": get_workflow_id(),
+        "trigger_source": source,
+        "status": stage,
+        **data,
+    }
+    try:
+        append_jsonl(Path("logs") / "workflows" / f"{source}.jsonl", payload)
+    except Exception as e:  # pragma: no cover - logging shouldn't break tests
+        getLogger(__name__).warning("Logging failed: %s", e)
+    else:
+        _update_summary(source, stage)
+
+
+def finalize_summary() -> None:
+    """Write a digest summary for the current workflow run."""
+    path = Path("logs") / "workflows" / "summary.json"
+    payload = {"workflow_id": get_workflow_id(), **SUMMARY}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
 def normalize_text(text: str) -> str:
     if not text:

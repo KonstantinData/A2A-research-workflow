@@ -11,7 +11,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional, Sequence
 
-from .mailer import send_email  # tatsächlicher SMTP/Provider-Client
+from .mailer import send_email as _send_email  # tatsächlicher SMTP/Provider-Client
+from core.utils import log_step
 
 
 def send(
@@ -26,14 +27,52 @@ def send(
     """
     Generische Send-Funktion, die Tests monkeypatchen.
     """
-    send_email(
-        to=to,
-        subject=subject,
-        body=body,
-        sender=sender,
-        attachments=attachments,
-        task_id=task_id,
-    )
+    try:
+        _send_email(
+            to=to,
+            subject=subject,
+            body=body,
+            sender=sender,
+            attachments=attachments,
+            task_id=task_id,
+        )
+        log_step("orchestrator", "mail_sent", {"to": to, "subject": subject})
+    except Exception as e:  # pragma: no cover - network errors
+        log_step(
+            "orchestrator",
+            "mail_error",
+            {"to": to, "subject": subject, "error": str(e)},
+        )
+        raise
+
+
+def send_email(
+    to: str,
+    subject: str,
+    body: str,
+    *,
+    sender: Optional[str] = None,
+    attachments: Optional[Sequence[str]] = None,
+    task_id: Optional[str] = None,
+) -> None:
+    """Wrapper around the low level mailer with logging."""
+    try:
+        _send_email(
+            to=to,
+            subject=subject,
+            body=body,
+            sender=sender,
+            attachments=attachments,
+            task_id=task_id,
+        )
+        log_step("orchestrator", "mail_sent", {"to": to, "subject": subject})
+    except Exception as e:  # pragma: no cover - network errors
+        log_step(
+            "orchestrator",
+            "mail_error",
+            {"to": to, "subject": subject, "error": str(e)},
+        )
+        raise
 
 
 def send_reminder(

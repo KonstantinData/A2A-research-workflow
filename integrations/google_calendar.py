@@ -32,17 +32,14 @@ from core.trigger_words import (
     extract_company as _extract_company,
     load_trigger_words as _load_trigger_words,
 )
-from core.utils import required_fields, optional_fields, already_processed, mark_processed
+from core.utils import (
+    required_fields,
+    optional_fields,
+    already_processed,
+    mark_processed,
+    log_step,
+)
 from core import parser
-
-import importlib.util as _ilu
-
-_JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
-_spec = _ilu.spec_from_file_location("jsonl_sink", _JSONL_PATH)
-_mod = _ilu.module_from_spec(_spec)
-assert _spec and _spec.loader
-_spec.loader.exec_module(_mod)
-append_jsonl = _mod.append
 
 # Exponiere email_sender für Tests (sie patchen google_calendar.email_sender)
 from . import email_sender as email_sender  # noqa: F401
@@ -196,28 +193,30 @@ def fetch_events() -> List[Dict[str, Any]]:
     results: List[Dict[str, Any]] = []
     for ev in items:
         summary = (ev.get("summary") or "").lower()
-        if not any(t in summary for t in triggers):
+        matched_trigger = next((t for t in triggers if t in summary), None)
+        if not matched_trigger:
             continue
         ev_id = ev.get("id") or ""
+        log_step(
+            "calendar",
+            "trigger_detected",
+            {"event_id": ev_id, "title": ev.get("summary"), "trigger": matched_trigger},
+        )
         updated = ev.get("updated") or ""
         if already_processed(ev_id, updated, logfile):
-            append_jsonl(
-                Path("logs") / "workflows" / "calendar.jsonl",
-                {
-                    "status": "skipped",
-                    "event_id": ev_id,
-                    "title": ev.get("summary"),
-                    "updated": updated,
-                },
+            log_step(
+                "calendar",
+                "skipped",
+                {"event_id": ev_id, "title": ev.get("summary"), "updated": updated},
             )
             continue
 
         mark_processed(ev_id, updated, logfile)
 
-        append_jsonl(
-            Path("logs") / "workflows" / "calendar.jsonl",
+        log_step(
+            "calendar",
+            "new_event",
             {
-                "status": "new_event",
                 "event_id": ev_id,
                 "title": ev.get("summary"),
                 "start": ev.get("start"),
@@ -267,30 +266,44 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
 
         missing_req = [f for f in required_fields("calendar") if not payload.get(f)]
         missing_opt = [f for f in optional_fields() if not payload.get(f)]
-        if missing_req:
-            email_sender.send_reminder(
-                to=creator,
-                creator_email=creator,
-                creator_name=None,
-                event_id=payload["event_id"],
-                event_title=payload.get("title", ""),
-                event_start=start_dt,
-                event_end=end_dt,
-                missing_fields=missing_req,
+        try:
+            if missing_req:
+                email_sender.send_reminder(
+                    to=creator,
+                    creator_email=creator,
+                    creator_name=None,
+                    event_id=payload["event_id"],
+                    event_title=payload.get("title", ""),
+                    event_start=start_dt,
+                    event_end=end_dt,
+                    missing_fields=missing_req,
+                )
+                log_step(
+                    "calendar",
+                    "reminder_sent",
+                    {"event_id": payload.get("event_id"), "missing_fields": missing_req},
+                )
+        except Exception as e:
+            log_step(
+                "calendar",
+                "reminder_error",
+                {"event_id": payload.get("event_id"), "error": str(e)},
             )
 
-        log_payload = {
-            "status": "scheduled_poll_event",
-            "event_id": payload.get("event_id"),
-            "title": payload.get("title"),
-            "company": payload.get("company"),
-            "domain": payload.get("domain"),
-            "email": payload.get("email"),
-            "phone": payload.get("phone"),
-            "missing_required": missing_req,
-            "missing_optional": missing_opt,
-        }
-        append_jsonl(Path("logs") / "workflows" / "calendar.jsonl", log_payload)
+        log_step(
+            "calendar",
+            "scheduled_poll_event",
+            {
+                "event_id": payload.get("event_id"),
+                "title": payload.get("title"),
+                "company": payload.get("company"),
+                "domain": payload.get("domain"),
+                "email": payload.get("email"),
+                "phone": payload.get("phone"),
+                "missing_required": missing_req,
+                "missing_optional": missing_opt,
+            },
+        )
 
         triggers.append(
             {
@@ -299,6 +312,12 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
                 "recipient": creator,
                 "payload": payload,
             }
+        )
+
+        log_step(
+            "calendar",
+            "handoff",
+            {"event_id": payload.get("event_id"), "agent": "agent1_internal_company_research"},
         )
 
     return triggers
