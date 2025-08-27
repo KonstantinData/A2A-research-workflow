@@ -8,7 +8,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Callable
 
 from core import feature_flags
-from core.utils import required_fields, optional_fields  # noqa: F401  # imported for completeness
+from core.utils import (
+    required_fields,
+    optional_fields,
+    log_step,
+    finalize_summary,
+)  # noqa: F401  # required_fields/optional_fields imported for completeness
 from integrations.google_calendar import fetch_events
 from integrations.google_contacts import fetch_contacts
 
@@ -128,6 +133,7 @@ def run(
                 "message": "No calendar or contact events matched trigger words",
             }
         )
+        finalize_summary()
         raise SystemExit(0)
 
     results: List[Dict[str, Any]] = []
@@ -143,6 +149,7 @@ def run(
 
     # Abort early if any researcher indicates missing fields
     if any(r.get("status") == "missing_fields" for r in results):
+        finalize_summary()
         raise SystemExit(0)
 
     consolidated = consolidate_fn(results) if consolidate_fn else {}
@@ -153,11 +160,13 @@ def run(
             created = datetime.fromisoformat(str(existing["createdAt"]).replace("Z", "+00:00"))
             if (datetime.now(timezone.utc) - created).days < 7:
                 log_event({"status": "report_skipped"})
+                finalize_summary()
                 return consolidated
         except Exception:
             pass
 
     if duplicate_checker and duplicate_checker(consolidated, existing):
+        finalize_summary()
         return consolidated
 
     out_dir = Path(os.getenv("OUTPUT_DIR", "output")) / "exports"
@@ -166,6 +175,13 @@ def run(
     csv_path = out_dir / "data.csv"
     pdf_renderer and pdf_renderer(consolidated, pdf_path)
     csv_exporter and csv_exporter(consolidated, csv_path)
+    if pdf_renderer:
+        first_id = (triggers or [{}])[0].get("payload", {}).get("event_id")
+        log_step(
+            "orchestrator",
+            "report_generated",
+            {"event_id": first_id, "path": str(pdf_path)},
+        )
 
     if company_id is None and hubspot_upsert:
         company_id = hubspot_upsert(consolidated)
@@ -181,6 +197,7 @@ def run(
     else:
         log_event({"status": "report_not_uploaded"})
 
+    finalize_summary()
     return consolidated
 
 
