@@ -201,9 +201,31 @@ def fetch_events() -> List[Dict[str, Any]]:
         ev_id = ev.get("id") or ""
         updated = ev.get("updated") or ""
         if already_processed(ev_id, updated, logfile):
-            append_jsonl(Path("logs") / "workflows" / "calendar.jsonl", {"status": "skipped", "event_id": ev_id})
+            append_jsonl(
+                Path("logs") / "workflows" / "calendar.jsonl",
+                {
+                    "status": "skipped",
+                    "event_id": ev_id,
+                    "title": ev.get("summary"),
+                    "updated": updated,
+                },
+            )
             continue
+
         mark_processed(ev_id, updated, logfile)
+
+        append_jsonl(
+            Path("logs") / "workflows" / "calendar.jsonl",
+            {
+                "status": "new_event",
+                "event_id": ev_id,
+                "title": ev.get("summary"),
+                "start": ev.get("start"),
+                "end": ev.get("end"),
+                "updated": updated,
+            },
+        )
+
         results.append(ev)
     return results
 
@@ -256,6 +278,19 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
                 event_end=end_dt,
                 missing_fields=missing_req,
             )
+
+        log_payload = {
+            "status": "scheduled_poll_event",
+            "event_id": payload.get("event_id"),
+            "title": payload.get("title"),
+            "company": payload.get("company"),
+            "domain": payload.get("domain"),
+            "email": payload.get("email"),
+            "phone": payload.get("phone"),
+            "missing_required": missing_req,
+            "missing_optional": missing_opt,
+        }
+        append_jsonl(Path("logs") / "workflows" / "calendar.jsonl", log_payload)
 
         triggers.append(
             {
