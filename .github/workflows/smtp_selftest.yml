@@ -35,10 +35,8 @@ jobs:
       - name: Send test mail
         run: |
           python - <<'PY'
-          import os
           from integrations.email_sender import send_email
           send_email(
-              os.environ["MAIL_FROM"],
               "${{ github.event.inputs.recipient }}",
               "${{ github.event.inputs.subject }}",
               "${{ github.event.inputs.body }}"
