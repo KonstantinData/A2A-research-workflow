@@ -6,7 +6,7 @@ on:
       recipient:
         description: "Empfänger-Adresse"
         required: true
-        default: "konstantin@yourdomain.tld"
+        default: "kontakt@konstantinmilonas.de"
       subject:
         description: "Betreff"
         required: false
@@ -27,11 +27,19 @@ jobs:
       SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
       MAIL_FROM:   ${{ secrets.MAIL_FROM }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install -r requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
       - name: Send test mail
         run: |
           python - <<'PY'
