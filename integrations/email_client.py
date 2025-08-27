@@ -27,7 +27,7 @@ def send_email(
     task_id: Optional[str] = None,
 ) -> None:
     """Send a notification e-mail about missing fields (friendly, deterministic)."""
-    sender = _mail_from()
+    _mail_from()
 
     # Normalize and sort for deterministic output
     fields_list = sorted({f.strip() for f in missing_fields if f and f.strip()})
@@ -56,4 +56,4 @@ def send_email(
     if task_id is not None:
         kwargs["task_id"] = task_id
 
-    email_sender.send_email(sender, employee_email, subject, body, **kwargs)
+    email_sender.send_email(to=employee_email, subject=subject, body=body, **kwargs)
