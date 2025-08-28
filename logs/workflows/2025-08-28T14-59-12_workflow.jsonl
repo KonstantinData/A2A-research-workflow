@@ -1,0 +1,7 @@
+{"status": "report_uploaded", "timestamp": "2025-08-28T14:59:12Z", "severity": "info", "workflow_id": "wf-20250828-145912-71251d"}
+{"status": "report_sent", "timestamp": "2025-08-28T14:59:12Z", "severity": "info", "workflow_id": "wf-20250828-145912-71251d"}
+{"status": "report_skipped", "timestamp": "2025-08-28T14:59:12Z", "severity": "info", "workflow_id": "wf-20250828-145912-71251d"}
+{"status": "report_uploaded", "timestamp": "2025-08-28T14:59:12Z", "severity": "info", "workflow_id": "wf-20250828-145912-71251d"}
+{"status": "report_sent", "timestamp": "2025-08-28T14:59:12Z", "severity": "info", "workflow_id": "wf-20250828-145912-71251d"}
+{"status": "report_sent", "timestamp": "2025-08-28T14:59:12Z", "severity": "info", "workflow_id": "wf-20250828-145912-71251d"}
+{"status": "report_not_sent", "severity": "warning", "timestamp": "2025-08-28T14:59:12Z", "workflow_id": "wf-20250828-145912-71251d"}
