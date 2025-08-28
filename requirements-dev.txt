@@ -1,5 +1,7 @@
 -r requirements.txt
 
-# Testing
+# Dev & Test dependencies
 pytest
 pyyaml
+ruff
+flake8
