@@ -26,7 +26,7 @@ jobs:
         run: |
           dom="${{ env.TEST_COMPANY_DOMAIN }}"
           [[ "$dom" =~ \.example$|\.test$ ]] || { echo "Refusing non-sandbox domain: $dom"; exit 1; }
-      - name: Run internal search
+      - name: Missing fields trigger reminder
         env:
           HUBSPOT_ACCESS_TOKEN: ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
           HUBSPOT_PORTAL_ID: ${{ secrets.HUBSPOT_PORTAL_ID }}
@@ -38,27 +38,46 @@ jobs:
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
         run: |
           python - <<'PY'
-          import os, json
+          import os
           from agents.agent_internal_search import run
 
-          payload = {
-              "company_name": os.environ["TEST_COMPANY_NAME"],
-              "company_domain": os.environ["TEST_COMPANY_DOMAIN"],
-              "creator_email": os.environ["TEST_CREATOR_EMAIL"],
+          trigger = {
+              "source": "manual",
+              "creator": os.environ["TEST_CREATOR_EMAIL"],
+              "recipient": os.environ["TEST_CREATOR_EMAIL"],
+              "payload": {"company_name": os.environ["TEST_COMPANY_NAME"]},
           }
+          res = run(trigger)
+          assert res["status"] == "missing_fields"
+          PY
+
+      - name: Run full workflow
+        env:
+          HUBSPOT_ACCESS_TOKEN: ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
+          HUBSPOT_PORTAL_ID: ${{ secrets.HUBSPOT_PORTAL_ID }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+        run: |
+          python - <<'PY'
+          import os, json, pathlib
+          from core.full_workflow import run_full_workflow
+
           trigger = {
               "source": "manual",
               "trigger_source": "manual",
               "creator": os.environ["TEST_CREATOR_EMAIL"],
               "recipient": os.environ["TEST_CREATOR_EMAIL"],
-              "payload": payload,
+              "payload": {
+                  "company_name": os.environ["TEST_COMPANY_NAME"],
+                  "company_domain": os.environ["TEST_COMPANY_DOMAIN"],
+                  "creator_email": os.environ["TEST_CREATOR_EMAIL"],
+              },
           }
-          res = run(trigger)
+          res = run_full_workflow(triggers=[trigger])
           print(json.dumps(res, indent=2))
-          assert res["payload"]["action"] in {
-              "NOT_IN_CRM",
-              "AWAIT_REQUESTOR_DECISION",
-              "NEEDS_DETAIL_RESEARCH",
-              "DELIVERED_EXISTING",
-          }
+          assert pathlib.Path("output/exports/report.pdf").exists()
           PY
