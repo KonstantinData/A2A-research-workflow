@@ -3,6 +3,7 @@
 from pathlib import Path
 import datetime as dt
 import sys
+import json
 
 import pytest
 
@@ -25,7 +26,16 @@ def setup_env(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "token")
     monkeypatch.setenv("HUBSPOT_PORTAL_ID", "pid")
-    monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
+    from core import utils
+    from core.utils import log_step
+
+    utils.WORKFLOW_ID = None
+    utils.SUMMARY = {}
+
+    def fake_send_email(*a, **k):
+        log_step("orchestrator", "mail_sent", {"to": k.get("to")})
+
+    monkeypatch.setattr(orchestrator.email_sender, "send_email", fake_send_email)
 
     logs = []
     monkeypatch.setattr(orchestrator, "log_event", lambda rec: logs.append(rec))
@@ -131,5 +141,9 @@ def test_no_company_id_or_pdf(setup_env, monkeypatch):
     )
 
     assert called["attach"] == 0
-    assert logs[0]["status"] == "report_not_uploaded"
+    assert logs[0]["status"] == "report_sent"
+
+    summary = json.loads((Path("logs/workflows/summary.json")).read_text())
+    assert summary["mails_sent"] == 1
+    assert summary["warnings"] == 0
 
