@@ -11,7 +11,3 @@ weasyprint>=65.0
 
 # HTTP client
 requests
-
-# Linters
-ruff
-flake8
