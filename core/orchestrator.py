@@ -146,17 +146,17 @@ def run(
     for trig in triggers:
         if researchers:
             log_event({"status": "pending", "creator": trig.get("creator")})
+        trig_results: List[Dict[str, Any]] = []
         for researcher in researchers or []:
             if getattr(researcher, "pro", False) and not feature_flags.ENABLE_PRO_SOURCES:
                 continue
             res = researcher(trig)
             if res:
-                results.append(res)
-
-    # Abort early if any researcher indicates missing fields
-    if any(r.get("status") == "missing_fields" for r in results):
-        finalize_summary()
-        raise SystemExit(0)
+                trig_results.append(res)
+        if any(r.get("status") == "missing_fields" for r in trig_results):
+            # skip further processing for this trigger but continue others
+            continue
+        results.extend(trig_results)
 
     consolidated = consolidate_fn(results) if consolidate_fn else {}
 

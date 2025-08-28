@@ -20,8 +20,8 @@ def test_send_reminder_formats_subject_and_body(monkeypatch):
     end = dt.datetime(2024, 5, 17, 10, 0)
 
     email_sender.send_reminder(
-        to='user@example.com',
-        creator_email='user@example.com',
+        to='user@condata.io',
+        creator_email='user@condata.io',
         creator_name='Alice',
         event_id='evt123',
         event_title='Demo',

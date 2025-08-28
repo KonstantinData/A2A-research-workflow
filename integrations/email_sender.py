@@ -11,12 +11,16 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional, Sequence
 import os
+import time
+from pathlib import Path
 
 from .mailer import send_email as _send_email  # tatsächlicher SMTP/Provider-Client
 from core.utils import log_step
 
 
-def _deliver(to: str, subject: str, body: str) -> None:
+def _deliver(
+    to: str, subject: str, body: str, attachments: Optional[Sequence[str]] = None
+) -> None:
     """Send message using environment configured SMTP credentials."""
     host = os.environ.get("SMTP_HOST")
     port = int(os.environ.get("SMTP_PORT", 587))
@@ -24,7 +28,18 @@ def _deliver(to: str, subject: str, body: str) -> None:
     password = os.environ.get("SMTP_PASS")
     mail_from = os.environ.get("MAIL_FROM", user)
     secure = os.environ.get("SMTP_SECURE", "ssl").lower()
-    _send_email(host, port, user, password, mail_from, to, subject, body, secure=secure)
+    _send_email(
+        host,
+        port,
+        user,
+        password,
+        mail_from,
+        to,
+        subject,
+        body,
+        secure=secure,
+        attachments=list(attachments or []),
+    )
 
 
 def send(
@@ -40,7 +55,7 @@ def send(
     Generische Send-Funktion, die Tests monkeypatchen.
     """
     try:
-        _deliver(to, subject, body)
+        _deliver(to, subject, body, attachments)
         log_step("orchestrator", "mail_sent", {"to": to, "subject": subject})
     except Exception as e:  # pragma: no cover - network errors
         log_step(
@@ -61,18 +76,46 @@ def send_email(
     attachments: Optional[Sequence[str]] = None,
     task_id: Optional[str] = None,
 ) -> None:
-    """Wrapper around the low level mailer with logging."""
-    try:
-        _deliver(to, subject, body)
-        log_step("orchestrator", "mail_sent", {"to": to, "subject": subject})
-    except Exception as e:  # pragma: no cover - network errors
-        log_step(
-            "orchestrator",
-            "mail_error",
-            {"to": to, "subject": subject, "error": str(e), "event_id": task_id},
-            severity="critical",
-        )
-        raise
+    """Wrapper around the low level mailer with logging and retries."""
+
+    attach_paths: list[str] = []
+    body_extra = ""
+    for path in attachments or []:
+        p = Path(path)
+        size = p.stat().st_size if p.exists() else 0
+        if size <= 5 * 1024 * 1024:
+            attach_paths.append(str(p))
+        else:
+            body_extra += f"\nDownload report: {p}"
+            log_step(
+                "mailer",
+                "attachment_skipped_too_large",
+                {"path": str(p), "size": size},
+                severity="warning",
+            )
+    if body_extra:
+        body = f"{body}\n\n{body_extra.strip()}"
+
+    delays = [5, 15, 45]
+    last_exc: Exception | None = None
+    for attempt in range(3):
+        try:
+            _deliver(to, subject, body, attach_paths)
+            log_step("orchestrator", "mail_sent", {"to": to, "subject": subject})
+            return
+        except Exception as e:  # pragma: no cover - network errors
+            last_exc = e
+            if attempt < 2:
+                time.sleep(delays[attempt])
+            else:
+                log_step(
+                    "orchestrator",
+                    "report_not_sent",
+                    {"to": to, "subject": subject, "error": str(e), "event_id": task_id},
+                    severity="critical",
+                )
+    if last_exc:
+        raise last_exc
 
 
 def send_reminder(
@@ -132,6 +175,15 @@ Thanks a lot for your support!
 "Your Internal Research Agent"
 """
 
+    # Allow reminders only for company domains
+    if not to.lower().endswith("@condata.io"):
+        log_step(
+            "mailer",
+            "reminder_skipped_invalid_domain",
+            {"to": to},
+            severity="warning",
+        )
+        return
     send(
         to=to,
         subject=subject,
