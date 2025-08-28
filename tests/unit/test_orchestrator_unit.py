@@ -11,7 +11,7 @@ from core import orchestrator, feature_flags
 
 
 def test_gather_triggers_normalizes_data():
-    events = [{"creator": "alice@example.com", "summary": "Test"}]
+    events = [{"creator": "alice@example.com", "summary": "meeting preparation"}]
     contacts = [
         {"emailAddresses": [{"value": "bob@example.com"}], "names": []}
     ]
@@ -32,6 +32,13 @@ def test_gather_triggers_normalizes_data():
             "payload": contacts[0],
         },
     ]
+
+
+def test_gather_triggers_skips_events_without_trigger():
+    events = [{"creator": "alice@example.com", "summary": "team sync"}]
+    triggers = orchestrator.gather_triggers(lambda: events, lambda: [])
+    assert triggers == []
+
 def test_run_pipeline_respects_feature_flags(monkeypatch):
     monkeypatch.setattr(feature_flags, "USE_PUSH_TRIGGERS", False)
     monkeypatch.setattr(feature_flags, "ENABLE_PRO_SOURCES", False)
@@ -40,7 +47,7 @@ def test_run_pipeline_respects_feature_flags(monkeypatch):
     monkeypatch.setenv("HUBSPOT_PORTAL_ID", "portal")
     monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
 
-    events = [{"creator": "carol@example.com"}]
+    events = [{"creator": "carol@example.com", "summary": "meeting preparation"}]
     contacts = []
 
     called = {"basic": 0, "pro": 0, "pdf": 0, "csv": 0, "upsert": 0, "attach": 0}

@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Callable
+from typing import Any, Dict, List, Callable, Optional
 
 from core import feature_flags
 from core.utils import (
@@ -18,6 +18,7 @@ from core.utils import (
 )  # noqa: F401  # required_fields/optional_fields imported for completeness
 from integrations.google_calendar import fetch_events
 from integrations.google_contacts import fetch_contacts
+from core.trigger_words import contains_trigger
 
 # Expose integrations so tests can monkeypatch them
 from integrations import email_sender as email_sender  # noqa: F401
@@ -67,7 +68,10 @@ def log_event(record: Dict[str, Any]) -> None:
 
 
 # --------- Trigger-Gathering für Kalender + Kontakte ----------
-def _as_trigger_from_event(ev: Dict[str, Any]) -> Dict[str, Any]:
+def _as_trigger_from_event(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    text = (ev.get("summary") or "") + " " + (ev.get("description") or "")
+    if not contains_trigger(text):
+        return None
     creator = ev.get("creator") or ev.get("creatorEmail") or ""
     if isinstance(creator, dict):
         creator = creator.get("email") or ""
@@ -99,9 +103,13 @@ def gather_triggers(
     triggers: List[Dict[str, Any]] = []
     try:
         for ev in fetch_events_fn() or []:
-            triggers.append(_as_trigger_from_event(ev))
+            t = _as_trigger_from_event(ev)
+            if t:
+                triggers.append(t)
         for c in fetch_contacts_fn() or []:
-            triggers.append(_as_trigger_from_contact(c))
+            t = _as_trigger_from_contact(c)
+            if t:
+                triggers.append(t)
     except Exception as e:
         log_event({"severity": "critical", "where": "gather_triggers", "error": str(e)})
         raise
