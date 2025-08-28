@@ -103,7 +103,7 @@ def gather_triggers(
         for c in fetch_contacts_fn() or []:
             triggers.append(_as_trigger_from_contact(c))
     except Exception as e:
-        log_event({"level": "error", "where": "gather_triggers", "error": str(e)})
+        log_event({"severity": "critical", "where": "gather_triggers", "error": str(e)})
         raise
     return triggers
 
@@ -252,7 +252,7 @@ def run(
                 {"event_id": first_id, "error": str(e)},
                 severity="critical",
             )
-            log_event({"status": "report_upload_failed"})
+            log_event({"status": "report_upload_failed", "severity": "critical"})
             log_step(
                 "orchestrator",
                 "report_upload_failed",
@@ -271,7 +271,7 @@ def run(
             )
             log_event({"status": "report_sent"})
         except Exception as e:
-            log_event({"status": "report_not_sent"})
+            log_event({"status": "report_not_sent", "severity": "critical"})
             log_step(
                 "orchestrator",
                 "report_not_sent",
@@ -279,7 +279,7 @@ def run(
                 severity="critical",
             )
     else:
-        log_event({"status": "report_not_sent"})
+        log_event({"status": "report_not_sent", "severity": "warning"})
         log_step(
             "orchestrator",
             "report_not_sent",

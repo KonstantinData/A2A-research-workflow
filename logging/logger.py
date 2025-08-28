@@ -84,6 +84,32 @@ def get_logger(
     return logger
 
 
+SEVERITY_LEVELS = {
+    "critical": _py_logging.CRITICAL,
+    "warning": _py_logging.WARNING,
+    "info": _py_logging.INFO,
+}
+
+
+def log_with_severity(logger: _py_logging.Logger, severity: str, message: str, **kwargs: Any) -> None:
+    """Log ``message`` with a textual severity.
+
+    Parameters
+    ----------
+    logger:
+        Logger obtained via :func:`get_logger`.
+    severity:
+        One of ``"critical"``, ``"warning"`` or ``"info"`` (case-insensitive).
+    message:
+        Text to log.
+    kwargs:
+        Additional keyword arguments passed to :func:`logging.Logger.log`.
+    """
+
+    level = SEVERITY_LEVELS.get(severity.lower(), _py_logging.INFO)
+    logger.log(level, message, **kwargs)
+
+
 class _ContextFilter(_py_logging.Filter):
     """Attach ``run_id`` and ``stage`` to log records."""
 
@@ -98,5 +124,5 @@ class _ContextFilter(_py_logging.Filter):
         return True
 
 
-__all__ = ["get_logger"]
+__all__ = ["get_logger", "log_with_severity", "SEVERITY_LEVELS"]
 
