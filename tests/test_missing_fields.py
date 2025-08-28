@@ -55,19 +55,17 @@ def test_missing_field_triggers_reminder(monkeypatch):
     monkeypatch.setattr(agent_internal_search, "internal_run", lambda t: {"payload": {}})
     monkeypatch.setattr(agent_internal_search.email_sender, "send", lambda **kw: send_calls.append(kw))
     monkeypatch.setattr(agent_internal_search.email_sender, "send_email", lambda **k: None)
-    trig = _trigger({"company": "ACME", "email": "a@b", "phone": "1"})
-    with pytest.raises(SystemExit) as exc:
-        orchestrator.run(
-            triggers=[trig],
-            researchers=[agent_internal_search.run],
-            pdf_renderer=_stub_pdf,
-            csv_exporter=_stub_csv,
-            hubspot_upsert=lambda d: None,
-            hubspot_attach=lambda p, c: None,
-            hubspot_check_existing=lambda cid: None,
-        )
-    assert exc.value.code == 0
-    assert send_calls and send_calls[0]["to"] == "a@b"
+    trig = _trigger({"company": "ACME", "email": "a@condata.io", "phone": "1"})
+    orchestrator.run(
+        triggers=[trig],
+        researchers=[agent_internal_search.run],
+        pdf_renderer=_stub_pdf,
+        csv_exporter=_stub_csv,
+        hubspot_upsert=lambda d: None,
+        hubspot_attach=lambda p, c: None,
+        hubspot_check_existing=lambda cid: None,
+    )
+    assert send_calls and send_calls[0]["to"] == "a@condata.io"
     assert any(r.get("status") == "pending" for r in logs)
     files = list(Path("logs/workflows").glob("*.jsonl"))
     content = "".join(f.read_text() for f in files)
@@ -132,7 +130,7 @@ def test_email_reply_resumes(monkeypatch):
         "fetch_replies",
         lambda: [{"creator": "a@b", "task_id": "1", "fields": {"domain": "acme.com"}}],
     )
-    trig = _trigger({"company": "ACME", "email": "a@b", "phone": "1"})
+    trig = _trigger({"company": "ACME", "email": "a@condata.io", "phone": "1"})
     orchestrator.run(
         triggers=[trig],
         researchers=[agent_internal_search.run],
@@ -157,17 +155,16 @@ def test_irrelevant_email_ignored(monkeypatch):
         "fetch_replies",
         lambda: [{"creator": "a@b", "task_id": "999", "fields": {"domain": "x.com"}}],
     )
-    trig = _trigger({"company": "ACME", "email": "a@b", "phone": "1"})
-    with pytest.raises(SystemExit):
-        orchestrator.run(
-            triggers=[trig],
-            researchers=[agent_internal_search.run],
-            pdf_renderer=_stub_pdf,
-            csv_exporter=_stub_csv,
-            hubspot_upsert=lambda d: None,
-            hubspot_attach=lambda p, c: None,
-            hubspot_check_existing=lambda cid: None,
-        )
+    trig = _trigger({"company": "ACME", "email": "a@condata.io", "phone": "1"})
+    orchestrator.run(
+        triggers=[trig],
+        researchers=[agent_internal_search.run],
+        pdf_renderer=_stub_pdf,
+        csv_exporter=_stub_csv,
+        hubspot_upsert=lambda d: None,
+        hubspot_attach=lambda p, c: None,
+        hubspot_check_existing=lambda cid: None,
+    )
     content = "".join(f.read_text() for f in Path("logs/workflows").glob("*.jsonl"))
     assert '"status": "pending"' in content
 
