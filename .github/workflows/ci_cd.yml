@@ -1,16 +1,36 @@
- name: CI
-@@
- jobs:
-   build:
-     runs-on: ubuntu-latest
-     timeout-minutes: 15
-+    env:
-+      # stabile Defaults für Unit-Tests (keine echten Außenbindungen)
-+      TRIGGER_WORDS_FILE: tests/fixtures/triggers.txt
-+      SMTP_HOST: localhost
-+      SMTP_PORT: 2525
-+      MAIL_FROM: ci@example.test
-@@
-       - name: Run tests
--        run: pytest
-+        run: pytest -q
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # stabile Defaults für Unit-Tests (keine echten Außenbindungen)
+      TRIGGER_WORDS_FILE: tests/fixtures/triggers.txt
+      SMTP_HOST: localhost
+      SMTP_PORT: 2525
+      MAIL_FROM: ci@example.test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run tests
+        run: pytest -q
