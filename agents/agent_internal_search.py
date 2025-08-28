@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -29,7 +29,7 @@ def _log_agent(
     action: str, domain: str, user_email: str, artifacts: str | None = None
 ) -> None:
     """Write a log line for this agent."""
-    date = datetime.utcnow()
+    date = datetime.now(timezone.utc)
     path = (
         Path("logs")
         / "agent_internal_search"
@@ -38,7 +38,7 @@ def _log_agent(
         / f"{date:%d}.jsonl"
     )
     record = {
-        "ts_utc": date.isoformat() + "Z",
+        "ts_utc": date.isoformat().replace("+00:00", "Z"),
         "agent": "agent_internal_search",
         "action": action,
         "company_domain": domain,
@@ -50,11 +50,11 @@ def _log_agent(
 
 
 def _log_workflow(record: Dict[str, Any]) -> None:
-    ts = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%S")
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
     path = Path("logs") / "workflows" / f"{ts}_workflow.jsonl"
     data = dict(record)
     data.setdefault(
-        "timestamp", datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+        "timestamp", datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     )
     append_jsonl(path, data)
 
@@ -168,7 +168,7 @@ def run(trigger: Normalized) -> Normalized:
             lr = last_report_date.replace("Z", "+00:00")
             last_dt = datetime.fromisoformat(str(lr))
             # Compare against current UTC time
-            days_since_report = (datetime.utcnow() - last_dt.replace(tzinfo=None)).days
+            days_since_report = (datetime.now(timezone.utc) - last_dt).days
         except Exception:
             days_since_report = None
             last_dt = None

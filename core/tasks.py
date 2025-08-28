@@ -12,7 +12,7 @@ compatible with both we honour ``TASKS_DB_URL`` when present and fall back to
 """
 
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import os
 import sqlite3
@@ -43,7 +43,7 @@ def _log_action(action: str, task: Dict[str, Any]) -> None:
         "task_id": task.get("id"),
         "status": task.get("status"),
         "assigned_to": task.get("employee_email"),
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     logger.info(json.dumps(payload))
 
@@ -92,7 +92,7 @@ def create_task(
     missing_fields: Any,
     employee_email: str,
 ) -> Dict[str, Any]:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     task = Task(
         id=str(uuid.uuid4()),
         trigger=trigger,
@@ -141,7 +141,7 @@ def get_task(task_id: str) -> Optional[Dict[str, Any]]:
 
 
 def update_task_status(task_id: str, status: str) -> Optional[Dict[str, Any]]:
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     with _connect() as conn:
         conn.execute(
             'UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?',

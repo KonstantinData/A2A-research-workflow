@@ -41,10 +41,13 @@ def log_event(record: Dict[str, Any]) -> None:
     appends the provided record.
     """
 
-    ts = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%S")
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
     path = Path("logs") / "workflows" / f"{ts}_workflow.jsonl"
     record = dict(record)
-    record.setdefault("timestamp", datetime.utcnow().replace(microsecond=0).isoformat() + "Z")
+    record.setdefault(
+        "timestamp",
+        datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+    )
     record.setdefault("severity", "info")
     record.setdefault("workflow_id", get_workflow_id())
     append_jsonl(path, record)

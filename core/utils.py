@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import unicodedata
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import lru_cache
 from logging import getLogger
 from pathlib import Path
@@ -35,7 +35,7 @@ def get_workflow_id() -> str:
     """Return a unique workflow identifier for the current run."""
     global WORKFLOW_ID, SUMMARY
     if WORKFLOW_ID is None:
-        WORKFLOW_ID = f"wf-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
+        WORKFLOW_ID = f"wf-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
         SUMMARY = {
             "events_detected": 0,
             "contacts_detected": 0,

@@ -6,7 +6,7 @@ Records events related to tasks such as reminders or escalations. The
 history shares the same SQLite database as :mod:`core.tasks`.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 import sqlite3
 
 from . import tasks
@@ -29,7 +29,7 @@ def _connect() -> sqlite3.Connection:
 
 def record_event(task_id: str, event: str) -> None:
     """Record a history ``event`` for ``task_id`` with the current timestamp."""
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     with _connect() as conn:
         conn.execute(
             "INSERT INTO task_history VALUES (?, ?, ?)",
