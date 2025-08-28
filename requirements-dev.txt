@@ -1,0 +1,7 @@
+-r requirements.txt
+
+# Dev & Test dependencies
+pytest
+pyyaml
+ruff
+flake8

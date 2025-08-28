@@ -15,7 +15,3 @@ requests
 # Linters
 ruff
 flake8
-
-# Testing
-pytest
-pyyaml
