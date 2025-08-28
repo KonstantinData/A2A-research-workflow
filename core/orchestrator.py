@@ -215,20 +215,37 @@ def run(
                 {"event_id": first_id, "error": str(e)},
                 severity="critical",
             )
-            log_event({"status": "report_not_uploaded"})
+            log_event({"status": "report_upload_failed"})
             log_step(
                 "orchestrator",
-                "report_not_uploaded",
+                "report_upload_failed",
                 {"event_id": first_id},
                 severity="warning",
             )
-            finalize_summary()
-            raise
+
+    recipient = (triggers or [{}])[0].get("recipient")
+    if recipient and pdf_path.exists():
+        try:
+            email_sender.send_email(
+                to=recipient,
+                subject="Your A2A research report",
+                body="Please find the attached report.",
+                attachments=[str(pdf_path)],
+            )
+            log_event({"status": "report_sent"})
+        except Exception as e:
+            log_event({"status": "report_not_sent"})
+            log_step(
+                "orchestrator",
+                "report_not_sent",
+                {"event_id": first_id, "error": str(e)},
+                severity="critical",
+            )
     else:
-        log_event({"status": "report_not_uploaded"})
+        log_event({"status": "report_not_sent"})
         log_step(
             "orchestrator",
-            "report_not_uploaded",
+            "report_not_sent",
             {"event_id": first_id},
             severity="warning",
         )
