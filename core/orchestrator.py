@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+import json
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Callable
@@ -21,6 +22,18 @@ from integrations.google_contacts import fetch_contacts
 # Expose integrations so tests can monkeypatch them
 from integrations import email_sender as email_sender  # noqa: F401
 from integrations import email_reader as email_reader  # noqa: F401
+
+# Research agents
+from agents import (
+    agent_internal_search,
+    agent_internal_level2_company_search,
+    agent_internal_customer_research,
+    agent_company_detail_research,
+    agent_external_level1_company_search,
+    agent_external_level2_companies_search,
+    reminder_service,
+    email_listener,
+)
 
 import importlib.util as _ilu
 
@@ -119,7 +132,13 @@ def run(
         else:
             triggers = gather_triggers(event_fetcher, contact_fetcher)
 
-    # Allow e-mail replies to fill missing fields
+    # Send reminders for triggers flagged as missing info
+    try:
+        reminder_service.check_and_notify(triggers)
+    except Exception:
+        pass
+
+    # Allow e-mail replies to fill missing fields and update task store
     try:
         replies = email_reader.fetch_replies()
     except Exception:
@@ -127,6 +146,10 @@ def run(
     for trig in triggers:
         tid = trig.get("payload", {}).get("id") or trig.get("payload", {}).get("event_id")
         for rep in list(replies):
+            try:
+                email_listener.run(json.dumps(rep))
+            except Exception:
+                pass
             if rep.get("task_id") == tid:
                 trig.setdefault("payload", {}).update(rep.get("fields", {}))
                 log_event({"status": "resumed", "event_id": rep.get("task_id"), "creator": rep.get("creator")})
@@ -142,6 +165,16 @@ def run(
         finalize_summary()
         raise SystemExit(0)
 
+    if researchers is None:
+        researchers = [
+            agent_internal_search.run,
+            agent_internal_level2_company_search.run,
+            agent_internal_customer_research.run,
+            agent_company_detail_research.run,
+            agent_external_level1_company_search.run,
+            agent_external_level2_companies_search.run,
+        ]
+
     results: List[Dict[str, Any]] = []
     for trig in triggers:
         if researchers:
@@ -152,6 +185,7 @@ def run(
                 continue
             res = researcher(trig)
             if res:
+                trig.setdefault("payload", {}).update(res.get("payload", {}))
                 trig_results.append(res)
         if any(r.get("status") == "missing_fields" for r in trig_results):
             # skip further processing for this trigger but continue others
