@@ -89,6 +89,11 @@ def finalize_summary() -> None:
     payload = {"workflow_id": get_workflow_id(), **SUMMARY}
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    # Surface summary in CI logs
+    try:
+        print(json.dumps(payload, ensure_ascii=False))
+    except Exception:
+        pass
 
 def normalize_text(text: str) -> str:
     if not text:
