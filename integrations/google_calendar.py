@@ -217,8 +217,23 @@ def fetch_events() -> List[Dict[str, Any]]:
         log_step(
             "calendar",
             "fetched_events",
-            {"count": len(results), "ids": [r["event_id"] for r in results]},
+            {
+                "count": len(results),
+                "events": [
+                    {
+                        "id": ev.get("id"),
+                        "summary": ev.get("summary"),
+                        "description": ev.get("description"),
+                        "start": ev.get("start"),
+                        "end": ev.get("end"),
+                        "creator": (ev.get("creator") or {}).get("email"),
+                    }
+                    for ev in raw_events
+                ],
+            },
         )
+    else:
+        log_step("calendar", "fetched_events", {"count": 0})
 
     log_step(
         "calendar",
