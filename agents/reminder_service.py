@@ -11,6 +11,7 @@ from pathlib import Path
 import logging
 
 from core import tasks, task_history
+from core.utils import get_workflow_id
 from integrations import email_client, email_sender
 from agents.templates import build_reminder_email
 
@@ -25,6 +26,26 @@ _REMINDER_LOG = Path("logs") / "workflows" / "reminders.jsonl"
 
 
 logger = logging.getLogger(__name__)
+
+
+def log_event(record: dict) -> None:
+    """Write ``record`` to a workflow JSONL log with a common schema."""
+    ts = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    path = Path("logs") / "workflows" / f"{ts}_workflow.jsonl"
+    payload = {
+        "event_id": record.get("event_id"),
+        "status": record.get("status"),
+        "timestamp": datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+        "severity": record.get("severity", "info"),
+        "workflow_id": get_workflow_id(),
+        "details": {},
+    }
+    for k, v in record.items():
+        if k not in {"event_id", "status", "timestamp", "severity", "workflow_id", "details"}:
+            payload["details"][k] = v
+        elif k == "details" and isinstance(v, dict):
+            payload["details"].update(v)
+    append_jsonl(path, payload)
 
 
 class ReminderScheduler:
@@ -46,6 +67,7 @@ class ReminderScheduler:
                 )
                 task_history.record_event(task["id"], "reminder_sent")
                 tasks.update_task_status(task["id"], "reminded")
+                log_event({"event_id": task["trigger"], "status": "reminder_sent", "task_id": task["id"]})
                 processed += 1
             logger.info(
                 "send_reminders job finished",
@@ -76,6 +98,7 @@ class ReminderScheduler:
                 )
                 task_history.record_event(task["id"], "escalated")
                 tasks.update_task_status(task["id"], "escalated")
+                log_event({"event_id": task["trigger"], "status": "escalation_sent", "task_id": task["id"]})
                 processed += 1
             logger.info(
                 "escalate_tasks job finished",
