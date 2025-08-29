@@ -224,12 +224,6 @@ def fetch_events() -> List[Dict[str, Any]]:
         },
     )
 
-    log_step(
-        "calendar",
-        "fetched",
-        {"count": len(results), "time_min": time_min, "time_max": time_max},
-    )
-
     return results
 
 

@@ -10,13 +10,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from core import orchestrator, feature_flags
 
 
-def test_gather_triggers_normalizes_data():
+def test_gather_triggers_normalizes_data(monkeypatch):
     events = [{"creator": "alice@example.com", "summary": "meeting preparation"}]
     contacts = [
         {"emailAddresses": [{"value": "bob@example.com"}], "names": []}
     ]
 
-    triggers = orchestrator.gather_triggers(lambda: events, lambda: contacts)
+    monkeypatch.setattr(orchestrator, "fetch_events", lambda: events)
+    monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: contacts)
+
+    triggers = orchestrator.gather_triggers()
 
     assert triggers == [
         {
@@ -34,10 +37,44 @@ def test_gather_triggers_normalizes_data():
     ]
 
 
-def test_gather_triggers_skips_events_without_trigger():
+def test_gather_triggers_skips_events_without_trigger(monkeypatch):
     events = [{"creator": "alice@example.com", "summary": "team sync"}]
-    triggers = orchestrator.gather_triggers(lambda: events, lambda: [])
+    monkeypatch.setattr(orchestrator, "fetch_events", lambda: events)
+    monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
+    triggers = orchestrator.gather_triggers()
     assert triggers == []
+
+
+def test_gather_triggers_logs_fetch(monkeypatch):
+    monkeypatch.delenv("A2A_DEMO", raising=False)
+    monkeypatch.delenv("DEMO_MODE", raising=False)
+    monkeypatch.setattr(orchestrator, "fetch_events", lambda: [])
+    monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
+    logs = []
+
+    def fake_log_step(category, status, payload=None, severity="info"):
+        logs.append({"category": category, "status": status, "payload": payload})
+
+    monkeypatch.setattr(orchestrator, "log_step", fake_log_step)
+    orchestrator.gather_triggers()
+    statuses = [l["status"] for l in logs]
+    assert "fetch_call" in statuses
+    assert any(l["status"] == "fetch_return" and l["payload"] == {"count": 0} for l in logs)
+
+
+def test_gather_triggers_demo_mode(monkeypatch):
+    monkeypatch.setenv("A2A_DEMO", "1")
+    called = {"fetch": 0}
+
+    def fake_fetch():
+        called["fetch"] += 1
+        return []
+
+    monkeypatch.setattr(orchestrator, "fetch_events", fake_fetch)
+    monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
+    triggers = orchestrator.gather_triggers()
+    assert called["fetch"] == 0
+    assert triggers and triggers[0]["payload"]["event_id"] == "e1"
 
 def test_run_pipeline_respects_feature_flags(monkeypatch):
     monkeypatch.setattr(feature_flags, "USE_PUSH_TRIGGERS", False)
@@ -80,9 +117,10 @@ def test_run_pipeline_respects_feature_flags(monkeypatch):
     def fake_attach(path, company_id):
         called["attach"] += 1
 
+    monkeypatch.setattr(orchestrator, "fetch_events", lambda: events)
+    monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: contacts)
+
     orchestrator.run(
-        event_fetcher=lambda: events,
-        contact_fetcher=lambda: contacts,
         researchers=[basic, pro],
         consolidate_fn=fake_consolidate,
         pdf_renderer=fake_pdf,
