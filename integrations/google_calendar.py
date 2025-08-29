@@ -172,8 +172,8 @@ def fetch_events() -> List[Dict[str, Any]]:
 
     service = _service()
     now = _utc_now()
-    minutes_back = int(os.getenv("CALENDAR_MINUTES_BACK", str(7 * 24 * 60)))
-    minutes_fwd = int(os.getenv("CALENDAR_MINUTES_FWD", str(60 * 24 * 60)))
+    minutes_back = int(os.getenv("CALENDAR_MINUTES_BACK", str(24 * 60)))
+    minutes_fwd = int(os.getenv("CALENDAR_MINUTES_FWD", str(7 * 24 * 60)))
     time_min = (now - dt.timedelta(minutes=minutes_back)).isoformat().replace("+00:00", "Z")
     time_max = (now + dt.timedelta(minutes=minutes_fwd)).isoformat().replace("+00:00", "Z")
 
@@ -213,27 +213,16 @@ def fetch_events() -> List[Dict[str, Any]]:
             }
         )
 
-    if results:
-        log_step(
-            "calendar",
-            "fetched_events",
-            {
-                "count": len(results),
-                "events": [
-                    {
-                        "id": ev.get("id"),
-                        "summary": ev.get("summary"),
-                        "description": ev.get("description"),
-                        "start": ev.get("start"),
-                        "end": ev.get("end"),
-                        "creator": (ev.get("creator") or {}).get("email"),
-                    }
-                    for ev in raw_events
-                ],
-            },
-        )
-    else:
-        log_step("calendar", "fetched_events", {"count": 0})
+    log_step(
+        "calendar",
+        "fetched_events",
+        {
+            "count": len(results),
+            "time_min": time_min,
+            "time_max": time_max,
+            "ids": [r.get("event_id") for r in results],
+        },
+    )
 
     log_step(
         "calendar",
