@@ -23,6 +23,7 @@ from core.trigger_words import contains_trigger
 # Expose integrations so tests can monkeypatch them
 from integrations import email_sender as email_sender  # noqa: F401
 from integrations import email_reader as email_reader  # noqa: F401
+from core import tasks
 
 # Research agents
 from agents import (
@@ -34,6 +35,7 @@ from agents import (
     agent_external_level2_companies_search,
     reminder_service,
     email_listener,
+    field_completion_agent,
 )
 
 import importlib.util as _ilu
@@ -65,6 +67,33 @@ def log_event(record: Dict[str, Any]) -> None:
     record.setdefault("severity", "info")
     record.setdefault("workflow_id", get_workflow_id())
     append_jsonl(path, record)
+
+
+def _event_id_exists(event_id: str) -> bool:
+    """Return True if ``event_id`` already present in any workflow log."""
+    if not event_id:
+        return False
+    base = Path("logs") / "workflows"
+    if not base.exists():
+        return False
+    for path in base.glob("*_workflow.jsonl"):
+        try:
+            with path.open("r", encoding="utf-8") as fh:
+                for line in fh:
+                    try:
+                        if json.loads(line).get("event_id") == event_id:
+                            return True
+                    except Exception:
+                        continue
+        except Exception:
+            continue
+    return False
+
+
+def _missing_required(source: str, payload: Dict[str, Any]) -> List[str]:
+    req = required_fields(source)
+    return [f for f in req if not (payload or {}).get(f)]
+
 
 
 # --------- Trigger-Gathering für Kalender + Kontakte ----------
@@ -140,6 +169,16 @@ def run(
         else:
             triggers = gather_triggers(event_fetcher, contact_fetcher)
 
+    # Remove duplicates based on event_id
+    filtered: List[Dict[str, Any]] = []
+    for trig in triggers or []:
+        eid = trig.get("payload", {}).get("event_id")
+        if eid and _event_id_exists(str(eid)):
+            log_event({"event_id": eid, "status": "duplicate_event"})
+        else:
+            filtered.append(trig)
+    triggers = filtered
+
     # Send reminders for triggers flagged as missing info
     try:
         reminder_service.check_and_notify(triggers)
@@ -147,12 +186,18 @@ def run(
         pass
 
     # Allow e-mail replies to fill missing fields and update task store
-    try:
-        replies = email_reader.fetch_replies()
-    except Exception:
-        replies = []
+    replies: List[Dict[str, Any]] = []
+    if email_listener.has_pending_events():
+        try:
+            replies = email_reader.fetch_replies()
+        except Exception:
+            replies = []
     for trig in triggers:
-        tid = trig.get("payload", {}).get("id") or trig.get("payload", {}).get("event_id")
+        tid = (
+            trig.get("payload", {}).get("task_id")
+            or trig.get("payload", {}).get("id")
+            or trig.get("payload", {}).get("event_id")
+        )
         for rep in list(replies):
             try:
                 email_listener.run(json.dumps(rep))
@@ -160,7 +205,10 @@ def run(
                 pass
             if rep.get("task_id") == tid:
                 trig.setdefault("payload", {}).update(rep.get("fields", {}))
-                log_event({"status": "resumed", "event_id": rep.get("task_id"), "creator": rep.get("creator")})
+                ev_id = trig.get("payload", {}).get("event_id") or rep.get("event_id")
+                log_event({"status": "email_reply_received", "event_id": ev_id, "creator": rep.get("creator")})
+                log_event({"status": "pending_email_reply_resolved", "event_id": ev_id})
+                log_event({"status": "resumed", "event_id": ev_id, "creator": rep.get("creator")})
                 replies.remove(rep)
 
     if not triggers:
@@ -185,6 +233,39 @@ def run(
 
     results: List[Dict[str, Any]] = []
     for trig in triggers:
+        payload = trig.setdefault("payload", {})
+        event_id = payload.get("event_id")
+        missing = _missing_required(trig.get("source", ""), payload) if event_id else []
+        if missing:
+            log_event({"event_id": event_id, "status": "fields_missing", "missing": missing})
+            enriched = field_completion_agent.run(trig)
+            if enriched:
+                payload.update(enriched)
+                missing = _missing_required(trig.get("source", ""), payload)
+                if not missing:
+                    log_event({"event_id": event_id, "status": "enriched_by_ai"})
+            if missing:
+                creator = trig.get("creator") or trig.get("recipient") or ""
+                task = tasks.create_task(str(event_id), missing, creator)
+                payload["task_id"] = task["id"]
+                subject = f"[Research Agent] Missing Information – Event {event_id} – Task {task['id']}"
+                miss_lines = "\n".join(missing)
+                body = (
+                    "Hello,\n\n" "the Research Agent is missing some required information:\n"
+                    f"{miss_lines}\n\nPlease reply with the missing fields.\nEvent-ID: {event_id}"
+                )
+                try:
+                    email_sender.send_email(
+                        to=creator,
+                        subject=subject,
+                        body=body,
+                        task_id=task["id"],
+                    )
+                except Exception:
+                    pass
+                log_event({"event_id": event_id, "status": "email_requested"})
+                log_event({"event_id": event_id, "status": "pending_email_reply"})
+                continue
         if researchers:
             log_event({"status": "pending", "creator": trig.get("creator")})
         trig_results: List[Dict[str, Any]] = []
@@ -193,7 +274,7 @@ def run(
                 continue
             res = researcher(trig)
             if res:
-                trig.setdefault("payload", {}).update(res.get("payload", {}))
+                payload.update(res.get("payload", {}))
                 trig_results.append(res)
         if any(r.get("status") == "missing_fields" for r in trig_results):
             # skip further processing for this trigger but continue others

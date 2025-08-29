@@ -193,11 +193,19 @@ def list_tasks() -> Iterable[Dict[str, Any]]:
         ]
 
 
+def pending_tasks() -> Iterable[Dict[str, Any]]:
+    """Return tasks awaiting an e-mail reply."""
+    return [
+        t for t in list_tasks() if t.get("status") in {"pending", "reminded"}
+    ]
+
+
 __all__ = [
     'create_task',
     'get_task',
     'update_task_status',
     'delete_task',
     'list_tasks',
+    'pending_tasks',
     'Task',
 ]
