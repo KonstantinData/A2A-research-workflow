@@ -5,7 +5,6 @@ from agents import (
     agent_external_level1_company_search,
     agent_external_level2_companies_search,
     agent_internal_level2_company_search,
-    agent_internal_customer_research,
 )
 
 SOURCES = [
@@ -13,5 +12,4 @@ SOURCES = [
     agent_external_level1_company_search.run,
     agent_external_level2_companies_search.run,
     agent_internal_level2_company_search.run,
-    agent_internal_customer_research.run,
 ]

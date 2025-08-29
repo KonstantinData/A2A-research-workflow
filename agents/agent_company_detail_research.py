@@ -28,6 +28,16 @@ from typing import Any, Dict
 from integrations import hubspot_api
 from . import company_data
 
+import importlib.util as _ilu
+from datetime import datetime, timezone
+
+_JSONL_PATH = Path(__file__).resolve().parent.parent / "logging" / "jsonl_sink.py"
+_spec = _ilu.spec_from_file_location("jsonl_sink", _JSONL_PATH)
+_mod = _ilu.module_from_spec(_spec)
+assert _spec and _spec.loader
+_spec.loader.exec_module(_mod)
+append_jsonl = _mod.append
+
 Normalized = Dict[str, Any]
 
 
@@ -49,6 +59,16 @@ def _write_artifact(filename: str, data: Any) -> None:
         pass
 
 
+def _log_workflow(record: Dict[str, Any]) -> None:
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
+    path = Path("logs") / "workflows" / f"{ts}_workflow.jsonl"
+    data = dict(record)
+    data.setdefault(
+        "timestamp", datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    )
+    append_jsonl(path, data)
+
+
 def run(trigger: Normalized) -> Normalized:
     """Populate detailed company information based on a static mapping.
 
@@ -65,6 +85,9 @@ def run(trigger: Normalized) -> Normalized:
         artefact is persisted into ``artifacts/`` for caching.
     """
     payload = trigger.get("payload", {}) or {}
+    if payload.get("action") == "AWAIT_REQUESTOR_DECISION":
+        return {"source": "company_detail_research", "creator": trigger.get("creator"), "recipient": trigger.get("recipient"), "payload": {}}
+
     # Pass through any pending PDF attachments to HubSpot
     report_path = payload.get("report_path")
     company_id = payload.get("company_id")
@@ -72,7 +95,6 @@ def run(trigger: Normalized) -> Normalized:
         try:
             hubspot_api.attach_pdf(Path(report_path), company_id)
         except Exception:
-            # Ignore HubSpot errors; this agent focuses on data enrichment
             pass
 
     # Derive a company name from various possible keys
@@ -148,7 +170,17 @@ def run(trigger: Normalized) -> Normalized:
     filename = (
         f"new_company_search_{info_dict['company_domain'].replace('.', '_')}.json"
     )
+    info_dict["neighbor_level1"] = payload.get("neighbor_level1", [])
+    info_dict["neighbor_level2"] = payload.get("neighbor_level2", [])
+
     _write_artifact(filename, info_dict)
+    _log_workflow(
+        {
+            "event_id": payload.get("event_id"),
+            "status": "report_generated",
+            "details": {"companies": info_dict.get("neighbor_level1", [])},
+        }
+    )
 
     return {
         "source": "company_detail_research",
