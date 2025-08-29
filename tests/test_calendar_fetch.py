@@ -115,7 +115,67 @@ def test_fetch_events_includes_creator_and_logs(monkeypatch, stub_time, tmp_path
     ]
 
     fetched_logs = [l for l in logs if l["status"] == "fetched_events"]
-    assert fetched_logs and fetched_logs[0]["payload"]["ids"] == ["1"]
+    assert fetched_logs
+    assert fetched_logs[0]["payload"] == {
+        "count": 1,
+        "events": [
+            {
+                "id": "1",
+                "summary": "Meet",
+                "description": "desc",
+                "start": {"dateTime": "2024-01-01T10:00:00+00:00"},
+                "end": {"dateTime": "2024-01-01T11:00:00+00:00"},
+                "creator": "alice@example.com",
+            }
+        ],
+    }
+
+
+def test_fetch_events_logs_two_events(monkeypatch, stub_time, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    events = [
+        {
+            "id": "1",
+            "summary": "A",
+            "start": {"dateTime": "2024-01-01T10:00:00+00:00"},
+            "end": {"dateTime": "2024-01-01T11:00:00+00:00"},
+        },
+        {
+            "id": "2",
+            "summary": "B",
+            "start": {"dateTime": "2024-01-02T10:00:00+00:00"},
+            "end": {"dateTime": "2024-01-02T11:00:00+00:00"},
+        },
+    ]
+    _setup_service(monkeypatch, events)
+    logs = []
+
+    def fake_log_step(category, status, payload, severity="info"):
+        logs.append({"category": category, "status": status, "payload": payload})
+
+    monkeypatch.setattr(google_calendar, "log_step", fake_log_step)
+    google_calendar.fetch_events()
+    fetched_logs = [l for l in logs if l["status"] == "fetched_events"]
+    assert fetched_logs
+    payload = fetched_logs[0]["payload"]
+    assert payload["count"] == 2
+    assert [e["id"] for e in payload["events"]] == ["1", "2"]
+    assert [e["summary"] for e in payload["events"]] == ["A", "B"]
+
+
+def test_fetch_events_logs_no_events(monkeypatch, stub_time, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    _setup_service(monkeypatch, [])
+    logs = []
+
+    def fake_log_step(category, status, payload, severity="info"):
+        logs.append({"category": category, "status": status, "payload": payload})
+
+    monkeypatch.setattr(google_calendar, "log_step", fake_log_step)
+    google_calendar.fetch_events()
+    fetched_logs = [l for l in logs if l["status"] == "fetched_events"]
+    assert fetched_logs
+    assert fetched_logs[0]["payload"] == {"count": 0}
 
 
 def test_orchestrator_no_triggers(monkeypatch, tmp_path):
