@@ -221,6 +221,8 @@ def fetch_events() -> List[Dict[str, Any]]:
             "time_min": time_min,
             "time_max": time_max,
             "ids": [r.get("event_id") for r in results],
+            "summaries": [r.get("summary") for r in results],
+            "creator_emails": [r.get("creatorEmail") for r in results],
         },
     )
 

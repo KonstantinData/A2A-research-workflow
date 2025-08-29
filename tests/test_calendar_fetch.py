@@ -121,6 +121,8 @@ def test_fetch_events_includes_creator_and_logs(monkeypatch, stub_time, tmp_path
         "time_min": "2023-12-31T00:00:00Z",
         "time_max": "2024-01-08T00:00:00Z",
         "ids": ["1"],
+        "summaries": ["Meet"],
+        "creator_emails": ["alice@example.com"],
     }
 
 
@@ -155,6 +157,8 @@ def test_fetch_events_logs_two_events(monkeypatch, stub_time, tmp_path):
     assert payload["time_min"] == "2023-12-31T00:00:00Z"
     assert payload["time_max"] == "2024-01-08T00:00:00Z"
     assert payload["ids"] == ["1", "2"]
+    assert payload["summaries"] == ["A", "B"]
+    assert payload["creator_emails"] == ["", ""]
 
 
 def test_fetch_events_logs_no_events(monkeypatch, stub_time, tmp_path):
@@ -174,6 +178,8 @@ def test_fetch_events_logs_no_events(monkeypatch, stub_time, tmp_path):
         "time_min": "2023-12-31T00:00:00Z",
         "time_max": "2024-01-08T00:00:00Z",
         "ids": [],
+        "summaries": [],
+        "creator_emails": [],
     }
 
 

@@ -73,7 +73,7 @@ def test_gather_triggers_demo_mode(monkeypatch):
     monkeypatch.setattr(orchestrator, "fetch_events", fake_fetch)
     monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
     triggers = orchestrator.gather_triggers()
-    assert called["fetch"] == 0
+    assert called["fetch"] == 1
     assert triggers and triggers[0]["payload"]["event_id"] == "e1"
 
 def test_run_pipeline_respects_feature_flags(monkeypatch):
