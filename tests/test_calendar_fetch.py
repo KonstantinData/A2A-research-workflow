@@ -47,7 +47,6 @@ def _setup_service(monkeypatch, items):
 
 def test_default_window(monkeypatch, stub_time, tmp_path):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(google_calendar, "load_trigger_words", lambda: ["foo"])
     call_rec = _setup_service(monkeypatch, [])
     google_calendar.fetch_events()
     assert call_rec["timeMin"] == "2023-12-25T00:00:00Z"
@@ -56,7 +55,6 @@ def test_default_window(monkeypatch, stub_time, tmp_path):
 
 def test_env_override(monkeypatch, stub_time, tmp_path):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(google_calendar, "load_trigger_words", lambda: ["foo"])
     monkeypatch.setenv("CALENDAR_MINUTES_BACK", "30")
     monkeypatch.setenv("CALENDAR_MINUTES_FWD", "60")
     call_rec = _setup_service(monkeypatch, [])
@@ -65,23 +63,20 @@ def test_env_override(monkeypatch, stub_time, tmp_path):
     assert call_rec["timeMax"] == "2024-01-01T01:00:00Z"
 
 
-def test_duplicate_event_skipped(monkeypatch, stub_time, tmp_path):
+def test_duplicate_event_not_skipped(monkeypatch, stub_time, tmp_path):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(google_calendar, "load_trigger_words", lambda: ["hit"])
     event = {"id": "1", "updated": "2021-01-01T00:00:00Z", "summary": "hit"}
-    call_rec = _setup_service(monkeypatch, [event])
+    _setup_service(monkeypatch, [event])
     first = google_calendar.fetch_events()
     assert len(first) == 1
     second = google_calendar.fetch_events()
-    assert len(second) == 0
-    assert Path("logs/processed_events.jsonl").exists()
+    assert len(second) == 1
 
 
-def test_event_updated_reprocessed(monkeypatch, stub_time, tmp_path):
+def test_event_updated_still_returned(monkeypatch, stub_time, tmp_path):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(google_calendar, "load_trigger_words", lambda: ["hit"])
     event = {"id": "1", "updated": "2021-01-01T00:00:00Z", "summary": "hit"}
-    call_rec = _setup_service(monkeypatch, [event])
+    _setup_service(monkeypatch, [event])
     first = google_calendar.fetch_events()
     assert len(first) == 1
     event["updated"] = "2021-01-02T00:00:00Z"
