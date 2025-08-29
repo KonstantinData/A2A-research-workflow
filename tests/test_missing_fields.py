@@ -123,6 +123,8 @@ def test_fetch_events_returns_even_when_marked_processed(monkeypatch):
             "description": "",
             "start": None,
             "end": None,
+            "creatorEmail": "",
+            "creator": {"email": ""},
         }
     ]
 

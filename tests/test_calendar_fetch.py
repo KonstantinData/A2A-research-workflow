@@ -84,6 +84,40 @@ def test_event_updated_still_returned(monkeypatch, stub_time, tmp_path):
     assert len(second) == 1
 
 
+def test_fetch_events_includes_creator_and_logs(monkeypatch, stub_time, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    event = {
+        "id": "1",
+        "summary": "Meet",
+        "description": "desc",
+        "start": {"dateTime": "2024-01-01T10:00:00+00:00"},
+        "end": {"dateTime": "2024-01-01T11:00:00+00:00"},
+        "creator": {"email": "alice@example.com"},
+    }
+    _setup_service(monkeypatch, [event])
+    logs = []
+
+    def fake_log_step(category, status, payload, severity="info"):
+        logs.append({"category": category, "status": status, "payload": payload})
+
+    monkeypatch.setattr(google_calendar, "log_step", fake_log_step)
+    res = google_calendar.fetch_events()
+    assert res == [
+        {
+            "event_id": "1",
+            "summary": "Meet",
+            "description": "desc",
+            "start": "2024-01-01T10:00:00+00:00",
+            "end": "2024-01-01T11:00:00+00:00",
+            "creatorEmail": "alice@example.com",
+            "creator": {"email": "alice@example.com"},
+        }
+    ]
+
+    fetched_logs = [l for l in logs if l["status"] == "fetched_events"]
+    assert fetched_logs and fetched_logs[0]["payload"]["ids"] == ["1"]
+
+
 def test_orchestrator_no_triggers(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(orchestrator, "gather_triggers", lambda *a, **k: [])
