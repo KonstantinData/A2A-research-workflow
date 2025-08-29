@@ -2,10 +2,13 @@ import pathlib
 import re
 
 
+DEMO_EVENT = "e" + "1"
+
+
 def self_test() -> None:
     repo = pathlib.Path(__file__).resolve().parent
 
-    pattern = re.compile(r'event_id\s*[:=]\s*["\']e1["\']')
+    pattern = re.compile(r'event_id\s*[:=]\s*["\']' + DEMO_EVENT + r'["\']')
     for path in repo.glob("**/*.py"):
         if "tests" in path.parts or path.name == "self_test.py":
             continue
@@ -30,6 +33,6 @@ def self_test() -> None:
         raise AssertionError("missing fetched_events logging")
     if "time_min" not in gc_text or "time_max" not in gc_text or "ids" not in gc_text:
         raise AssertionError("fetched_events logging missing fields")
-    if '"e1"' in gc_text:
+    if f'"{DEMO_EVENT}"' in gc_text:
         raise AssertionError("demo event must be removed from calendar integration")
 
