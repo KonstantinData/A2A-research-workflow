@@ -141,8 +141,12 @@ def gather_triggers() -> List[Dict[str, Any]]:
 
     triggers: List[Dict[str, Any]] = []
     try:
+        log_step("calendar", "fetch_call", {})
+        events = fetch_events()
+        log_step("calendar", "fetch_return", {"count": len(events)})
         if os.getenv("A2A_DEMO") == "1" or os.getenv("DEMO_MODE") == "1":
-            events = [
+            events = list(events or [])
+            events.append(
                 {
                     "event_id": "e1",
                     "summary": "Demo research event",
@@ -152,11 +156,7 @@ def gather_triggers() -> List[Dict[str, Any]]:
                     "creatorEmail": "demo@example.com",
                     "creator": {"email": "demo@example.com"},
                 }
-            ]
-        else:
-            log_step("calendar", "fetch_call", {})
-            events = fetch_events()
-            log_step("calendar", "fetch_return", {"count": len(events)})
+            )
 
         for ev in events or []:
             t = _as_trigger_from_event(ev)
