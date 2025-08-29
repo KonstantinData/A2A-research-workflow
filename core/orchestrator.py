@@ -136,18 +136,33 @@ def _as_trigger_from_contact(c: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def gather_triggers(
-    fetch_events_fn: Callable[[], List[Dict[str, Any]]] = fetch_events,
-    fetch_contacts_fn: Callable[[], List[Dict[str, Any]]] = fetch_contacts,
-) -> List[Dict[str, Any]]:
+def gather_triggers() -> List[Dict[str, Any]]:
     """Standardisiere Trigger in gemeinsames Format {source, creator, recipient, payload}."""
+
     triggers: List[Dict[str, Any]] = []
     try:
-        for ev in fetch_events_fn() or []:
+        if os.getenv("A2A_DEMO") == "1" or os.getenv("DEMO_MODE") == "1":
+            events = [
+                {
+                    "event_id": "e1",
+                    "summary": "Demo research event",
+                    "description": "",
+                    "start": None,
+                    "end": None,
+                    "creatorEmail": "demo@example.com",
+                    "creator": {"email": "demo@example.com"},
+                }
+            ]
+        else:
+            log_step("calendar", "fetch_call", {})
+            events = fetch_events()
+            log_step("calendar", "fetch_return", {"count": len(events)})
+
+        for ev in events or []:
             t = _as_trigger_from_event(ev)
             if t:
                 triggers.append(t)
-        for c in fetch_contacts_fn() or []:
+        for c in fetch_contacts() or []:
             t = _as_trigger_from_contact(c)
             if t:
                 triggers.append(t)
@@ -160,8 +175,6 @@ def gather_triggers(
 def run(
     *,
     triggers: List[Dict[str, Any]] | None = None,
-    event_fetcher: Callable[[], List[Dict[str, Any]]] = fetch_events,
-    contact_fetcher: Callable[[], List[Dict[str, Any]]] = fetch_contacts,
     researchers: List[Callable[[Dict[str, Any]], Dict[str, Any]]] | None = None,
     consolidate_fn: Callable[[List[Dict[str, Any]]], Dict[str, Any]] | None = lambda r: {},
     pdf_renderer: Callable[[Dict[str, Any], Path], None] | None = lambda d, p: None,
@@ -179,7 +192,7 @@ def run(
         if feature_flags.USE_PUSH_TRIGGERS:
             triggers = []
         else:
-            triggers = gather_triggers(event_fetcher, contact_fetcher)
+            triggers = gather_triggers()
 
     # Remove duplicates based on event_id
     filtered: List[Dict[str, Any]] = []
