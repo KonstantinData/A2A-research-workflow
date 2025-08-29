@@ -130,14 +130,24 @@ def test_calendar_poll_populates_start_end(monkeypatch):
     assert payload["end_iso"] == "2024-01-01T11:00:00+00:00"
 
 
-def test_fetch_events_exits_early_when_no_triggers(tmp_path, monkeypatch):
-    path = tmp_path / "triggers.txt"
-    path.write_text("")
-    monkeypatch.setenv("TRIGGER_WORDS_FILE", str(path))
-    trigger_words.load_trigger_words.cache_clear()
+def test_fetch_events_no_trigger_file(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
 
-    with pytest.raises(RuntimeError):
-        google_calendar.fetch_events()
+    class DummyEvents:
+        def list(self, **kwargs):
+            return self
+
+        def execute(self):
+            return {"items": []}
+
+    class DummyService:
+        def events(self):
+            return DummyEvents()
+
+    monkeypatch.setattr(google_calendar, "_service", lambda: DummyService())
+
+    # Should not raise even if trigger word file is empty or missing
+    assert google_calendar.fetch_events() == []
 
 
 def test_fetch_contacts_exits_early_when_no_triggers(tmp_path, monkeypatch):

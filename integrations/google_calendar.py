@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import datetime as dt
 import os
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Callable
 
 # optionale OpenAI-Attrappe für Tests (wird gemonkeypatched)
@@ -35,8 +34,6 @@ from core.trigger_words import (
 from core.utils import (
     required_fields,
     optional_fields,
-    already_processed,
-    mark_processed,
     log_step,
 )
 from core import parser
@@ -164,7 +161,14 @@ def _service():  # pragma: no cover - real service only in live environment
 
 
 def fetch_events() -> List[Dict[str, Any]]:
-    """Fetch upcoming calendar events and filter by trigger words."""
+    """Fetch upcoming calendar events without applying any filters.
+
+    The function acts purely as a data provider and therefore does not perform
+    trigger evaluation or duplicate checking. All events returned by the Google
+    Calendar API are mapped into a simplified structure:
+
+    ``{"event_id", "summary", "description", "start", "end"}``
+    """
 
     service = _service()
     now = _utc_now()
@@ -173,7 +177,7 @@ def fetch_events() -> List[Dict[str, Any]]:
     time_min = (now - dt.timedelta(minutes=minutes_back)).isoformat().replace("+00:00", "Z")
     time_max = (now + dt.timedelta(minutes=minutes_fwd)).isoformat().replace("+00:00", "Z")
 
-    items: List[Dict[str, Any]] = []
+    raw_events: List[Dict[str, Any]] = []
     for cal_id in _calendar_ids(None):
         resp = (
             service.events()
@@ -186,46 +190,28 @@ def fetch_events() -> List[Dict[str, Any]]:
             )
             .execute()
         )
-        items.extend(resp.get("items", []))
+        raw_events.extend(resp.get("items", []))
 
-    triggers = [t.lower() for t in load_trigger_words()]
-    logfile = Path("logs/processed_events.jsonl")
     results: List[Dict[str, Any]] = []
-    for ev in items:
-        summary = (ev.get("summary") or "").lower()
-        matched_trigger = next((t for t in triggers if t in summary), None)
-        if not matched_trigger:
-            continue
-        ev_id = ev.get("id") or ""
-        log_step(
-            "calendar",
-            "trigger_detected",
-            {"event_id": ev_id, "title": ev.get("summary"), "trigger": matched_trigger},
-        )
-        updated = ev.get("updated") or ""
-        if already_processed(ev_id, updated, logfile):
-            log_step(
-                "calendar",
-                "skipped",
-                {"event_id": ev_id, "title": ev.get("summary"), "updated": updated},
-            )
-            continue
-
-        mark_processed(ev_id, updated, logfile)
-
-        log_step(
-            "calendar",
-            "new_event",
+    for ev in raw_events:
+        start_dt = _dt(ev.get("start"))
+        end_dt = _dt(ev.get("end"))
+        results.append(
             {
-                "event_id": ev_id,
-                "title": ev.get("summary"),
-                "start": ev.get("start"),
-                "end": ev.get("end"),
-                "updated": updated,
-            },
+                "event_id": ev.get("id"),
+                "summary": ev.get("summary"),
+                "description": ev.get("description"),
+                "start": start_dt.isoformat() if start_dt else None,
+                "end": end_dt.isoformat() if end_dt else None,
+            }
         )
 
-        results.append(ev)
+    log_step(
+        "calendar",
+        "fetched",
+        {"count": len(results), "time_min": time_min, "time_max": time_max},
+    )
+
     return results
 
 

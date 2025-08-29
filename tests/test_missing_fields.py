@@ -89,11 +89,17 @@ def test_only_optional_missing(monkeypatch):
     assert any(r.get("status") == "missing_optional_fields" for r in logs)
 
 
-def test_duplicate_event_skipped(monkeypatch):
-    monkeypatch.setattr(google_calendar, "load_trigger_words", lambda: ["Meet"])
-
+def test_fetch_events_returns_even_when_marked_processed(monkeypatch):
     def fake_events():
-        return [{"id": "e1", "iCalUID": "e1", "updated": "u1", "summary": "Meet ACME", "description": ""}]
+        return [
+            {
+                "id": "e1",
+                "iCalUID": "e1",
+                "updated": "u1",
+                "summary": "Meet ACME",
+                "description": "",
+            }
+        ]
 
     monkeypatch.setattr(google_calendar, "_calendar_ids", lambda cid: ["primary"])
 
@@ -110,9 +116,15 @@ def test_duplicate_event_skipped(monkeypatch):
     monkeypatch.setattr(google_calendar, "_service", lambda: FakeReq())
     utils.mark_processed("e1", "u1", Path("logs/processed_events.jsonl"))
     events = google_calendar.fetch_events()
-    assert events == []
-    content = Path("logs/workflows/calendar.jsonl").read_text()
-    assert '"status": "skipped"' in content
+    assert events == [
+        {
+            "event_id": "e1",
+            "summary": "Meet ACME",
+            "description": "",
+            "start": None,
+            "end": None,
+        }
+    ]
 
 
 def test_email_reply_resumes(monkeypatch):
