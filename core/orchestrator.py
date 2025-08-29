@@ -50,23 +50,36 @@ append_jsonl = _mod.append
 
 # --------- kleine Logging-Helfer, von Tests gepatcht ---------
 def log_event(record: Dict[str, Any]) -> None:
-    """Append ``record`` to a JSONL workflow log file.
+    """Append ``record`` to a JSONL workflow log file using a common template.
 
-    Tests look for files named ``*_workflow.jsonl`` in ``logs/workflows``.  Each
-    call therefore creates/uses a file with a timestamp to the nearest second and
-    appends the provided record.
+    The workflow expects every entry to provide at least ``event_id`` and
+    ``status``.  Additional context is nested under ``details`` so that the log
+    structure remains consistent across services.
     """
 
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
     path = Path("logs") / "workflows" / f"{ts}_workflow.jsonl"
-    record = dict(record)
-    record.setdefault(
-        "timestamp",
-        datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-    )
-    record.setdefault("severity", "info")
-    record.setdefault("workflow_id", get_workflow_id())
-    append_jsonl(path, record)
+
+    base: Dict[str, Any] = {
+        "event_id": record.get("event_id"),
+        "status": record.get("status"),
+        "timestamp": datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z"),
+        "severity": record.get("severity", "info"),
+        "workflow_id": get_workflow_id(),
+        "details": {},
+    }
+
+    # Collect any extra keys into the ``details`` field.
+    for k, v in record.items():
+        if k not in {"event_id", "status", "timestamp", "severity", "workflow_id", "details"}:
+            base.setdefault("details", {})[k] = v
+        elif k == "details" and isinstance(v, dict):
+            base["details"].update(v)
+
+    append_jsonl(path, base)
 
 
 def _event_id_exists(event_id: str) -> bool:
@@ -267,7 +280,7 @@ def run(
                 log_event({"event_id": event_id, "status": "pending_email_reply"})
                 continue
         if researchers:
-            log_event({"status": "pending", "creator": trig.get("creator")})
+            log_event({"event_id": event_id, "status": "pending", "creator": trig.get("creator")})
         trig_results: List[Dict[str, Any]] = []
         for researcher in researchers or []:
             if getattr(researcher, "pro", False) and not feature_flags.ENABLE_PRO_SOURCES:
@@ -283,12 +296,13 @@ def run(
 
     consolidated = consolidate_fn(results) if consolidate_fn else {}
 
+    first_id = (triggers or [{}])[0].get("payload", {}).get("event_id")
     existing = hubspot_check_existing(company_id) if hubspot_check_existing else None
     if existing and existing.get("createdAt"):
         try:
             created = datetime.fromisoformat(str(existing["createdAt"]).replace("Z", "+00:00"))
             if (datetime.now(timezone.utc) - created).days < 7:
-                log_event({"status": "report_skipped"})
+                log_event({"event_id": first_id, "status": "report_skipped"})
                 finalize_summary()
                 return consolidated
         except Exception:
@@ -302,7 +316,6 @@ def run(
     out_dir.mkdir(parents=True, exist_ok=True)
     pdf_path = out_dir / "report.pdf"
     csv_path = out_dir / "data.csv"
-    first_id = (triggers or [{}])[0].get("payload", {}).get("event_id")
     try:
         pdf_renderer and pdf_renderer(consolidated, pdf_path)
         csv_exporter and csv_exporter(consolidated, csv_path)
@@ -333,7 +346,7 @@ def run(
     ):
         try:
             hubspot_attach(pdf_path, company_id)
-            log_event({"status": "report_uploaded"})
+            log_event({"event_id": first_id, "status": "report_uploaded"})
         except Exception as e:
             log_step(
                 "orchestrator",
@@ -341,7 +354,7 @@ def run(
                 {"event_id": first_id, "error": str(e)},
                 severity="critical",
             )
-            log_event({"status": "report_upload_failed", "severity": "critical"})
+            log_event({"event_id": first_id, "status": "report_upload_failed", "severity": "critical"})
             log_step(
                 "orchestrator",
                 "report_upload_failed",
@@ -358,9 +371,9 @@ def run(
                 body="Please find the attached report.",
                 attachments=[str(pdf_path)],
             )
-            log_event({"status": "report_sent"})
+            log_event({"event_id": first_id, "status": "report_sent"})
         except Exception as e:
-            log_event({"status": "report_not_sent", "severity": "critical"})
+            log_event({"event_id": first_id, "status": "report_not_sent", "severity": "critical"})
             log_step(
                 "orchestrator",
                 "report_not_sent",
@@ -368,7 +381,7 @@ def run(
                 severity="critical",
             )
     else:
-        log_event({"status": "report_not_sent", "severity": "warning"})
+        log_event({"event_id": first_id, "status": "report_not_sent", "severity": "warning"})
         log_step(
             "orchestrator",
             "report_not_sent",
