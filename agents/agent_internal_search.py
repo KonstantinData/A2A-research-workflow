@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
@@ -25,9 +24,7 @@ append_jsonl = _mod.append
 Normalized = Dict[str, Any]
 
 
-def _log_agent(
-    action: str, domain: str, user_email: str, artifacts: str | None = None
-) -> None:
+def _log_agent(action: str, domain: str, user_email: str, artifacts: str | None = None) -> None:
     """Write a log line for this agent."""
     date = datetime.now(timezone.utc)
     path = (
@@ -80,10 +77,6 @@ def run(trigger: Normalized) -> Normalized:
     missing_required, missing_optional = validate_required_fields(payload, context)
     creator_email = payload.get("creator_email") or ""
     creator_name = trigger.get("creator_name")
-    if creator_name:
-        greeting = f"Hi {creator_name},"
-    else:
-        greeting = f"Hi {creator_email},"
     company = payload.get("company") or payload.get("company_name") or "Unknown"
 
     if missing_required:
@@ -99,13 +92,11 @@ def run(trigger: Normalized) -> Normalized:
         except Exception:
             end_dt = None
         missing = missing_required + missing_optional
-        # Create a pending task with a unique ID so replies can be matched
         task = tasks.create_task(
             trigger=str(payload.get("event_id") or event_title),
             missing_fields=missing,
             employee_email=creator_email or "",
         )
-        # Include the task ID in the reminder for correlation
         email_sender.send_reminder(
             to=creator_email,
             creator_email=creator_email,
@@ -156,66 +147,70 @@ def run(trigger: Normalized) -> Normalized:
     result = internal_run(trigger)
     payload_res = result.get("payload", {}) or {}
 
-    # Determine if the company already exists and whether a previous report is still current.
     exists = payload_res.get("exists")
     last_report_date = payload_res.get("last_report_date")
-    # Parse the last report date into a datetime object; treat None or parse failures as very old
-    days_since_report: int | None = None
     last_dt: datetime | None = None
     if last_report_date:
         try:
-            # Expect ISO-8601 with or without trailing Z; convert to naive UTC
             lr = last_report_date.replace("Z", "+00:00")
             last_dt = datetime.fromisoformat(str(lr))
-            # Compare against current UTC time
-            days_since_report = (datetime.now(timezone.utc) - last_dt).days
         except Exception:
-            days_since_report = None
             last_dt = None
 
-    # If the company exists and the report is younger than 361 days, ask the employee whether to reuse it.
-    # Otherwise proceed as if the company is new or the report is outdated.
-    if exists:
-        if days_since_report is not None and days_since_report <= 361:
-            action = "AWAIT_REQUESTOR_DECISION"
-            # Send a friendly email with the last report date included
-            first_name = creator_email.split("@", 1)[0]
-            # Format the date in a human‑readable way; fall back to ISO string if parsing fails
-            # Format the date in a human‑readable way; fall back to ISO string if parsing fails
-            if last_dt:
-                try:
-                    date_display = last_dt.strftime("%Y-%m-%d")
-                except Exception:
-                    date_display = last_report_date
-            else:
-                date_display = last_report_date or "unknown"
-            subject = f"Quick check: report for {company_name}"
-            body = (
-                f"Hi {first_name},\n\n"
-                f"good news — we already have a report for {company_name}.\n"
-                f"The latest version is from {date_display}.\n\n"
-                f"What should I do next?\n\n"
-                f"Reply with I USE THE EXISTING — I'll send you the PDF, and you'll also find it in HubSpot under Company → Attachments.\n\n"
-                f"Reply with NEW REPORT — I'll refresh the report, add new findings, and highlight changes.\n\n"
-                "Best regards,\nYour Internal Research Agent"
-            )
-            email_sender.send_email(to=creator_email, subject=subject, body=body)
-        else:
-            # Older report or unknown date – treat as no existing report
-            action = "NOT_IN_CRM"
-    else:
-        action = "NOT_IN_CRM"
+    samples: List[Dict[str, Any]] = []
+    for n in payload_res.get("neighbors", []) or []:
+        samples.append(
+            {
+                "company_name": n.get("company_name") or n.get("name") or "",
+                "domain": n.get("company_domain") or n.get("domain") or "",
+                "description": n.get("description"),
+                "reason_for_match": "internal industry/description similarity",
+            }
+        )
+    if samples:
+        Path("artifacts").mkdir(exist_ok=True)
+        with open("artifacts/internal_level1_samples.json", "w", encoding="utf-8") as fh:
+            json.dump(samples, fh)
+        _log_workflow(
+            {
+                "event_id": payload.get("event_id"),
+                "status": "neighbor_level1_found",
+                "details": {"companies": samples},
+            }
+        )
 
-    # If the company does not exist or the report is outdated, there is no need
-    # to inject classification numbers.  Downstream neighbour searches rely on
-    # industry_group, industry and description only.
-    # Classification codes are inferred later during detail research if required.
+    if exists and last_report_date:
+        action = "AWAIT_REQUESTOR_DECISION"
+        first_name = creator_email.split("@", 1)[0]
+        if last_dt:
+            try:
+                date_display = last_dt.strftime("%Y-%m-%d")
+            except Exception:
+                date_display = last_report_date
+        else:
+            date_display = last_report_date or "unknown"
+        subject = f"Quick check: report for {company_name}"
+        body = (
+            f"Hi {first_name},\n\n"
+            f"good news — we already have a report for {company_name}.\n"
+            f"The latest version is from {date_display}.\n\n"
+            f"What should I do next?\n\n"
+            f"Reply with I USE THE EXISTING — I'll send you the PDF, and you'll also find it in HubSpot under Company → Attachments.\n\n"
+            f"Reply with NEW REPORT — I'll refresh the report, add new findings, and highlight changes.\n\n"
+            "Best regards,\nYour Internal Research Agent",
+        )
+        email_sender.send_email(to=creator_email, subject=subject, body=body)
+        _log_workflow(
+            {
+                "event_id": payload.get("event_id"),
+                "status": "email_sent",
+                "details": {"to": creator_email},
+            }
+        )
+    else:
+        action = "REPORT_REQUIRED"
 
     artifacts_path: str | None = None
-    # Emit a small artefact when optional descriptive fields are present.  The
-    # artefact is used by downstream components to seed search for similar
-    # companies.  It now records the industry group and industry rather than
-    # classification numbers.
     if any(payload.get(k) for k in ("industry_group", "industry", "description")):
         artifacts_path = "artifacts/matching_crm_companies.json"
         Path("artifacts").mkdir(exist_ok=True)
@@ -238,5 +233,5 @@ def run(trigger: Normalized) -> Normalized:
         "source": "internal_search",
         "creator": trigger.get("creator"),
         "recipient": trigger.get("recipient"),
-        "payload": {"action": action},
+        "payload": {"action": action, "level1_samples": samples},
     }

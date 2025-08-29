@@ -29,7 +29,6 @@ from core import tasks
 from agents import (
     agent_internal_search,
     agent_internal_level2_company_search,
-    agent_internal_customer_research,
     agent_company_detail_research,
     agent_external_level1_company_search,
     agent_external_level2_companies_search,
@@ -237,11 +236,10 @@ def run(
     if researchers is None:
         researchers = [
             agent_internal_search.run,
-            agent_internal_level2_company_search.run,
-            agent_internal_customer_research.run,
-            agent_company_detail_research.run,
             agent_external_level1_company_search.run,
             agent_external_level2_companies_search.run,
+            agent_internal_level2_company_search.run,
+            agent_company_detail_research.run,
         ]
 
     results: List[Dict[str, Any]] = []

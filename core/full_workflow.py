@@ -44,7 +44,6 @@ from agents import (
     agent_external_level1_company_search as _ext_l1,
     agent_external_level2_companies_search as _ext_l2,
     agent_internal_level2_company_search as _int_l2,
-    agent_internal_customer_research as _cust_research,
 )
 
 
@@ -120,16 +119,14 @@ def _process_trigger(trig: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if res_internal.get("status") == "missing_fields":
         return None
     results: List[Dict[str, Any]] = [res_internal]
-    # Step 2: enrich with static details
-    results.append(_detail_search.run(trig))
-    # Step 3: find neighbours with similar classification or industry
+    # Step 2: find neighbours with similar classification or industry
     results.append(_ext_l1.run(trig))
-    # Step 4: identify possible external customers for level 2 research
+    # Step 3: identify possible external customers for level 2 research
     results.append(_ext_l2.run(trig))
-    # Step 5: identify possible internal customers
+    # Step 4: enrich external level 2 results with internal data
     results.append(_int_l2.run(trig))
-    # Step 6: summarise customer research
-    results.append(_cust_research.run(trig))
+    # Step 5: compile detailed company profile and report
+    results.append(_detail_search.run(trig))
     consolidated = _consolidate.consolidate(results)
     return consolidated
 
