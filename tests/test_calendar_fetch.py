@@ -49,8 +49,8 @@ def test_default_window(monkeypatch, stub_time, tmp_path):
     monkeypatch.chdir(tmp_path)
     call_rec = _setup_service(monkeypatch, [])
     google_calendar.fetch_events()
-    assert call_rec["timeMin"] == "2023-12-25T00:00:00Z"
-    assert call_rec["timeMax"] == "2024-03-01T00:00:00Z"
+    assert call_rec["timeMin"] == "2023-12-31T00:00:00Z"
+    assert call_rec["timeMax"] == "2024-01-08T00:00:00Z"
 
 
 def test_env_override(monkeypatch, stub_time, tmp_path):
@@ -118,16 +118,9 @@ def test_fetch_events_includes_creator_and_logs(monkeypatch, stub_time, tmp_path
     assert fetched_logs
     assert fetched_logs[0]["payload"] == {
         "count": 1,
-        "events": [
-            {
-                "id": "1",
-                "summary": "Meet",
-                "description": "desc",
-                "start": {"dateTime": "2024-01-01T10:00:00+00:00"},
-                "end": {"dateTime": "2024-01-01T11:00:00+00:00"},
-                "creator": "alice@example.com",
-            }
-        ],
+        "time_min": "2023-12-31T00:00:00Z",
+        "time_max": "2024-01-08T00:00:00Z",
+        "ids": ["1"],
     }
 
 
@@ -159,8 +152,9 @@ def test_fetch_events_logs_two_events(monkeypatch, stub_time, tmp_path):
     assert fetched_logs
     payload = fetched_logs[0]["payload"]
     assert payload["count"] == 2
-    assert [e["id"] for e in payload["events"]] == ["1", "2"]
-    assert [e["summary"] for e in payload["events"]] == ["A", "B"]
+    assert payload["time_min"] == "2023-12-31T00:00:00Z"
+    assert payload["time_max"] == "2024-01-08T00:00:00Z"
+    assert payload["ids"] == ["1", "2"]
 
 
 def test_fetch_events_logs_no_events(monkeypatch, stub_time, tmp_path):
@@ -175,7 +169,12 @@ def test_fetch_events_logs_no_events(monkeypatch, stub_time, tmp_path):
     google_calendar.fetch_events()
     fetched_logs = [l for l in logs if l["status"] == "fetched_events"]
     assert fetched_logs
-    assert fetched_logs[0]["payload"] == {"count": 0}
+    assert fetched_logs[0]["payload"] == {
+        "count": 0,
+        "time_min": "2023-12-31T00:00:00Z",
+        "time_max": "2024-01-08T00:00:00Z",
+        "ids": [],
+    }
 
 
 def test_orchestrator_no_triggers(monkeypatch, tmp_path):
