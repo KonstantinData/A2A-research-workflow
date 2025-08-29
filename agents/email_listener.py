@@ -21,8 +21,10 @@ from email import message_from_string
 from typing import Dict, Any
 from datetime import datetime
 import json
+import time
 
 from core import tasks as tasks_db
+from integrations import email_reader
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -146,4 +148,26 @@ def run(raw_email: str) -> Dict[str, Any]:
     return process_email(raw_email)
 
 
-__all__ = ["parse_email", "process_email", "run"]
+def has_pending_events() -> bool:
+    """Return ``True`` if any tasks are awaiting email replies."""
+    return any(tasks_db.pending_tasks())
+
+
+def poll_pending_replies(interval: int = 600) -> None:
+    """Poll mailbox every ``interval`` seconds while pending events exist."""
+    while has_pending_events():
+        try:
+            for rep in email_reader.fetch_replies():
+                run(json.dumps(rep))
+        except Exception:
+            pass
+        time.sleep(interval)
+
+
+__all__ = [
+    "parse_email",
+    "process_email",
+    "run",
+    "has_pending_events",
+    "poll_pending_replies",
+]

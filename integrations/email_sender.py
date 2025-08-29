@@ -76,7 +76,11 @@ def send_email(
     attachments: Optional[Sequence[str]] = None,
     task_id: Optional[str] = None,
 ) -> None:
-    """Wrapper around the low level mailer with logging and retries."""
+    """Wrapper around the low level mailer with logging and retries.
+
+    ``task_id`` may be supplied for correlation so that replies can be matched
+    to pending workflow items.  When provided it is logged with the message
+    metadata."""
 
     attach_paths: list[str] = []
     body_extra = ""

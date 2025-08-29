@@ -33,9 +33,7 @@ class ReminderScheduler:
     @staticmethod
     def _open_tasks():
         """Return tasks that are still pending or awaiting escalation."""
-        return [
-            t for t in tasks.list_tasks() if t.get("status") in {"pending", "reminded"}
-        ]
+        return list(tasks.pending_tasks())
 
     def send_reminders(self) -> None:
         """Send reminder e-mails for all open tasks and record history."""
