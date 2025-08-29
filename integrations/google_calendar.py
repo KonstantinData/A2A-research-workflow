@@ -167,7 +167,7 @@ def fetch_events() -> List[Dict[str, Any]]:
     trigger evaluation or duplicate checking. All events returned by the Google
     Calendar API are mapped into a simplified structure:
 
-    ``{"event_id", "summary", "description", "start", "end"}``
+    ``{"event_id", "summary", "description", "start", "end", "creatorEmail", "creator"}``
     """
 
     service = _service()
@@ -196,6 +196,11 @@ def fetch_events() -> List[Dict[str, Any]]:
     for ev in raw_events:
         start_dt = _dt(ev.get("start"))
         end_dt = _dt(ev.get("end"))
+        creator_email = ""
+        c = ev.get("creator") or {}
+        if isinstance(c, dict):
+            creator_email = c.get("email") or ""
+        creator_email = creator_email or ev.get("creatorEmail") or ""
         results.append(
             {
                 "event_id": ev.get("id"),
@@ -203,7 +208,16 @@ def fetch_events() -> List[Dict[str, Any]]:
                 "description": ev.get("description"),
                 "start": start_dt.isoformat() if start_dt else None,
                 "end": end_dt.isoformat() if end_dt else None,
+                "creatorEmail": creator_email,
+                "creator": {"email": creator_email},
             }
+        )
+
+    if results:
+        log_step(
+            "calendar",
+            "fetched_events",
+            {"count": len(results), "ids": [r["event_id"] for r in results]},
         )
 
     log_step(
