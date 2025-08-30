@@ -26,9 +26,10 @@ def test_demo_events_guarded():
 def test_required_log_statements():
     repo = pathlib.Path(__file__).resolve().parents[1]
     orch_text = (repo / "core" / "orchestrator.py").read_text()
-    assert "fetch_call" in orch_text and "fetch_return" in orch_text
+    assert "fetch_return" in orch_text
     gc_text = (repo / "integrations" / "google_calendar.py").read_text()
-    assert "fetched_events" in gc_text
+    for token in ["fetch_call", "raw_api_response", "fetched_events"]:
+        assert token in gc_text
 
 
 # 3. Runtime validation
@@ -44,6 +45,8 @@ def test_runtime_logging(monkeypatch):
     sample_event = {"event_id": "live1", "summary": "X", "creatorEmail": "a@b.c"}
 
     def fake_fetch():
+        log_step("calendar", "fetch_call", {})
+        log_step("calendar", "raw_api_response", {"response": {}})
         log_step(
             "calendar",
             "fetched_events",
@@ -70,6 +73,7 @@ def test_runtime_logging(monkeypatch):
 
     text = log_file.read_text()
     assert "fetch_call" in text
+    assert "raw_api_response" in text
     assert "fetch_return" in text
     assert "fetched_events" in text
     assert '"e1"' not in text
@@ -80,6 +84,8 @@ def test_runtime_blocks_demo(monkeypatch):
     os.environ.pop("A2A_DEMO", None)
 
     def fake_fetch():
+        log_step("calendar", "fetch_call", {})
+        log_step("calendar", "raw_api_response", {"response": {}})
         log_step(
             "calendar",
             "fetched_events",

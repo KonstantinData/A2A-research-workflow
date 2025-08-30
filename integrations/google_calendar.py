@@ -56,6 +56,12 @@ def fetch_events() -> List[Normalized]:
     time_min = (now - timedelta(minutes=minutes_back)).isoformat()
     time_max = (now + timedelta(minutes=minutes_fwd)).isoformat()
 
+    log_step(
+        "calendar",
+        "fetch_call",
+        {"time_min": time_min, "time_max": time_max},
+    )
+
     results: List[Dict[str, Any]] = []
 
     try:

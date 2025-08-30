@@ -110,6 +110,27 @@ def _missing_required(source: str, payload: Dict[str, Any]) -> List[str]:
     return [f for f in req if not (payload or {}).get(f)]
 
 
+def _calendar_fetch_logged(wf_id: str) -> bool:
+    """Verify required calendar fetch log entries exist for this workflow."""
+    path = Path("logs") / "workflows" / "calendar.jsonl"
+    if not path.exists():
+        return False
+    required = {"fetch_call", "raw_api_response", "fetched_events"}
+    statuses: set[str] = set()
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    continue
+                if rec.get("workflow_id") == wf_id:
+                    statuses.add(rec.get("status"))
+    except Exception:
+        return False
+    return required.issubset(statuses)
+
+
 
 # --------- Trigger-Gathering für Kalender + Kontakte ----------
 def _as_trigger_from_event(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -139,13 +160,25 @@ def _as_trigger_from_contact(c: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+
 def gather_triggers() -> List[Dict[str, Any]]:
     """Standardisiere Trigger in gemeinsames Format {source, creator, recipient, payload}."""
 
     triggers: List[Dict[str, Any]] = []
     try:
-        log_step("calendar", "fetch_call", {})
         events = fetch_events()
+
+        wf_id = get_workflow_id()
+        if not _calendar_fetch_logged(wf_id):
+            raise SystemExit("Missing calendar fetch logs – aborting run")
+
+        if not events or not any(e.get("event_id") for e in events):
+            raise SystemExit("No real calendar events detected – aborting run")
+
+        if any(ev.get("event_id") == _DEMO_EVENT_ID for ev in events):
+            if not (os.getenv("DEMO_MODE") == "1" or os.getenv("A2A_DEMO") == "1"):
+                raise SystemExit("Demo event detected in non-demo mode – aborting run")
+
         log_step("calendar", "fetch_return", {"count": len(events)})
 
         if os.getenv("A2A_DEMO") == "1" or os.getenv("DEMO_MODE") == "1":
@@ -153,12 +186,6 @@ def gather_triggers() -> List[Dict[str, Any]]:
 
             events = list(events or [])
             events.extend(demo_events())
-        else:
-            for ev in events or []:
-                if ev.get("event_id") == _DEMO_EVENT_ID:
-                    raise SystemExit(
-                        "demo event detected without DEMO_MODE or A2A_DEMO set"
-                    )
 
         for ev in events or []:
             t = _as_trigger_from_event(ev)
@@ -172,6 +199,7 @@ def gather_triggers() -> List[Dict[str, Any]]:
         log_event({"severity": "critical", "where": "gather_triggers", "error": str(e)})
         raise
     return triggers
+
 
 
 def run(
