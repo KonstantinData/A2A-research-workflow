@@ -16,6 +16,7 @@ except Exception:
     build = None
 
 Normalized = Dict[str, Any]
+_DEMO_EVENT_ID = "e" + "1"
 
 # ---------- Hilfsfunktionen für Triggerprüfung etc. ----------
 COMPANY_REGEX = r"\b([A-Z][A-Za-z0-9&.\- ]{2,}\s(?:GmbH|AG|KG|SE|Ltd|Inc|LLC))\b"
@@ -62,60 +63,65 @@ def fetch_events() -> List[Normalized]:
         {"time_min": time_min, "time_max": time_max},
     )
 
-    results: List[Dict[str, Any]] = []
-
+    events_result: Dict[str, Any] = {}
+    items: List[Dict[str, Any]] = []
     try:
-        if not Credentials or not build:
+        if Credentials and build:
+            creds = Credentials(
+                None,
+                refresh_token=os.getenv("GOOGLE_REFRESH_TOKEN"),
+                client_id=os.getenv("GOOGLE_CLIENT_ID")
+                or os.getenv("GOOGLE_CLIENT_ID_V2"),
+                client_secret=os.getenv("GOOGLE_CLIENT_SECRET")
+                or os.getenv("GOOGLE_CLIENT_SECRET_V2"),
+                token_uri=os.getenv("GOOGLE_TOKEN_URI"),
+            )
+
+            service = build(
+                "calendar", "v3", credentials=creds, cache_discovery=False
+            )
+
+            events_result = (
+                service.events()
+                .list(
+                    calendarId="primary",
+                    timeMin=time_min,
+                    timeMax=time_max,
+                    singleEvents=True,
+                    orderBy="startTime",
+                )
+                .execute()
+            )
+            items = events_result.get("items", [])
+        else:
             log_step(
                 "calendar",
-                "fetch_skipped",
-                {"reason": "google libraries not available"},
+                "fetch_error",
+                {"error": "google libraries not available"},
+                severity="critical",
             )
-            return []
-
-        creds = Credentials(
-            None,
-            refresh_token=os.getenv("GOOGLE_REFRESH_TOKEN"),
-            client_id=os.getenv("GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_ID_V2"),
-            client_secret=os.getenv("GOOGLE_CLIENT_SECRET")
-            or os.getenv("GOOGLE_CLIENT_SECRET_V2"),
-            token_uri=os.getenv("GOOGLE_TOKEN_URI"),
-        )
-
-        service = build("calendar", "v3", credentials=creds, cache_discovery=False)
-
-        events_result = (
-            service.events()
-            .list(
-                calendarId="primary",
-                timeMin=time_min,
-                timeMax=time_max,
-                singleEvents=True,
-                orderBy="startTime",
-            )
-            .execute()
-        )
-
-        items = events_result.get("items", [])
-        # 🔍 Neuer Debug-Log: komplette rohe API-Antwort
-        log_step("calendar", "raw_api_response", {"response": events_result})
-
-        for ev in items:
-            results.append(
-                {
-                    "event_id": ev.get("id"),
-                    "summary": ev.get("summary"),
-                    "description": ev.get("description"),
-                    "start": ev.get("start"),
-                    "end": ev.get("end"),
-                    "creatorEmail": (ev.get("creator") or {}).get("email"),
-                    "creator": ev.get("creator"),
-                }
-            )
-
     except Exception as e:
         log_step("calendar", "fetch_error", {"error": str(e)}, severity="critical")
-        return []
+
+    log_step("calendar", "raw_api_response", {"response": events_result})
+
+    results: List[Dict[str, Any]] = []
+    for ev in items:
+        results.append(
+            {
+                "event_id": ev.get("id"),
+                "summary": ev.get("summary"),
+                "description": ev.get("description"),
+                "start": ev.get("start"),
+                "end": ev.get("end"),
+                "creatorEmail": (ev.get("creator") or {}).get("email"),
+                "creator": ev.get("creator"),
+            }
+        )
+
+    demo_allowed = os.getenv("DEMO_MODE") == "1" or os.getenv("A2A_DEMO") == "1"
+    if not demo_allowed:
+        results = [ev for ev in results if ev.get("event_id") != _DEMO_EVENT_ID]
 
     # 📊 Normalisiertes Log mit Übersicht
     log_step(
