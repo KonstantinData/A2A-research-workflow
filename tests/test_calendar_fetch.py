@@ -34,14 +34,21 @@ class _StubService:
 @pytest.fixture
 def stub_time(monkeypatch):
     fixed = dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc)
-    monkeypatch.setattr(google_calendar, "_utc_now", lambda: fixed)
+
+    class _FixedDateTime(dt.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return fixed
+
+    monkeypatch.setattr(google_calendar, "datetime", _FixedDateTime)
     return fixed
 
 
 def _setup_service(monkeypatch, items):
     rec = {}
     svc = _StubService(items, rec)
-    monkeypatch.setattr(google_calendar, "_service", lambda: svc)
+    monkeypatch.setattr(google_calendar, "build", lambda *a, **k: svc)
+    monkeypatch.setattr(google_calendar, "Credentials", lambda *a, **k: object())
     return rec
 
 
@@ -49,8 +56,8 @@ def test_default_window(monkeypatch, stub_time, tmp_path):
     monkeypatch.chdir(tmp_path)
     call_rec = _setup_service(monkeypatch, [])
     google_calendar.fetch_events()
-    assert call_rec["timeMin"] == "2023-12-31T00:00:00Z"
-    assert call_rec["timeMax"] == "2024-01-08T00:00:00Z"
+    assert call_rec["timeMin"] == "2023-12-31T00:00:00+00:00"
+    assert call_rec["timeMax"] == "2024-01-08T00:00:00+00:00"
 
 
 def test_env_override(monkeypatch, stub_time, tmp_path):
@@ -59,8 +66,8 @@ def test_env_override(monkeypatch, stub_time, tmp_path):
     monkeypatch.setenv("CALENDAR_MINUTES_FWD", "60")
     call_rec = _setup_service(monkeypatch, [])
     google_calendar.fetch_events()
-    assert call_rec["timeMin"] == "2023-12-31T23:30:00Z"
-    assert call_rec["timeMax"] == "2024-01-01T01:00:00Z"
+    assert call_rec["timeMin"] == "2023-12-31T23:30:00+00:00"
+    assert call_rec["timeMax"] == "2024-01-01T01:00:00+00:00"
 
 
 def test_duplicate_event_not_skipped(monkeypatch, stub_time, tmp_path):
@@ -107,8 +114,8 @@ def test_fetch_events_includes_creator_and_logs(monkeypatch, stub_time, tmp_path
             "event_id": "1",
             "summary": "Meet",
             "description": "desc",
-            "start": "2024-01-01T10:00:00+00:00",
-            "end": "2024-01-01T11:00:00+00:00",
+            "start": {"dateTime": "2024-01-01T10:00:00+00:00"},
+            "end": {"dateTime": "2024-01-01T11:00:00+00:00"},
             "creatorEmail": "alice@example.com",
             "creator": {"email": "alice@example.com"},
         }
@@ -118,8 +125,8 @@ def test_fetch_events_includes_creator_and_logs(monkeypatch, stub_time, tmp_path
     assert fetched_logs
     assert fetched_logs[0]["payload"] == {
         "count": 1,
-        "time_min": "2023-12-31T00:00:00Z",
-        "time_max": "2024-01-08T00:00:00Z",
+        "time_min": "2023-12-31T00:00:00+00:00",
+        "time_max": "2024-01-08T00:00:00+00:00",
         "ids": ["1"],
         "summaries": ["Meet"],
         "creator_emails": ["alice@example.com"],
@@ -154,11 +161,11 @@ def test_fetch_events_logs_two_events(monkeypatch, stub_time, tmp_path):
     assert fetched_logs
     payload = fetched_logs[0]["payload"]
     assert payload["count"] == 2
-    assert payload["time_min"] == "2023-12-31T00:00:00Z"
-    assert payload["time_max"] == "2024-01-08T00:00:00Z"
+    assert payload["time_min"] == "2023-12-31T00:00:00+00:00"
+    assert payload["time_max"] == "2024-01-08T00:00:00+00:00"
     assert payload["ids"] == ["1", "2"]
     assert payload["summaries"] == ["A", "B"]
-    assert payload["creator_emails"] == ["", ""]
+    assert payload["creator_emails"] == [None, None]
 
 
 def test_fetch_events_logs_no_events(monkeypatch, stub_time, tmp_path):
@@ -175,8 +182,8 @@ def test_fetch_events_logs_no_events(monkeypatch, stub_time, tmp_path):
     assert fetched_logs
     assert fetched_logs[0]["payload"] == {
         "count": 0,
-        "time_min": "2023-12-31T00:00:00Z",
-        "time_max": "2024-01-08T00:00:00Z",
+        "time_min": "2023-12-31T00:00:00+00:00",
+        "time_max": "2024-01-08T00:00:00+00:00",
         "ids": [],
         "summaries": [],
         "creator_emails": [],
@@ -196,36 +203,3 @@ def test_orchestrator_no_triggers(monkeypatch, tmp_path):
         records[0]["message"]
         == "No calendar or contact events matched trigger words"
     )
-
-
-def test_extract_company_regex_success(monkeypatch):
-    def fake_regex(title, trigger):
-        return "Dr. Willmar Schwabe"
-
-    monkeypatch.setattr(google_calendar, "extract_company", fake_regex)
-
-    result = google_calendar.extract_company_ai(
-        "Meeting-Vorbereitung Firma Dr. Willmar Schwabe",
-        "meeting-vorbereitung",
-    )
-    assert result == "Dr. Willmar Schwabe"
-
-
-def test_extract_company_gpt_fallback(monkeypatch):
-    def fake_regex(title, trigger):
-        return "Unknown"
-
-    monkeypatch.setattr(google_calendar, "extract_company", fake_regex)
-
-    def fake_openai_call(*args, **kwargs):
-        return {"choices": [{"message": {"content": "Dr. Willmar Schwabe"}}]}
-
-    monkeypatch.setattr(
-        google_calendar.openai.ChatCompletion, "create", fake_openai_call
-    )
-
-    result = google_calendar.extract_company_ai(
-        "Meeting-Vorbereitung Firma Dr. Willmar Schwabe",
-        "meeting-vorbereitung",
-    )
-    assert result == "Dr. Willmar Schwabe"

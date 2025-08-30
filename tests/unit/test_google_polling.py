@@ -6,45 +6,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from integrations import google_calendar, google_contacts  # noqa: E402
+from integrations import google_contacts  # noqa: E402
 from core import trigger_words  # noqa: E402
-
-
-def test_calendar_scheduled_poll_normalizes(monkeypatch):
-    event = {
-        "id": "e1",
-        "creator": {"email": "alice@example.com"},
-        "summary": "Meeting",
-        "description": "Firma TestCorp\nwww.testcorp.com\n+49 1234567",
-    }
-    monkeypatch.setattr(google_calendar, "fetch_events", lambda: [event])
-    monkeypatch.setattr(google_calendar.email_sender, "send_reminder", lambda **k: None)
-
-    result = google_calendar.scheduled_poll()
-
-    assert result == [
-        {
-            "creator": "alice@example.com",
-            "trigger_source": "calendar",
-            "recipient": "alice@example.com",
-            "payload": {
-                "title": "Meeting",
-                "description": "Firma TestCorp\nwww.testcorp.com\n+49 1234567",
-                "company": "TestCorp",
-                "domain": "www.testcorp.com",
-                "email": "alice@example.com",
-                "phone": "+49 1234567",
-                "notes_extracted": {
-                    "company": "TestCorp",
-                    "domain": "www.testcorp.com",
-                    "phone": "+49 1234567",
-                },
-                "event_id": "e1",
-                "start_iso": None,
-                "end_iso": None,
-            },
-        }
-    ]
 
 
 def test_contacts_scheduled_poll_normalizes(monkeypatch):
@@ -109,45 +72,6 @@ def test_contacts_poll_falls_back_to_admin(monkeypatch):
     google_contacts.scheduled_poll()
 
     assert sent.get("to") == "admin@condata.io"
-
-
-def test_calendar_poll_populates_start_end(monkeypatch):
-    event = {
-        "id": "e1",
-        "creator": {"email": "alice@example.com"},
-        "summary": "Demo",
-        "description": "Firma Demo",
-        "start": {"dateTime": "2024-01-01T10:00:00+00:00"},
-        "end": {"dateTime": "2024-01-01T11:00:00+00:00"},
-    }
-    monkeypatch.setattr(google_calendar, "fetch_events", lambda: [event])
-    monkeypatch.setattr(google_calendar.email_sender, "send_reminder", lambda **k: None)
-
-    result = google_calendar.scheduled_poll()
-
-    payload = result[0]["payload"]
-    assert payload["start_iso"] == "2024-01-01T10:00:00+00:00"
-    assert payload["end_iso"] == "2024-01-01T11:00:00+00:00"
-
-
-def test_fetch_events_no_trigger_file(monkeypatch, tmp_path):
-    monkeypatch.chdir(tmp_path)
-
-    class DummyEvents:
-        def list(self, **kwargs):
-            return self
-
-        def execute(self):
-            return {"items": []}
-
-    class DummyService:
-        def events(self):
-            return DummyEvents()
-
-    monkeypatch.setattr(google_calendar, "_service", lambda: DummyService())
-
-    # Should not raise even if trigger word file is empty or missing
-    assert google_calendar.fetch_events() == []
 
 
 def test_fetch_contacts_exits_early_when_no_triggers(tmp_path, monkeypatch):

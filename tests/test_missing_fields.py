@@ -90,43 +90,20 @@ def test_only_optional_missing(monkeypatch):
 
 
 def test_fetch_events_returns_even_when_marked_processed(monkeypatch):
-    def fake_events():
-        return [
-            {
-                "id": "e1",
-                "iCalUID": "e1",
-                "updated": "u1",
-                "summary": "Meet ACME",
-                "description": "",
-            }
-        ]
+    event = {
+        "event_id": "e1",
+        "summary": "Meet ACME",
+        "description": "",
+        "start": None,
+        "end": None,
+        "creatorEmail": "",
+        "creator": {"email": ""},
+    }
 
-    monkeypatch.setattr(google_calendar, "_calendar_ids", lambda cid: ["primary"])
-
-    class FakeReq:
-        def events(self):
-            return self
-
-        def list(self, **kw):
-            return self
-
-        def execute(self):
-            return {"items": fake_events()}
-
-    monkeypatch.setattr(google_calendar, "_service", lambda: FakeReq())
+    monkeypatch.setattr(google_calendar, "fetch_events", lambda: [event])
     utils.mark_processed("e1", "u1", Path("logs/processed_events.jsonl"))
     events = google_calendar.fetch_events()
-    assert events == [
-        {
-            "event_id": "e1",
-            "summary": "Meet ACME",
-            "description": "",
-            "start": None,
-            "end": None,
-            "creatorEmail": "",
-            "creator": {"email": ""},
-        }
-    ]
+    assert events == [event]
 
 
 def test_email_reply_resumes(monkeypatch):

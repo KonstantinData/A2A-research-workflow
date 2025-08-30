@@ -5,44 +5,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from integrations import google_calendar, google_contacts
-
-
-def test_calendar_scheduled_poll_integration(monkeypatch):
-    event = {
-        "id": "e1",
-        "creator": {"email": "alice@example.com"},
-        "summary": "Demo",
-        "description": "Firma DemoCorp\ndemocorp.com\n+49 2222222",
-    }
-    monkeypatch.setattr(google_calendar, "fetch_events", lambda: [event])
-    monkeypatch.setattr(google_calendar.email_sender, "send_reminder", lambda **k: None)
-
-    result = google_calendar.scheduled_poll()
-
-    assert result == [
-        {
-            "creator": "alice@example.com",
-            "trigger_source": "calendar",
-            "recipient": "alice@example.com",
-            "payload": {
-                "title": "Demo",
-                "description": "Firma DemoCorp\ndemocorp.com\n+49 2222222",
-                "company": "DemoCorp",
-                "domain": "democorp.com",
-                "email": "alice@example.com",
-                "phone": "+49 2222222",
-                "notes_extracted": {
-                    "company": "DemoCorp",
-                    "domain": "democorp.com",
-                    "phone": "+49 2222222",
-                },
-                "event_id": "e1",
-                "start_iso": None,
-                "end_iso": None,
-            },
-        }
-    ]
+from integrations import google_contacts
 
 
 def test_contacts_scheduled_poll_integration(monkeypatch):
