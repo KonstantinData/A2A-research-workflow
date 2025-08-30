@@ -85,8 +85,32 @@ def log_step(source: str, stage: str, data: Dict[str, Any], *, severity: str = "
 
 def finalize_summary() -> None:
     """Write a digest summary for the current workflow run."""
+    wf_id = get_workflow_id()
     path = Path("logs") / "workflows" / "summary.json"
-    payload = {"workflow_id": get_workflow_id(), **SUMMARY}
+    payload = {"workflow_id": wf_id, **SUMMARY}
+
+    cal_path = Path("logs") / "workflows" / "calendar.jsonl"
+    calendar_logs: List[Dict[str, Any]] = []
+    if cal_path.exists():
+        try:
+            with cal_path.open("r", encoding="utf-8") as fh:
+                for line in fh:
+                    try:
+                        rec = json.loads(line)
+                    except Exception:
+                        continue
+                    if rec.get("workflow_id") == wf_id:
+                        calendar_logs.append(rec)
+        except Exception:
+            calendar_logs = []
+
+    if not any(
+        e.get("status") in ("fetch_call", "fetched_events") for e in calendar_logs
+    ):
+        payload["run_mode"] = "reminder_only"
+    else:
+        payload["run_mode"] = "calendar_fetch"
+
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
     # Surface summary in CI logs
