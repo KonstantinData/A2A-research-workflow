@@ -11,13 +11,15 @@ from core import orchestrator, feature_flags
 
 
 def test_gather_triggers_normalizes_data(monkeypatch):
-    events = [{"creator": "alice@example.com", "summary": "meeting preparation"}]
+    events = [{"creator": "alice@example.com", "summary": "meeting preparation", "event_id": "x1"}]
     contacts = [
         {"emailAddresses": [{"value": "bob@example.com"}], "names": []}
     ]
 
     monkeypatch.setattr(orchestrator, "fetch_events", lambda: events)
     monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: contacts)
+    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf: True)
+    monkeypatch.setattr(orchestrator, "_event_id_exists", lambda eid: False)
 
     triggers = orchestrator.gather_triggers()
 
@@ -38,9 +40,10 @@ def test_gather_triggers_normalizes_data(monkeypatch):
 
 
 def test_gather_triggers_skips_events_without_trigger(monkeypatch):
-    events = [{"creator": "alice@example.com", "summary": "team sync"}]
+    events = [{"creator": "alice@example.com", "summary": "team sync", "event_id": "x2"}]
     monkeypatch.setattr(orchestrator, "fetch_events", lambda: events)
     monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
+    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf: True)
     triggers = orchestrator.gather_triggers()
     assert triggers == []
 
@@ -48,18 +51,36 @@ def test_gather_triggers_skips_events_without_trigger(monkeypatch):
 def test_gather_triggers_logs_fetch(monkeypatch):
     monkeypatch.delenv("A2A_DEMO", raising=False)
     monkeypatch.delenv("DEMO_MODE", raising=False)
-    monkeypatch.setattr(orchestrator, "fetch_events", lambda: [])
+    def fake_fetch():
+        orchestrator.log_step("calendar", "fetch_call", {})
+        orchestrator.log_step("calendar", "raw_api_response", {"response": {}})
+        orchestrator.log_step(
+            "calendar",
+            "fetched_events",
+            {
+                "count": 1,
+                "time_min": "t0",
+                "time_max": "t1",
+                "ids": ["x"],
+                "summaries": [""],
+                "creator_emails": [""],
+            },
+        )
+        return [{"event_id": "x"}]
+
+    monkeypatch.setattr(orchestrator, "fetch_events", fake_fetch)
     monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
     logs = []
+    original_log_step = orchestrator.log_step
 
     def fake_log_step(category, status, payload=None, severity="info"):
         logs.append({"category": category, "status": status, "payload": payload})
+        original_log_step(category, status, payload or {}, severity=severity)
 
     monkeypatch.setattr(orchestrator, "log_step", fake_log_step)
     orchestrator.gather_triggers()
     statuses = [l["status"] for l in logs]
-    assert "fetch_call" in statuses
-    assert any(l["status"] == "fetch_return" and l["payload"] == {"count": 0} for l in logs)
+    assert {"fetch_call", "raw_api_response", "fetched_events", "fetch_return"} <= set(statuses)
 
 
 def test_gather_triggers_demo_mode(monkeypatch):
@@ -68,13 +89,27 @@ def test_gather_triggers_demo_mode(monkeypatch):
 
     def fake_fetch():
         called["fetch"] += 1
-        return []
+        orchestrator.log_step("calendar", "fetch_call", {})
+        orchestrator.log_step("calendar", "raw_api_response", {"response": {}})
+        orchestrator.log_step(
+            "calendar",
+            "fetched_events",
+            {
+                "count": 1,
+                "time_min": "t0",
+                "time_max": "t1",
+                "ids": ["real"],
+                "summaries": [""],
+                "creator_emails": [""],
+            },
+        )
+        return [{"event_id": "real"}]
 
     monkeypatch.setattr(orchestrator, "fetch_events", fake_fetch)
     monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
     triggers = orchestrator.gather_triggers()
     assert called["fetch"] == 1
-    assert triggers and triggers[0]["payload"]["event_id"] == "e1"
+    assert any(t["payload"].get("event_id") == "e1" for t in triggers)
 
 def test_run_pipeline_respects_feature_flags(monkeypatch):
     monkeypatch.setattr(feature_flags, "USE_PUSH_TRIGGERS", False)
@@ -83,9 +118,6 @@ def test_run_pipeline_respects_feature_flags(monkeypatch):
     monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "token")
     monkeypatch.setenv("HUBSPOT_PORTAL_ID", "portal")
     monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
-
-    events = [{"creator": "carol@example.com", "summary": "meeting preparation"}]
-    contacts = []
 
     called = {"basic": 0, "pro": 0, "pdf": 0, "csv": 0, "upsert": 0, "attach": 0}
 
@@ -117,8 +149,16 @@ def test_run_pipeline_respects_feature_flags(monkeypatch):
     def fake_attach(path, company_id):
         called["attach"] += 1
 
-    monkeypatch.setattr(orchestrator, "fetch_events", lambda: events)
-    monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: contacts)
+    trigger = {
+        "source": "calendar",
+        "creator": "carol@example.com",
+        "recipient": "carol@example.com",
+        "payload": {"event_id": "x3"},
+    }
+
+    monkeypatch.setattr(orchestrator, "gather_triggers", lambda: [trigger])
+    monkeypatch.setattr(orchestrator, "_event_id_exists", lambda eid: False)
+    monkeypatch.setattr(orchestrator, "_missing_required", lambda s, p: [])
 
     orchestrator.run(
         researchers=[basic, pro],

@@ -21,16 +21,14 @@ def self_test() -> None:
     orch_text = orch_path.read_text()
     if len(re.findall(r"fetch_events\(", orch_text)) != 1:
         raise AssertionError("fetch_events not called exactly once in orchestrator")
-    if (
-        'log_step("calendar", "fetch_call"' not in orch_text
-        or 'log_step("calendar", "fetch_return"' not in orch_text
-    ):
-        raise AssertionError("missing fetch_call/fetch_return log steps")
+    if 'log_step("calendar", "fetch_return"' not in orch_text:
+        raise AssertionError("missing fetch_return log step")
 
     gc_path = repo / "integrations" / "google_calendar.py"
     gc_text = gc_path.read_text()
-    if "fetched_events" not in gc_text:
-        raise AssertionError("missing fetched_events logging")
+    for token in ["fetch_call", "raw_api_response", "fetched_events"]:
+        if token not in gc_text:
+            raise AssertionError(f"missing {token} logging")
     if "time_min" not in gc_text or "time_max" not in gc_text or "ids" not in gc_text:
         raise AssertionError("fetched_events logging missing fields")
     if f'"{DEMO_EVENT}"' in gc_text:
