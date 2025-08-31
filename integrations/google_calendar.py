@@ -16,7 +16,6 @@ except Exception:
     build = None
 
 Normalized = Dict[str, Any]
-_DEMO_EVENT_ID = "e" + "1"
 
 # ---------- Hilfsfunktionen für Triggerprüfung etc. ----------
 COMPANY_REGEX = r"\b([A-Z][A-Za-z0-9&.\- ]{2,}\s(?:GmbH|AG|KG|SE|Ltd|Inc|LLC))\b"
@@ -118,10 +117,6 @@ def fetch_events() -> List[Normalized]:
                 "creator": ev.get("creator"),
             }
         )
-
-    demo_allowed = os.getenv("DEMO_MODE") == "1" or os.getenv("A2A_DEMO") == "1"
-    if not demo_allowed:
-        results = [ev for ev in results if ev.get("event_id") != _DEMO_EVENT_ID]
 
     # 📊 Normalisiertes Log mit Übersicht
     log_step(

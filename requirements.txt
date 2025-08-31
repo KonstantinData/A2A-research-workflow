@@ -11,3 +11,7 @@ weasyprint>=65.0
 
 # HTTP client
 requests
+
+# YAML parsing and testing
+pyyaml
+pytest

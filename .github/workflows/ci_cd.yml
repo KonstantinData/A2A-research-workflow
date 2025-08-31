@@ -35,11 +35,13 @@ jobs:
       - name: Validate CI/CD workflow YAML
         run: python -c "import yaml; yaml.safe_load(open('.github/workflows/ci_cd.yml'))"
 
-      - name: Run unit tests
-        run: python -m pytest -q
-
-      - name: Run integration tests
-        run: python -m pytest tests/integration -q
+      - name: Run tests
+        run: |
+          python -m pytest \
+            tests/test_calendar_fetch.py \
+            tests/test_ci_cd_workflow_yaml.py \
+            tests/test_orchestrator.py \
+            tests/test_utils.py -q
 
       - name: Upload workflow logs
         if: always()

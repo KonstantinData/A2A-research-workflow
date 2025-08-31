@@ -1,8 +1,6 @@
 -r requirements.txt
 
 # Dev & Test dependencies
-pyyaml
-pytest
 ruff
 flake8
 
