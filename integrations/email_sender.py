@@ -177,6 +177,10 @@ def send_missing_fields_reminder(
         "Your colleague from the Research Team"
     )
 
+    allow = os.getenv("ALLOWLIST_EMAIL_DOMAIN")
+    if allow and not recipient_email.lower().endswith(f"@{allow.lower()}"):
+        log_step("mailer", "reminder_skipped_invalid_domain", {"to": recipient_email}, severity="warning")
+        return
     send_email(to=recipient_email, subject=subject, body=body)
 
 
