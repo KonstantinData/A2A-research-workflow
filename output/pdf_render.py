@@ -50,7 +50,7 @@ def _html_from_data(data: Dict[str, Any]) -> str:
     fields = data.get("fields") or []
     meta = data.get("meta") or {}
     items = "".join(
-        f"<tr>{''.join(f'<td>{(r.get(f) or '')}</td>' for f in fields)}</tr>"
+        "<tr>" + "".join(f"<td>{r.get(f, '')}</td>" for f in fields) + "</tr>"
         for r in rows
     )
     head = "".join(f"<th>{f}</th>" for f in fields)
@@ -60,7 +60,9 @@ def _html_from_data(data: Dict[str, Any]) -> str:
         f"{head}"
         "</tr></thead><tbody>"
         f"{items}"
-        "</tbody></table><pre>{meta}</pre></body></html>"
+        "</tbody></table>"
+        f"<pre>{meta}</pre>"
+        "</body></html>"
     )
 
 
