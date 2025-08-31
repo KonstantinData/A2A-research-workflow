@@ -17,7 +17,7 @@ def test_email_client_delegates_to_email_sender(monkeypatch):
         calls['subject'] = subject
         calls['body'] = body
 
-    monkeypatch.setenv('MAIL_FROM', 'bot@example.com')
+    monkeypatch.setenv('SMTP_FROM', 'bot@example.com')
     monkeypatch.setattr(email_client.email_sender, 'send_email', fake_send)
 
     email_client.send_email('user@example.com', ['name', 'role'])

@@ -17,7 +17,7 @@ See repository README for common variables.
 - `SMTP_PORT`
 - `SMTP_USER`
 - `SMTP_PASS`
-- `MAIL_FROM`
+- `SMTP_FROM`
 - `SMTP_SECURE`
 - `ALLOWLIST_EMAIL_DOMAIN` (optional)
 

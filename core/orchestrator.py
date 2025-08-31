@@ -437,7 +437,11 @@ def main(argv: List[str] | None = None) -> int:
     try:
         run()
     except SystemExit as exc:  # propagate exit code but keep logs
-        return int(exc.code or 0)
+        code = exc.code
+        if isinstance(code, int):
+            return code
+        print(code)
+        return 0
     return 0
 
 

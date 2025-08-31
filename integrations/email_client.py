@@ -13,11 +13,14 @@ from . import email_sender
 
 
 def _mail_from() -> str:
-    """Require MAIL_FROM via environment (set by Actions secrets/variables)."""
+    """Require SMTP_FROM via environment (set by Actions secrets/variables)."""
     try:
-        return os.environ["MAIL_FROM"]
-    except KeyError as e:
-        raise RuntimeError("MAIL_FROM not configured") from e
+        return os.environ["SMTP_FROM"]
+    except KeyError:
+        try:
+            return os.environ["MAIL_FROM"]
+        except KeyError as e:  # pragma: no cover - legacy fallback
+            raise RuntimeError("SMTP_FROM not configured") from e
 
 
 def send_email(
