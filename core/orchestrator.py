@@ -88,7 +88,7 @@ def _event_id_exists(event_id: str) -> bool:
     base = Path("logs") / "workflows"
     if not base.exists():
         return False
-    for path in base.glob("*.jsonl"):
+    for path in base.glob("wf-*.jsonl"):
         try:
             with path.open("r", encoding="utf-8") as fh:
                 for line in fh:
