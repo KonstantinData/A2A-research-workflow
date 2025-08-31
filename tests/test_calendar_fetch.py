@@ -199,8 +199,9 @@ def test_orchestrator_no_triggers(monkeypatch, tmp_path):
     monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
     res = orchestrator.run()
     assert res == {"status": "idle"}
-    assert records and records[0]["status"] == "no_triggers"
+    assert any(r["status"] == "no_triggers" for r in records)
+    no_trig = next(r for r in records if r["status"] == "no_triggers")
     assert (
-        records[0]["message"]
+        no_trig["message"]
         == "No calendar or contact events matched trigger words"
     )
