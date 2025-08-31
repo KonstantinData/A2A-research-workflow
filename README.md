@@ -145,7 +145,7 @@ CRM.
 | `SMTP_PORT` | SMTP server port | `587` |
 | `SMTP_USER` | SMTP username | – |
 | `SMTP_PASS` | SMTP password | – |
-| `MAIL_FROM` | Sender e‑mail address | `SMTP_USER` |
+| `SMTP_FROM` | Sender e‑mail address | `SMTP_USER` |
 | `SMTP_SECURE` | SMTP security mode (`ssl`/`starttls`) | `ssl` |
 | `ALLOWLIST_EMAIL_DOMAIN` | Allow reminder emails only to addresses in this domain | – |
 | `MAIL_TO` | Recipient e‑mail for reports | – |

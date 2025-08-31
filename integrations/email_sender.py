@@ -26,7 +26,7 @@ def _deliver(
     port = int(os.environ.get("SMTP_PORT", 587))
     user = os.environ.get("SMTP_USER")
     password = os.environ.get("SMTP_PASS")
-    mail_from = os.environ.get("MAIL_FROM", user)
+    mail_from = os.environ.get("SMTP_FROM") or os.environ.get("MAIL_FROM", user)
     secure = os.environ.get("SMTP_SECURE", "ssl").lower()
     _send_email(
         host,
