@@ -6,6 +6,8 @@ import os
 import re
 from typing import Any, Dict, List
 
+from core.utils import log_step
+
 try:  # pragma: no cover - optional dependency
     import openai  # type: ignore
 except Exception:  # pragma: no cover - openai may not be installed
@@ -81,6 +83,32 @@ def run(trig: Dict[str, Any]) -> Dict[str, Any]:
         match = re.search(DOMAIN_REGEX, text, re.IGNORECASE)
         if match:
             result["domain"] = match.group(1).lower().rstrip("/")
+
+    if not result.get("company_name"):
+        payload = trig.get("payload") or {}
+        domain = result.get("domain") or payload.get("domain")
+        if not domain:
+            emails: List[str] = []
+            for key in ("creatorEmail", "creator", "email"):
+                val = payload.get(key)
+                if isinstance(val, dict):
+                    val = val.get("email")
+                if val:
+                    emails.append(str(val))
+            for att in payload.get("attendees", []) or []:
+                if isinstance(att, dict) and att.get("email"):
+                    emails.append(att["email"])
+            for mail in emails:
+                if "@" in mail:
+                    domain = mail.split("@", 1)[1].lower()
+                    break
+        if domain:
+            result.setdefault("domain", domain)
+            log_step(
+                "field_completion",
+                "field_completion",
+                {"status": "recovered_from_email", "domain": domain},
+            )
 
     return result
 

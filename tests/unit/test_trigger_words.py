@@ -14,3 +14,17 @@ def test_contains_trigger():
     assert not contains_trigger("no match", words)
     assert contains_trigger(" research ", words)
     assert not contains_trigger("", words)
+
+
+def test_contains_trigger_location():
+    event = {"location": "Raum fuer Besuchsvorbereitung"}
+    assert contains_trigger(event)
+
+
+def test_contains_trigger_attendee_email():
+    event = {"attendees": [{"email": "info@besuchsvorbereitung.de"}]}
+    assert contains_trigger(event)
+
+
+def test_contains_trigger_fuzzy_match():
+    assert contains_trigger("besuchsvorbereitugn")
