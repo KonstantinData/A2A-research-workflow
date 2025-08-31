@@ -129,9 +129,31 @@ def render_pdf(
     out_path = out_dir / "report.pdf"
 
     if not rows:
+        # Render ein Minimal-HTML mit WeasyPrint (wenn vorhanden); nur wenn weder
+        # WeasyPrint noch ReportLab verfügbar sind, auf Text ausweichen.
         reason = (meta or {}).get("reason") if meta else None
-        _write_placeholder_pdf(out_path, reason)
-        return
+        empty = {
+            "fields": ["info"],
+            "rows": [
+                {
+                    "info": f"No data to report. Reason: {reason or 'No valid triggers'}",
+                }
+            ],
+            "meta": meta or {},
+        }
+        html = _html_from_data(empty)
+        try:
+            from weasyprint import HTML  # type: ignore
+
+            HTML(string=html).write_pdf(str(out_path))
+            return
+        except Exception:
+            try:
+                _write_placeholder_pdf(out_path, reason)
+                return
+            except Exception:
+                out_path.write_text(html, encoding="utf-8")
+                return
 
     data = {"rows": rows, "fields": fields, "meta": meta or {}}
     html = _html_from_data(data)
