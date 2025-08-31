@@ -86,9 +86,6 @@ def fetch_events() -> List[Normalized]:
     try:
         if build:
             creds = _creds()
-            if creds is None:
-                raise RuntimeError("missing google oauth env")
-
             service = build(
                 "calendar", "v3", credentials=creds, cache_discovery=False
             )
