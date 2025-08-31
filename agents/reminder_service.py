@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime, time as dtime, timedelta
+from datetime import datetime, time as dtime, timedelta, timezone
 
 import importlib.util as _ilu
 from pathlib import Path
@@ -46,6 +46,35 @@ def log_event(record: dict) -> None:
         elif k == "details" and isinstance(v, dict):
             payload["details"].update(v)
     append_jsonl(path, payload)
+
+
+def task_age_in_days(task: dict) -> int:
+    """Return age of ``task`` in whole days."""
+    created = task.get("created_at")
+    if isinstance(created, str):
+        try:
+            created_dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
+        except Exception:
+            return 0
+    elif isinstance(created, datetime):
+        created_dt = created
+    else:
+        return 0
+    return (datetime.now(timezone.utc) - created_dt).days
+
+
+def maybe_send_reminder(task: dict) -> None:
+    if task.get("status") != "awaiting employee response":
+        return
+    days = task_age_in_days(task)
+    if days == 2:
+        email_sender.send_missing_fields_reminder(
+            task, task["missing_fields"], task["employee_email"], final=False
+        )
+    elif days == 6:
+        email_sender.send_missing_fields_reminder(
+            task, task["missing_fields"], task["employee_email"], final=True
+        )
 
 
 class ReminderScheduler:

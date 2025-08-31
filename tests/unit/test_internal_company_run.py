@@ -5,6 +5,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from agents.internal_company import run as run_module
+from integrations import email_sender
 
 
 def test_run_creates_task_for_missing_creator_and_recipient(monkeypatch):
@@ -23,6 +24,7 @@ def test_run_creates_task_for_missing_creator_and_recipient(monkeypatch):
 
     monkeypatch.setattr(run_module, "INTERNAL_SOURCES", [StubSource()])
     monkeypatch.setattr(run_module, "create_task", fake_create_task)
+    monkeypatch.setattr(email_sender, "request_missing_fields", lambda *a, **k: None)
 
     result = run_module.run(trigger)
 
@@ -48,6 +50,7 @@ def test_run_creates_task_when_summary_missing(monkeypatch):
 
     monkeypatch.setattr(run_module, "INTERNAL_SOURCES", [EmptySource()])
     monkeypatch.setattr(run_module, "create_task", fake_create_task)
+    monkeypatch.setattr(email_sender, "request_missing_fields", lambda *a, **k: None)
 
     result = run_module.run(trigger)
 
