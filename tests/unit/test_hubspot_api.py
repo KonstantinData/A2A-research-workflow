@@ -44,18 +44,17 @@ def test_attach_pdf(monkeypatch, tmp_path):
     def fake_put(url, headers=None, json=None, timeout=10):
         called["put"] = True
         assert "associations" in url
-        return DummyResp({"id": "assoc456"})
+        return DummyResp({})
 
     monkeypatch.setattr(hubspot_api.requests, "post", fake_post)
     monkeypatch.setattr(hubspot_api.requests, "put", fake_put)
     monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "token")
-    monkeypatch.setenv("HUBSPOT_PORTAL_ID", "portal")
 
     pdf = tmp_path / "file.pdf"
     pdf.write_bytes(b"pdf")
     result = hubspot_api.attach_pdf(pdf, "123")
     assert called["post"] and called["put"]
-    assert result == {"file_id": "file123", "association_id": "assoc456"}
+    assert result == {"file_id": "file123"}
 
 
 def test_check_existing_report(monkeypatch):
