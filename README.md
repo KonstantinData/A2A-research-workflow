@@ -28,12 +28,12 @@ flowchart LR
    ```bash
    pip install -r requirements.txt
    ```
-3. Set required environment variables as needed (see `ops/CONFIG.md`).
+3. Set required environment variables as needed. SMTP/IMAP/HubSpot/Google variables are listed in [`.env.example`](.env.example) and documented in [`ops/CONFIG.md`](ops/CONFIG.md).
 4. Adjust trigger words in `config/trigger_words.txt` or point `TRIGGER_WORDS_FILE` to a custom list.
 
 ## LIVE Setup
 
-1. Copy `.env.example` to `.env` and fill in the credentials.
+1. Copy [`.env.example`](.env.example) to `.env` and fill in the credentials (SMTP/IMAP/HubSpot/Google variables see [`ops/CONFIG.md`](ops/CONFIG.md)).
 2. Start the orchestrator with Docker Compose:
    ```bash
    docker compose -f ops/docker-compose.yml up
