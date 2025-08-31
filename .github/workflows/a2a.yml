@@ -87,9 +87,10 @@ jobs:
 
       - name: Run orchestrator (LIVE)
         env:
-          GOOGLE_CLIENT_ID:      ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET:  ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GOOGLE_REFRESH_TOKEN:  ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_CLIENT_ID:      ${{ secrets.GOOGLE_CLIENT_ID || secrets.GOOGLE_CLIENT_ID_V2 || vars.GOOGLE_CLIENT_ID || vars.GOOGLE_CLIENT_ID_V2 }}
+          GOOGLE_CLIENT_SECRET:  ${{ secrets.GOOGLE_CLIENT_SECRET || secrets.GOOGLE_CLIENT_SECRET_V2 || vars.GOOGLE_CLIENT_SECRET || vars.GOOGLE_CLIENT_SECRET_V2 }}
+          GOOGLE_REFRESH_TOKEN:  ${{ secrets.GOOGLE_REFRESH_TOKEN || vars.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_TOKEN_URI:      ${{ secrets.GOOGLE_TOKEN_URI || 'https://oauth2.googleapis.com/token' }}
           HUBSPOT_ACCESS_TOKEN:  ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
           HUBSPOT_PORTAL_ID:     ${{ secrets.HUBSPOT_PORTAL_ID }}
           SMTP_HOST:             ${{ secrets.SMTP_HOST }}
