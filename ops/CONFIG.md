@@ -19,6 +19,7 @@ See repository README for common variables.
 - `SMTP_PASS`
 - `MAIL_FROM`
 - `SMTP_SECURE`
+- `ALLOWLIST_EMAIL_DOMAIN` (optional)
 
 ## Trigger Words
 - `TRIGGER_WORDS_FILE` (defaults to `config/trigger_words.txt`)

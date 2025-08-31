@@ -237,8 +237,9 @@ Thanks a lot for your support!
 "Your Internal Research Agent"
 """
 
-    # Allow reminders only for company domains
-    if not to.lower().endswith("@condata.io"):
+    # Allow reminders only for a configured company domain (optional)
+    allow = os.getenv("ALLOWLIST_EMAIL_DOMAIN")
+    if allow and not to.lower().endswith(f"@{allow.lower()}"):
         log_step(
             "mailer",
             "reminder_skipped_invalid_domain",
