@@ -11,7 +11,7 @@ def test_missing_creds_yields_idle_artifacts(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("OUTPUT_DIR", str(tmp_path / "out"))
     monkeypatch.setenv("A2A_TEST_MODE", "1")
-    monkeypatch.setattr(google_calendar, "_creds", lambda: None)
+    monkeypatch.setattr(google_calendar, "build_user_credentials", lambda scopes: None)
     res = orchestrator.run()
     assert res == {"status": "idle"}
     pdf = Path(tmp_path / "out" / "exports" / "report.pdf")
