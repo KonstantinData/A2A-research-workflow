@@ -8,17 +8,17 @@ See repository README for common variables.
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_REFRESH_TOKEN`
-- `EMAIL_SMTP_HOST` (optional)
-- `EMAIL_SMTP_USER` (optional)
-- `EMAIL_SMTP_PASS` (optional)
+- `SMTP_HOST` (optional)
+- `SMTP_USER` (optional)
+- `SMTP_PASS` (optional)
 
 ## Email
-- `EMAIL_SMTP_HOST`
-- `MAIL_SMTP_PORT`
-- `EMAIL_SMTP_USER`
-- `EMAIL_SMTP_PASS`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASS`
 - `MAIL_FROM`
-- `MAIL_SMTP_SECURE`
+- `SMTP_SECURE`
 
 ## Trigger Words
 - `TRIGGER_WORDS_FILE` (defaults to `config/trigger_words.txt`)
