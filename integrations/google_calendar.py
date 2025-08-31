@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
 from core.utils import log_step
+from .google_oauth import build_user_credentials, which_variant
 
 try:
     from google.oauth2.credentials import Credentials
@@ -14,26 +15,6 @@ try:
 except Exception:
     Credentials = None
     build = None
-
-GOOGLE_TOKEN_URI = os.getenv("GOOGLE_TOKEN_URI", "https://oauth2.googleapis.com/token")
-
-
-def _creds():
-    client_id = os.getenv("GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_ID_V2")
-    client_secret = os.getenv("GOOGLE_CLIENT_SECRET") or os.getenv("GOOGLE_CLIENT_SECRET_V2")
-    refresh_token = os.getenv("GOOGLE_REFRESH_TOKEN")
-    token_uri = os.getenv("GOOGLE_TOKEN_URI", GOOGLE_TOKEN_URI)
-    if not (client_id and client_secret and refresh_token):
-        return None
-    if Credentials is None:
-        return None
-    return Credentials(
-        None,
-        refresh_token=refresh_token,
-        token_uri=token_uri,
-        client_id=client_id,
-        client_secret=client_secret,
-    )
 
 Normalized = Dict[str, Any]
 
@@ -67,6 +48,8 @@ def extract_domain(text: str) -> str | None:
 
 
 # ---------- Hauptfunktion fetch_events ----------
+SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+
 def fetch_events() -> List[Normalized]:
     """Fetch events from Google Calendar API within the configured time window."""
 
@@ -78,42 +61,19 @@ def fetch_events() -> List[Normalized]:
 
     log_step("calendar", "fetch_call", {"time_min": time_min, "time_max": time_max})
 
-    creds = _creds()
-    if not creds:
-        missing = [
-            n
-            for n in [
-                "GOOGLE_CLIENT_ID",
-                "GOOGLE_CLIENT_SECRET",
-                "GOOGLE_REFRESH_TOKEN",
-            ]
-            if not os.getenv(n)
-        ]
-        log_step(
-            "calendar",
-            "credentials_missing",
-            {"missing_env": missing},
-            severity="warning",
-        )
-        log_step("calendar", "raw_api_response", {"response": {}})
-        log_step(
-            "calendar",
-            "fetched_events",
-            {
-                "count": 0,
-                "time_min": time_min,
-                "time_max": time_max,
-                "ids": [],
-                "summaries": [],
-                "creator_emails": [],
-            },
-        )
-        return []
-
     events_result: Dict[str, Any] = {}
     items: List[Dict[str, Any]] = []
     try:
         if build:
+            creds = build_user_credentials(SCOPES)
+            if not creds:
+                log_step(
+                    "calendar",
+                    "missing_google_oauth_env",
+                    {"variant": which_variant()},
+                    severity="error",
+                )
+                return []
             service = build(
                 "calendar", "v3", credentials=creds, cache_discovery=False
             )
