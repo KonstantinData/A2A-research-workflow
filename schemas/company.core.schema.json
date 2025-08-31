@@ -9,8 +9,8 @@
     },
     "domain": {
       "type": "string",
-      "format": "uri",
-      "description": "Die Web‑Domain des Unternehmens."
+      "pattern": "^[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+      "description": "Hostname ohne Protokoll, z. B. 'example.com'."
     },
     "industry_group": {
       "type": "string",
