@@ -204,7 +204,16 @@ def gather_triggers() -> List[Dict[str, Any]]:
                 )
                 continue
             triggers.append(trig)
-        for c in fetch_contacts() or []:
+        try:
+            contacts = fetch_contacts() or []
+        except Exception as e:
+            log_event({
+                "status": "contacts_fetch_failed",
+                "severity": "warning",
+                "error": str(e),
+            })
+            contacts = []
+        for c in contacts:
             t = _as_trigger_from_contact(c)
             if t:
                 triggers.append(t)
