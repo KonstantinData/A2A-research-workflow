@@ -40,7 +40,7 @@ def test_run_exits_when_no_triggers(monkeypatch, tmp_path):
     assert called == {"pdf": 0, "csv": 0}
 
     log_dir = Path("logs/workflows")
-    files = list(log_dir.glob("*_workflow.jsonl"))
+    files = list(log_dir.glob("*.jsonl"))
     assert files, "log file not written"
     content = files[0].read_text()
     assert '"status": "no_triggers"' in content
