@@ -177,7 +177,8 @@ def gather_triggers() -> List[Dict[str, Any]]:
             })
 
         if not events or not any(e.get("event_id") for e in events):
-            raise SystemExit("No real calendar events detected – aborting run")
+            log_event({"status": "no_calendar_events", "severity": "warning"})
+            events = []
 
         log_step("calendar", "fetch_return", {"count": len(events)})
 
