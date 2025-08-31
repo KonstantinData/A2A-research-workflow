@@ -39,6 +39,7 @@ def test_run_exits_when_no_triggers(monkeypatch, tmp_path):
 def test_run_processes_with_triggers(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
+    monkeypatch.setenv("A2A_TEST_MODE", "1")
 
     called = {"pdf": 0, "csv": 0}
 

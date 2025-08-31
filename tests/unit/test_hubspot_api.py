@@ -170,6 +170,7 @@ def _run_no_upload(monkeypatch, tmp_path, upsert_return, pdf_write):
     monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "tok")
     monkeypatch.setenv("HUBSPOT_PORTAL_ID", "portal")
     monkeypatch.setenv("OUTPUT_DIR", str(tmp_path))
+    monkeypatch.setenv("A2A_TEST_MODE", "1")
     monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
 
     called = {"attach": 0}
