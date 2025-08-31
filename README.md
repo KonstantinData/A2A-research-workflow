@@ -31,6 +31,28 @@ flowchart LR
 3. Set required environment variables as needed (see `ops/CONFIG.md`).
 4. Adjust trigger words in `config/trigger_words.txt` or point `TRIGGER_WORDS_FILE` to a custom list.
 
+## LIVE Setup
+
+1. Copy `.env.example` to `.env` and fill in the credentials.
+2. Start the orchestrator with Docker Compose:
+   ```bash
+   docker compose -f ops/docker-compose.yml up
+   ```
+3. For scheduled runs via GitHub Actions, define repository secrets:
+   - `GOOGLE_CLIENT_ID`
+   - `GOOGLE_CLIENT_SECRET`
+   - `GOOGLE_REFRESH_TOKEN`
+   - `HUBSPOT_ACCESS_TOKEN`
+   - `HUBSPOT_PORTAL_ID`
+   - `SMTP_HOST`
+   - `SMTP_PORT`
+   - `SMTP_USER`
+   - `SMTP_PASS`
+   - `SMTP_SECURE`
+   - `SMTP_FROM`
+
+PDF generation relies on WeasyPrint system libraries, installed by the Dockerfile and the CI workflow.
+
 ## Workflow Description
 
 1. Poll Google Calendar and Contacts for new entries containing trigger words.
