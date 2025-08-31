@@ -302,6 +302,16 @@ def run(
 
     if not triggers:
         log_event({
+            "status": "no_triggers_diagnostics",
+            "details": {
+                "window": {
+                    "back_min": int(os.getenv("CALENDAR_MINUTES_BACK", "1440")),
+                    "fwd_min": int(os.getenv("CALENDAR_MINUTES_FWD", "10080")),
+                }
+            },
+            "severity": "info",
+        })
+        log_event({
             "status": "no_triggers",
             "message": "No calendar or contact events matched trigger words"
         })
