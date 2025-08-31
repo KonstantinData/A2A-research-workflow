@@ -56,8 +56,8 @@ def log_event(record: Dict[str, Any]) -> None:
     structure remains consistent across services.
     """
 
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
-    path = Path("logs") / "workflows" / f"{ts}_workflow.jsonl"
+    wf = get_workflow_id()
+    path = Path("logs") / "workflows" / f"{wf}.jsonl"
 
     base: Dict[str, Any] = {
         "event_id": record.get("event_id"),
@@ -88,7 +88,7 @@ def _event_id_exists(event_id: str) -> bool:
     base = Path("logs") / "workflows"
     if not base.exists():
         return False
-    for path in base.glob("*_workflow.jsonl"):
+    for path in base.glob("*.jsonl"):
         try:
             with path.open("r", encoding="utf-8") as fh:
                 for line in fh:
