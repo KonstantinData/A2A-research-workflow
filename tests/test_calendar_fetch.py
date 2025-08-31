@@ -49,6 +49,9 @@ def _setup_service(monkeypatch, items):
     svc = _StubService(items, rec)
     monkeypatch.setattr(google_calendar, "build", lambda *a, **k: svc)
     monkeypatch.setattr(google_calendar, "Credentials", lambda *a, **k: object())
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "id")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "secret")
+    monkeypatch.setenv("GOOGLE_REFRESH_TOKEN", "token")
     return rec
 
 
