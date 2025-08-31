@@ -1,6 +1,7 @@
 Hello,
 
-Please find the attached report and data.
+Please find the attached report (PDF) and data (CSV).
+If anything looks off, just reply to this email.
 
 Thanks,
 A2A Bot
