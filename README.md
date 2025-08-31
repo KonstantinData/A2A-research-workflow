@@ -2,7 +2,7 @@
 
 Automated Agent-to-Agent (A2A) research workflow for company data enrichment, HubSpot integration, and standardized PDF/CSV reporting using Python and GitHub Actions.
 
-No external cloud services are required; the job runs entirely within GitHub Actions.
+The workflow operates exclusively in live mode and requires valid credentials for Google Calendar, Google Contacts, HubSpot, and an SMTP server.
 
 ## Project Overview
 
@@ -137,14 +137,6 @@ Only the core section is used to produce the PDF/CSV reports.  The
 `hubspot` section is consumed by `upsert_company()` to feed the HubSpot
 CRM.
 
-## Example Run
-
-```bash
-python -m core.orchestrator
-```
-
-This will poll Google services for triggers and send notification e‑mails (stubbed in tests). Outputs are written to `output/exports`.
-
 ## Environment Variables
 
 | Variable | Description | Default |
@@ -178,7 +170,7 @@ Key directories:
 - `agents/` – individual research agents.
 - `core/` – orchestration, classification, consolidation, and feature flags.
 - `integrations/` – external service clients (HubSpot, Google, email) and templates.
-- `output/` – PDF and CSV rendering utilities and sample exports.
+- `output/` – PDF and CSV rendering utilities.
 - `schemas/` – JSON schema definitions.
 - `compliance/` – GDPR helpers.
 - `logging/` – logging utilities and error definitions.

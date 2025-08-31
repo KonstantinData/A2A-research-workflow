@@ -47,9 +47,6 @@ _spec.loader.exec_module(_mod)
 append_jsonl = _mod.append
 
 
-_DEMO_EVENT_ID = "e" + "1"
-
-
 # --------- kleine Logging-Helfer, von Tests gepatcht ---------
 def log_event(record: Dict[str, Any]) -> None:
     """Append ``record`` to a JSONL workflow log file using a common template.
@@ -175,17 +172,7 @@ def gather_triggers() -> List[Dict[str, Any]]:
         if not events or not any(e.get("event_id") for e in events):
             raise SystemExit("No real calendar events detected – aborting run")
 
-        if any(ev.get("event_id") == _DEMO_EVENT_ID for ev in events):
-            if not (os.getenv("DEMO_MODE") == "1" or os.getenv("A2A_DEMO") == "1"):
-                raise SystemExit("Demo event detected in non-demo mode – aborting run")
-
         log_step("calendar", "fetch_return", {"count": len(events)})
-
-        if os.getenv("A2A_DEMO") == "1" or os.getenv("DEMO_MODE") == "1":
-            from core.demo_mode import demo_events
-
-            events = list(events or [])
-            events.extend(demo_events())
 
         for ev in events or []:
             t = _as_trigger_from_event(ev)

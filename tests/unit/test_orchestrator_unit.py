@@ -49,8 +49,6 @@ def test_gather_triggers_skips_events_without_trigger(monkeypatch):
 
 
 def test_gather_triggers_logs_fetch(monkeypatch):
-    monkeypatch.delenv("A2A_DEMO", raising=False)
-    monkeypatch.delenv("DEMO_MODE", raising=False)
     def fake_fetch():
         orchestrator.log_step("calendar", "fetch_call", {})
         orchestrator.log_step("calendar", "raw_api_response", {"response": {}})
@@ -81,35 +79,6 @@ def test_gather_triggers_logs_fetch(monkeypatch):
     orchestrator.gather_triggers()
     statuses = [l["status"] for l in logs]
     assert {"fetch_call", "raw_api_response", "fetched_events", "fetch_return"} <= set(statuses)
-
-
-def test_gather_triggers_demo_mode(monkeypatch):
-    monkeypatch.setenv("A2A_DEMO", "1")
-    called = {"fetch": 0}
-
-    def fake_fetch():
-        called["fetch"] += 1
-        orchestrator.log_step("calendar", "fetch_call", {})
-        orchestrator.log_step("calendar", "raw_api_response", {"response": {}})
-        orchestrator.log_step(
-            "calendar",
-            "fetched_events",
-            {
-                "count": 1,
-                "time_min": "t0",
-                "time_max": "t1",
-                "ids": ["real"],
-                "summaries": [""],
-                "creator_emails": [""],
-            },
-        )
-        return [{"event_id": "real"}]
-
-    monkeypatch.setattr(orchestrator, "fetch_events", fake_fetch)
-    monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
-    triggers = orchestrator.gather_triggers()
-    assert called["fetch"] == 1
-    assert any(t["payload"].get("event_id") == "e1" for t in triggers)
 
 def test_run_pipeline_respects_feature_flags(monkeypatch):
     monkeypatch.setattr(feature_flags, "USE_PUSH_TRIGGERS", False)

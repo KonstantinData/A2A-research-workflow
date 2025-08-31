@@ -104,12 +104,14 @@ def finalize_summary() -> None:
         except Exception:
             calendar_logs = []
 
-    if not any(
+    if SUMMARY.get("events_detected") or SUMMARY.get("reports_generated"):
+        payload["run_mode"] = "live_run"
+    elif any(
         e.get("status") in ("fetch_call", "fetched_events") for e in calendar_logs
     ):
-        payload["run_mode"] = "reminder_only"
-    else:
         payload["run_mode"] = "calendar_fetch"
+    else:
+        payload["run_mode"] = "reminder_only"
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")

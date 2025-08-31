@@ -1,4 +1,0 @@
-{"status": "pending", "creator": "carol@example.com", "timestamp": "2025-08-28T14:58:53Z", "severity": "info", "workflow_id": "wf-20250828-145852-0ba914"}
-{"status": "report_uploaded", "timestamp": "2025-08-28T14:58:53Z", "severity": "info", "workflow_id": "wf-20250828-145852-0ba914"}
-{"status": "report_sent", "timestamp": "2025-08-28T14:58:53Z", "severity": "info", "workflow_id": "wf-20250828-145852-0ba914"}
-{"status": "no_triggers", "message": "No calendar or contact events matched trigger words", "timestamp": "2025-08-28T14:58:53Z", "severity": "info", "workflow_id": "wf-20250828-145852-0ba914"}
