@@ -27,7 +27,7 @@ import logging
 # Determine database location.  ``TASKS_DB_URL`` is expected to contain a
 # ``sqlite:///`` style URL while ``TASKS_DB_PATH`` points directly to a file.  We
 # normalise both to a simple ``Path`` for ``sqlite3``.
-DEFAULT_DB_PATH = Path(__file__).with_name('tasks.db')
+DEFAULT_DB_PATH = Path(os.getenv("TASKS_DB_PATH", Path.cwd() / "data" / "tasks.db"))
 _db_url = os.getenv('TASKS_DB_URL')
 if _db_url:
     DB_PATH = Path(_db_url.replace('sqlite:///', '', 1))
@@ -49,6 +49,7 @@ def _log_action(action: str, task: Dict[str, Any]) -> None:
 
 
 def _connect() -> sqlite3.Connection:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute(
