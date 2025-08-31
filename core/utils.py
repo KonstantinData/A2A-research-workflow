@@ -22,6 +22,12 @@ import importlib.util as _ilu
 import glob
 import shutil
 
+try:  # pragma: no cover - optional dependency
+    from integrations.google_oauth import which_variant as _which_variant
+except Exception:  # pragma: no cover
+    def _which_variant() -> str:
+        return "unknown"
+
 _JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
 _spec = _ilu.spec_from_file_location("jsonl_sink", _JSONL_PATH)
 _mod = _ilu.module_from_spec(_spec)
@@ -75,8 +81,9 @@ def log_step(source: str, stage: str, data: Dict[str, Any], *, severity: str = "
         "trigger_source": source,
         "status": stage,
         "severity": severity,
-        **data,
+        "variant": _which_variant(),
     }
+    payload.update(data)
     try:
         append_jsonl(Path("logs") / "workflows" / f"{source}.jsonl", payload)
     except Exception as e:  # pragma: no cover - logging shouldn't break tests
