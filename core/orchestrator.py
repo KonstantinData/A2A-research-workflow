@@ -15,6 +15,7 @@ from core.utils import (
     log_step,
     finalize_summary,
     get_workflow_id,
+    bundle_logs_into_exports,
 )  # noqa: F401  # required_fields/optional_fields imported for completeness
 from integrations.google_calendar import fetch_events
 from integrations.google_contacts import fetch_contacts
@@ -281,6 +282,7 @@ def run(
             }
         )
         finalize_summary()
+        bundle_logs_into_exports()
         raise SystemExit(0)
 
     if researchers is None:
@@ -332,12 +334,14 @@ def run(
             if (datetime.now(timezone.utc) - created).days < 7:
                 log_event({"event_id": first_id, "status": "report_skipped"})
                 finalize_summary()
+                bundle_logs_into_exports()
                 return consolidated
         except Exception:
             pass
 
     if duplicate_checker and duplicate_checker(consolidated, existing):
         finalize_summary()
+        bundle_logs_into_exports()
         return consolidated
 
     out_dir = Path(os.getenv("OUTPUT_DIR", "output")) / "exports"
@@ -361,6 +365,7 @@ def run(
             severity="critical",
         )
         finalize_summary()
+        bundle_logs_into_exports()
         raise
 
     if company_id is None and hubspot_upsert:
@@ -418,6 +423,7 @@ def run(
         )
 
     finalize_summary()
+    bundle_logs_into_exports()
     return consolidated
 
 

@@ -19,6 +19,8 @@ from logging import getLogger
 from pathlib import Path
 from typing import Any, Dict, List
 import importlib.util as _ilu
+import glob
+import shutil
 
 _JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
 _spec = _ilu.spec_from_file_location("jsonl_sink", _JSONL_PATH)
@@ -192,3 +194,24 @@ def already_processed(item_id: str, updated: str, logfile) -> bool:
 def mark_processed(item_id: str, updated: str, logfile) -> None:
     """Record ``item_id`` with ``updated`` in ``logfile``."""
     append_jsonl(Path(logfile), {"id": item_id, "updated": updated})
+
+
+def bundle_logs_into_exports() -> None:
+    """Copy workflow logs into the ``output/exports`` directory.
+
+    The orchestrator bundles the logs alongside the generated reports so that
+    debugging information is always available with the exported artefacts.  Any
+    missing source directory is ignored to keep the helper safe in test
+    environments.
+    """
+
+    src = Path("logs/workflows")
+    dst = Path("output/exports/run_logs")
+    dst.mkdir(parents=True, exist_ok=True)
+    if not src.exists():
+        return
+    for p in glob.glob(str(src / "*")):
+        try:
+            shutil.copy2(p, dst / Path(p).name)
+        except Exception:
+            continue
