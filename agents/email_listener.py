@@ -22,6 +22,7 @@ from typing import Dict, Any
 from datetime import datetime
 import json
 import time
+import re
 
 from core import tasks as tasks_db
 from integrations import email_reader
@@ -102,6 +103,42 @@ def parse_email(raw_email: str) -> Dict[str, str]:
     return data
 
 
+def extract_task_id(subject: str, body: str) -> str:
+    """Extract task identifier from ``subject`` or ``body``."""
+    match = re.search(r"Task ID[:\s]*([\w-]+)", subject, re.IGNORECASE)
+    if match:
+        return match.group(1)
+    match = re.search(r"Task ID[:\s]*([\w-]+)", body, re.IGNORECASE)
+    if match:
+        return match.group(1)
+    return ""
+
+
+def parse_missing_fields_from_body(body: str) -> Dict[str, str]:
+    """Parse key-value pairs from e-mail ``body``."""
+    data: Dict[str, str] = {}
+    for line in body.splitlines():
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        data[key.strip().lower()] = value.strip()
+    return data
+
+
+def update_task(task_id: str, provided_data: Dict[str, str]) -> Dict[str, Any] | None:
+    """Update task record with ``provided_data`` and mark as completed."""
+    if not task_id:
+        return None
+    now = datetime.utcnow().isoformat()
+    with tasks_db._connect() as conn:
+        conn.execute(
+            "UPDATE tasks SET missing_fields = ?, status = ?, updated_at = ? WHERE id = ?",
+            (json.dumps(provided_data), "completed", now, task_id),
+        )
+        conn.commit()
+    return tasks_db.get_task(task_id)
+
+
 # ---------------------------------------------------------------------------
 # Processing
 # ---------------------------------------------------------------------------
@@ -113,13 +150,30 @@ def process_email(raw_email: str) -> Dict[str, Any]:
     ``data`` from the email and an optional ``result`` if a new research run was
     triggered.
     """
+    msg = message_from_string(raw_email)
+    subject = msg.get("subject", "")
+    body = _get_body(msg)
+
+    if "Task ID" in body or "missing details" in subject.lower():
+        task_id = extract_task_id(subject, body)
+        provided_data = parse_missing_fields_from_body(body)
+        task = update_task(task_id, provided_data)
+        result = None
+        if task and task.get("trigger") == "internal_company_research":
+            from agents.internal_company import run as internal_company_run
+
+            try:
+                result = internal_company_run(provided_data)
+            except Exception:
+                result = None
+        return {"task": task, "data": provided_data, "result": result}
+
     parsed = parse_email(raw_email)
     task_id = parsed.pop("task_id", None)
     if not task_id:
         return {"error": "task_id not found"}
 
     now = datetime.utcnow().isoformat()
-    # Update task record with provided data
     with tasks_db._connect() as conn:
         conn.execute(
             "UPDATE tasks SET missing_fields = ?, updated_at = ? WHERE id = ?",
@@ -131,13 +185,11 @@ def process_email(raw_email: str) -> Dict[str, Any]:
 
     result = None
     if task and task.get("trigger") == "internal_company_research":
-        # Lazy import to avoid heavy dependencies unless necessary
         from agents.internal_company import run as internal_company_run
 
         try:
             result = internal_company_run(parsed)
         except Exception:
-            # If renewed research fails we still return the task info
             result = None
 
     return {"task": task, "data": parsed, "result": result}

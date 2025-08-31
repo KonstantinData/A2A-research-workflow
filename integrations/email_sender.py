@@ -122,6 +122,64 @@ def send_email(
         raise last_exc
 
 
+def request_missing_fields(task: dict, missing_fields: list[str], recipient_email: str) -> None:
+    """
+    Send a collegial email to the event/contact creator asking for missing details.
+    The colleague can simply reply to this email with the information.
+    Updating the calendar entry is optional.
+    """
+    if not recipient_email:
+        return
+
+    subject = "Could you provide a few missing details for our research request?"
+
+    body = (
+        f"Hello,\n\n"
+        f"We are working on your request (Task ID: {task.get('id')}). "
+        f"Some details are still missing:\n"
+        + "".join(f"- {field}\n" for field in missing_fields)
+        + (
+            "\nIt would be very helpful if you could simply reply to this email with the missing details. "
+            "If you prefer, you may also update the calendar entry, but that’s optional.\n\n"
+            "Thanks a lot for your support!\n\n"
+            "Best regards,\n"
+            "Your colleague from the Research Team"
+        )
+    )
+
+    send_email(to=recipient_email, subject=subject, body=body)
+
+
+def send_missing_fields_reminder(
+    task: dict, missing_fields: list[str], recipient_email: str, final: bool = False
+) -> None:
+    """Send a friendly reminder if missing fields are still not provided."""
+    if not recipient_email or not missing_fields:
+        return
+
+    subject = (
+        f"Final reminder: details needed to complete your request (Task ID: {task.get('id')})"
+        if final
+        else f"Quick check-in on the missing details (Task ID: {task.get('id')})"
+    )
+
+    missing_fmt = "".join(f"- {f}\n" for f in missing_fields)
+    body = (
+        "Hello,\n\n"
+        f"{'This is a friendly final reminder' if final else 'Just a quick check-in'} regarding your request "
+        f"(Task ID: {task.get('id')}).\n"
+        "We’re still missing the following details:\n"
+        f"{missing_fmt}\n"
+        "You can simply reply to this email with the information.\n"
+        "Updating the calendar entry is optional.\n\n"
+        "Thanks a lot for your help!\n\n"
+        "Best regards,\n"
+        "Your colleague from the Research Team"
+    )
+
+    send_email(to=recipient_email, subject=subject, body=body)
+
+
 def send_reminder(
     *,
     to: str,

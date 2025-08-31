@@ -23,7 +23,6 @@ from core.trigger_words import contains_trigger
 # Expose integrations so tests can monkeypatch them
 from integrations import email_sender as email_sender  # noqa: F401
 from integrations import email_reader as email_reader  # noqa: F401
-from core import tasks
 
 # Research agents
 from agents import (
@@ -307,27 +306,7 @@ def run(
                 if not missing:
                     log_event({"event_id": event_id, "status": "enriched_by_ai"})
             if missing:
-                creator = trig.get("creator") or trig.get("recipient") or ""
-                task = tasks.create_task(str(event_id), missing, creator)
-                payload["task_id"] = task["id"]
-                subject = f"[Research Agent] Missing Information – Event {event_id} – Task {task['id']}"
-                miss_lines = "\n".join(missing)
-                body = (
-                    "Hello,\n\n" "the Research Agent is missing some required information:\n"
-                    f"{miss_lines}\n\nPlease reply with the missing fields.\nEvent-ID: {event_id}"
-                )
-                try:
-                    email_sender.send_email(
-                        to=creator,
-                        subject=subject,
-                        body=body,
-                        task_id=task["id"],
-                    )
-                except Exception:
-                    pass
-                log_event({"event_id": event_id, "status": "email_requested"})
-                log_event({"event_id": event_id, "status": "pending_email_reply"})
-                continue
+                log_event({"event_id": event_id, "status": "missing_fields_pending", "missing": missing})
         if researchers:
             log_event({"event_id": event_id, "status": "pending", "creator": trig.get("creator")})
         trig_results: List[Dict[str, Any]] = []

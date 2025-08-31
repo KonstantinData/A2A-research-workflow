@@ -35,6 +35,8 @@ def run(trigger: Normalized) -> Normalized:
         missing_fields = list(_parse_missing_fields(str(exc)))
         employee_email = _extract_email(trigger.get("recipient"))
         task = create_task("internal_company_research", missing_fields, employee_email)
+        from integrations import email_sender
+        email_sender.request_missing_fields(task, missing_fields, employee_email)
         final_result = {
             "source": result["source"],
             "creator": result.get("creator"),
