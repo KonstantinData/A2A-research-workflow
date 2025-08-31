@@ -6,6 +6,7 @@ import imaplib
 import os
 import re
 import time
+import logging
 from email.header import decode_header
 from pathlib import Path
 from typing import Any, Dict, List
@@ -21,6 +22,8 @@ _spec.loader.exec_module(_mod)
 append_jsonl = _mod.append
 
 _REPLY_LOG = Path("logs") / "workflows" / "replies.jsonl"
+
+logger = logging.getLogger(__name__)
 
 
 def _decode(value: str) -> str:
@@ -42,7 +45,12 @@ def fetch_replies() -> List[Dict[str, Any]]:
     pwd = os.getenv("IMAP_PASS")
     folder = os.getenv("IMAP_FOLDER", "INBOX")
     if not all([host, user, pwd]):
-        raise RuntimeError("IMAP credentials not configured")
+        logger.info("IMAP credentials not configured; skipping fetch")
+        append_jsonl(
+            _REPLY_LOG,
+            {"status": "imap_not_configured", "severity": "info"},
+        )
+        return []
 
     results: List[Dict[str, Any]] = []
     imap = imaplib.IMAP4_SSL(host, port)
