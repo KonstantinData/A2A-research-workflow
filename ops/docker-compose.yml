@@ -2,4 +2,13 @@ version: '3'
 services:
   app:
     build: .
-    command: python core/orchestrator.py
+    environment:
+      - OUTPUT_DIR=/app/output
+      - TASKS_DB_URL=sqlite:///app/data/tasks.db
+    env_file:
+      - .env
+    volumes:
+      - ./output:/app/output
+      - ./logs:/app/logs
+      - ./data:/app/data
+    command: python -m core.orchestrator
