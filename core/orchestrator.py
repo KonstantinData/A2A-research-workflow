@@ -498,9 +498,8 @@ def main(argv: List[str] | None = None) -> int:
     finally:
         try:
             finalize_summary(); bundle_logs_into_exports()
-        except Exception:
-            pass
-        log_event({"status": "workflow_completed"})
+        finally:
+            log_event({"status": "workflow_completed"})
     return 0
 
 
