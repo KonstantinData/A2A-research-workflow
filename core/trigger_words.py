@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 TRIGGERS: List[str] = [
     "research",
     "meeting preparation",
+    "meeting vorbereitung",
     "business customer",
     "recherche",
     "meeting-vorbereitung",
