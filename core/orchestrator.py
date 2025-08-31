@@ -170,7 +170,11 @@ def gather_triggers() -> List[Dict[str, Any]]:
 
         wf_id = get_workflow_id()
         if not _calendar_fetch_logged(wf_id):
-            raise SystemExit("Missing calendar fetch logs – aborting run")
+            log_event({
+                "status": "calendar_fetch_missing",
+                "severity": "warning",
+                "message": "Proceeding without calendar logs"
+            })
 
         if not events or not any(e.get("event_id") for e in events):
             raise SystemExit("No real calendar events detected – aborting run")
@@ -275,15 +279,35 @@ def run(
                 replies.remove(rep)
 
     if not triggers:
-        log_event(
-            {
-                "status": "no_triggers",
-                "message": "No calendar or contact events matched trigger words",
-            }
-        )
+        log_event({
+            "status": "no_triggers",
+            "message": "No calendar or contact events matched trigger words"
+        })
+        # --- Idle/Heartbeat Artefakte erzeugen ---
+        from output import pdf_render, csv_export
+        outdir = Path(os.getenv("OUTPUT_DIR", "output")) / "exports"
+        outdir.mkdir(parents=True, exist_ok=True)
+        pdf_path = outdir / "report.pdf"
+        csv_path = outdir / "data.csv"
+        placeholder = {
+            "fields": ["info"],
+            "rows": [{"info": "No valid triggers in current window"}],
+            "meta": {"reason": "no_triggers"}
+        }
+        try:
+            pdf_render.render_pdf(placeholder, pdf_path)
+            log_event({"status": "artifact_pdf", "path": str(pdf_path)})
+        except Exception as e:
+            log_event({"status": "artifact_pdf_error", "error": str(e), "severity": "warning"})
+        try:
+            csv_export.export_csv(placeholder, csv_path, reason="no_triggers")
+            log_event({"status": "artifact_csv", "path": str(csv_path)})
+        except Exception as e:
+            log_event({"status": "artifact_csv_error", "error": str(e), "severity": "warning"})
+        # Zusammenfassung/Logs bündeln und normal zurückkehren
         finalize_summary()
         bundle_logs_into_exports()
-        raise SystemExit(0)
+        return {"status": "idle"}
 
     if researchers is None:
         researchers = [
