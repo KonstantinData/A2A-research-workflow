@@ -16,22 +16,23 @@ except Exception:
     build = None
 
 GOOGLE_TOKEN_URI = os.getenv("GOOGLE_TOKEN_URI", "https://oauth2.googleapis.com/token")
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_ID_V2")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET") or os.getenv("GOOGLE_CLIENT_SECRET_V2")
-GOOGLE_REFRESH_TOKEN = os.getenv("GOOGLE_REFRESH_TOKEN")
 
 
 def _creds():
-    if not (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET and GOOGLE_REFRESH_TOKEN):
+    client_id = os.getenv("GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_ID_V2")
+    client_secret = os.getenv("GOOGLE_CLIENT_SECRET") or os.getenv("GOOGLE_CLIENT_SECRET_V2")
+    refresh_token = os.getenv("GOOGLE_REFRESH_TOKEN")
+    token_uri = os.getenv("GOOGLE_TOKEN_URI", GOOGLE_TOKEN_URI)
+    if not (client_id and client_secret and refresh_token):
         return None
     if Credentials is None:
         return None
     return Credentials(
         None,
-        refresh_token=GOOGLE_REFRESH_TOKEN,
-        token_uri=GOOGLE_TOKEN_URI,
-        client_id=GOOGLE_CLIENT_ID,
-        client_secret=GOOGLE_CLIENT_SECRET,
+        refresh_token=refresh_token,
+        token_uri=token_uri,
+        client_id=client_id,
+        client_secret=client_secret,
     )
 
 Normalized = Dict[str, Any]
@@ -75,17 +76,44 @@ def fetch_events() -> List[Normalized]:
     time_min = (now - timedelta(minutes=minutes_back)).isoformat()
     time_max = (now + timedelta(minutes=minutes_fwd)).isoformat()
 
-    log_step(
-        "calendar",
-        "fetch_call",
-        {"time_min": time_min, "time_max": time_max},
-    )
+    log_step("calendar", "fetch_call", {"time_min": time_min, "time_max": time_max})
+
+    creds = _creds()
+    if not creds:
+        missing = [
+            n
+            for n in [
+                "GOOGLE_CLIENT_ID",
+                "GOOGLE_CLIENT_SECRET",
+                "GOOGLE_REFRESH_TOKEN",
+            ]
+            if not os.getenv(n)
+        ]
+        log_step(
+            "calendar",
+            "credentials_missing",
+            {"missing_env": missing},
+            severity="warning",
+        )
+        log_step("calendar", "raw_api_response", {"response": {}})
+        log_step(
+            "calendar",
+            "fetched_events",
+            {
+                "count": 0,
+                "time_min": time_min,
+                "time_max": time_max,
+                "ids": [],
+                "summaries": [],
+                "creator_emails": [],
+            },
+        )
+        return []
 
     events_result: Dict[str, Any] = {}
     items: List[Dict[str, Any]] = []
     try:
         if build:
-            creds = _creds()
             service = build(
                 "calendar", "v3", credentials=creds, cache_discovery=False
             )
