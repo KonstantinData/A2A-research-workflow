@@ -362,6 +362,7 @@ def run(
         results.extend(trig_results)
 
     consolidated = consolidate_fn(results) if consolidate_fn else {}
+    log_event({"status": "consolidated", "count": len(results)})
 
     first_id = (triggers or [{}])[0].get("payload", {}).get("event_id")
     existing = hubspot_check_existing(company_id) if hubspot_check_existing else None
