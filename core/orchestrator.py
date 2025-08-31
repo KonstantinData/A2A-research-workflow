@@ -131,8 +131,8 @@ def _calendar_fetch_logged(wf_id: str) -> bool:
 
 # --------- Trigger-Gathering für Kalender + Kontakte ----------
 def _as_trigger_from_event(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    text = (ev.get("summary") or "") + " " + (ev.get("description") or "")
-    if not contains_trigger(text):
+    # prüft summary, description, location, attendees[].email usw.
+    if not contains_trigger(ev):
         return None
 
     return {
