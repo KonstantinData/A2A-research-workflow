@@ -196,6 +196,8 @@ def run_full_workflow(
         # Log final status via orchestrator's logger for consistency
         try:
             _orchestrator.log_event({"status": "workflow_completed", "creator": trig.get("creator")})
+            _orchestrator.log_event({"status": "artifact_pdf", "path": str(pdf_path)})
+            _orchestrator.log_event({"status": "artifact_csv", "path": str(csv_path)})
         except Exception:
             pass
         completed.append(consolidated)
