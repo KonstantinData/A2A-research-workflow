@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+from difflib import SequenceMatcher
 from functools import lru_cache
 from typing import Iterable, List, Optional
 
@@ -57,8 +58,9 @@ def load_trigger_words() -> List[str]:
     return TRIGGERS
 
 
+
 def _levenshtein_leq1(a: str, b: str) -> bool:
-    """Return ``True`` if the Levenshtein distance between ``a`` and ``b`` is ≤ 1."""
+    """Return True if Levenshtein distance between ``a`` and ``b`` is ≤ 1."""
     if a == b:
         return True
     if abs(len(a) - len(b)) > 1:
@@ -72,7 +74,6 @@ def _levenshtein_leq1(a: str, b: str) -> bool:
             if j == i + 1 and a[i] == b[j] and a[j] == b[i]:
                 return True  # single transposition
         return False
-    # handle insert/delete
     if len(a) < len(b):
         short, long = a, b
     else:
@@ -91,42 +92,57 @@ def _levenshtein_leq1(a: str, b: str) -> bool:
     return True
 
 
+def _fuzzy_match(word: str, trigger: str) -> bool:
+    """Return True if word and trigger are sufficiently similar (ratio ≥ 0.9)."""
+    ratio = SequenceMatcher(None, word, trigger).ratio()
+    return ratio >= 0.9
+
+
+def _hybrid_match(word: str, trigger: str) -> bool:
+    """Use strict Levenshtein ≤1 first, then SequenceMatcher ≥0.9 as fallback."""
+    return _levenshtein_leq1(word, trigger) or _fuzzy_match(word, trigger)
+
+
 def contains_trigger(
-    text: str | dict, triggers: Optional[Iterable[str]] = None, *, fuzzy: bool = True
+    text: str | dict, triggers: Optional[Iterable[str]] = None
 ) -> bool:
     """Return ``True`` when any trigger word is contained in ``text``.
 
-    ``text`` may be a raw string or a dictionary representing a calendar event.
-    The function normalises relevant fields and performs a token based
-    comparison.  Optionally a fuzzy check (Levenshtein distance ≤ 1) can be
-    applied to catch common typos.
+    The function accepts either a raw string or a dictionary representing an
+    event. When an event dictionary is provided the ``summary``, ``description``,
+    ``location`` and ``attendees[].email`` fields are inspected. Both exact
+    word-boundary matches and fuzzy matches (typos within ~1 edit) are
+    supported.
     """
     if not text:
         return False
 
     if isinstance(text, dict):
-        fields = [
-            text.get("summary", ""),
-            text.get("description", ""),
-            text.get("location", ""),
+        parts = [
+            text.get("summary") or "",
+            text.get("description") or "",
+            text.get("location") or "",
         ]
-        for att in text.get("attendees", []) or []:
-            if isinstance(att, dict):
-                fields.append(att.get("email", ""))
-        norm = " ".join(_normalize_text(f or "") for f in fields if f)
+        attendee_emails = [
+            a.get("email", "")
+            for a in text.get("attendees", [])
+            if isinstance(a, dict)
+        ]
+        parts.extend(attendee_emails)
+        norm = " ".join(normalize_text(p) for p in parts if p)
     else:
-        norm = _normalize_text(text)
+        norm = normalize_text(text)
 
-    tokens = re.findall(r"\b\w+\b", norm)
+    words = re.findall(r"\b\w+\b", norm)
+
     for trig in triggers or load_trigger_words():
-        trig_norm = _normalize_text(trig)
-        pattern = rf"\b{re.escape(trig_norm)}\b"
-        if re.search(pattern, norm):
+        norm_trig = normalize_text(trig)
+        if re.search(rf"\b{re.escape(norm_trig)}\b", norm):
             return True
-        if fuzzy and " " not in trig_norm:
-            for token in tokens:
-                if _levenshtein_leq1(token, trig_norm):
-                    return True
+        for w in words:
+            if _hybrid_match(w, norm_trig):
+                return True
+
     return False
 
 
