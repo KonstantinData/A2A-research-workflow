@@ -18,6 +18,11 @@ except Exception:  # pragma: no cover
     Request = None  # type: ignore
     build = None  # type: ignore
 
+GOOGLE_TOKEN_URI = os.getenv("GOOGLE_TOKEN_URI", "https://oauth2.googleapis.com/token")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_ID_V2")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET") or os.getenv("GOOGLE_CLIENT_SECRET_V2")
+GOOGLE_REFRESH_TOKEN = os.getenv("GOOGLE_REFRESH_TOKEN")
+
 # Scopes required for the People API. ``contacts.other.readonly`` enables
 # access to the "Other contacts" bucket which some accounts use for storing
 # address book entries. Using both scopes keeps the refresh token compatible
@@ -26,6 +31,21 @@ SCOPES = [
     "https://www.googleapis.com/auth/contacts.readonly",
     "https://www.googleapis.com/auth/contacts.other.readonly",
 ]
+
+
+def _creds():
+    if not (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET and GOOGLE_REFRESH_TOKEN):
+        return None
+    if Credentials is None:
+        return None
+    return Credentials(
+        token=None,
+        refresh_token=GOOGLE_REFRESH_TOKEN,
+        token_uri=GOOGLE_TOKEN_URI,
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        scopes=SCOPES,
+    )
 
 from core.trigger_words import load_trigger_words
 from core import feature_flags, summarize, parser
@@ -68,27 +88,24 @@ def _notes_blob(person: Dict[str, Any]) -> str:
 
 def fetch_contacts(page_size: int = 200, page_limit: int = 10) -> List[Dict[str, Any]]:
     """Live-Fetch (in Tests typischerweise gemonkeypatched)."""
-    if build is None or Credentials is None or Request is None:  # pragma: no cover
+    if build is None or Request is None:  # pragma: no cover
         return []
 
-    required = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"]
-    missing = [k for k in required if not os.getenv(k)]
-    if missing:  # pragma: no cover
-        raise RuntimeError("Missing Google OAuth env: " + ", ".join(missing))
+    creds = _creds()
+    if creds is None:  # pragma: no cover
+        raise RuntimeError("Missing Google OAuth env")
 
-    creds = Credentials(
-        token=None,
-        refresh_token=os.environ["GOOGLE_REFRESH_TOKEN"],
-        token_uri="https://oauth2.googleapis.com/token",
-        client_id=os.environ["GOOGLE_CLIENT_ID"],
-        client_secret=os.environ["GOOGLE_CLIENT_SECRET"],
-        scopes=SCOPES,
-    )
     try:
         creds.refresh(Request())
     except Exception:  # pragma: no cover - invalid/expired tokens
         return []
+
     service = build("people", "v1", credentials=creds, cache_discovery=False)
+    log_step(
+        "contacts",
+        "fetch_call",
+        {"page_size": page_size, "page_limit": page_limit},
+    )
 
     out: List[Dict[str, Any]] = []
     page_token: Optional[str] = None
