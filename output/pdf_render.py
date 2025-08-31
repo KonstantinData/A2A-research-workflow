@@ -20,19 +20,47 @@ different calling conventions:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
-import json
+from typing import Any, Dict, List
+
+try:  # jinja2 is optional and may not be installed
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+except Exception:  # pragma: no cover - fallback when dependency missing
+    Environment = FileSystemLoader = select_autoescape = None  # type: ignore
 
 
-def _html_from_data(data: Any) -> str:
-    """Return a very small HTML document representing ``data``."""
+def _html_from_data(data: Dict[str, Any]) -> str:
+    """Return an HTML document representing ``data``.
 
+    If a Jinja2 template is available a styled report is rendered.  Otherwise a
+    minimal inline HTML table is produced.
+    """
+
+    tpl_dir = Path(__file__).resolve().parents[0] / "templates" / "pdf"
+    tpl = tpl_dir / "report.html.j2"
+    if Environment and tpl.exists():
+        env = Environment(
+            loader=FileSystemLoader(str(tpl_dir)),
+            autoescape=select_autoescape(["html", "xml"]),
+            enable_async=False,
+        )
+        return env.get_template("report.html.j2").render(**data)
+
+    # fallback: minimal inline HTML
+    rows = data.get("rows") or []
+    fields = data.get("fields") or []
+    meta = data.get("meta") or {}
+    items = "".join(
+        f"<tr>{''.join(f'<td>{(r.get(f) or '')}</td>' for f in fields)}</tr>"
+        for r in rows
+    )
+    head = "".join(f"<th>{f}</th>" for f in fields)
     return (
-        "<!doctype html>\n"
-        "<html>\n<head><meta charset=\"utf-8\"><title>A2A Report</title></head>\n"
-        "<body>\n<h1>A2A Research Report</h1>\n"
-        f"<pre>{json.dumps(data, indent=2, ensure_ascii=False)}</pre>\n"
-        "</body></html>"
+        "<html><body><h1>Company Dossier</h1>"
+        "<table><thead><tr>"
+        f"{head}"
+        "</tr></thead><tbody>"
+        f"{items}"
+        "</tbody></table><pre>{meta}</pre></body></html>"
     )
 
 
