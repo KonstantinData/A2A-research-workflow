@@ -56,7 +56,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Smoke: container build & run
+      - name: "Smoke: container build & run"
         run: |
           docker build -t a2a:ci -f ops/Dockerfile .
           docker run --rm -e USE_PUSH_TRIGGERS=1 -v $PWD/output:/app/output a2a:ci || true
