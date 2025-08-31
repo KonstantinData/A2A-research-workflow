@@ -114,6 +114,8 @@ def test_fetch_events_includes_creator_and_logs(monkeypatch, stub_time, tmp_path
             "event_id": "1",
             "summary": "Meet",
             "description": "desc",
+            "location": None,
+            "attendees": [],
             "start": {"dateTime": "2024-01-01T10:00:00+00:00"},
             "end": {"dateTime": "2024-01-01T11:00:00+00:00"},
             "creatorEmail": "alice@example.com",

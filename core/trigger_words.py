@@ -2,7 +2,7 @@ import logging
 import os
 import re
 from functools import lru_cache
-from typing import List, Optional
+from typing import Iterable, List, Optional
 
 from core.utils import normalize_text as _normalize_text
 
@@ -57,19 +57,76 @@ def load_trigger_words() -> List[str]:
     return TRIGGERS
 
 
-def contains_trigger(text: str | dict, triggers: Optional[List[str]] = None) -> bool:
+def _levenshtein_leq1(a: str, b: str) -> bool:
+    """Return ``True`` if the Levenshtein distance between ``a`` and ``b`` is ≤ 1."""
+    if a == b:
+        return True
+    if abs(len(a) - len(b)) > 1:
+        return False
+    if len(a) == len(b):
+        diffs = [i for i, (x, y) in enumerate(zip(a, b)) if x != y]
+        if len(diffs) == 1:
+            return True
+        if len(diffs) == 2:
+            i, j = diffs
+            if j == i + 1 and a[i] == b[j] and a[j] == b[i]:
+                return True  # single transposition
+        return False
+    # handle insert/delete
+    if len(a) < len(b):
+        short, long = a, b
+    else:
+        short, long = b, a
+    i = j = 0
+    mismatches = 0
+    while i < len(short) and j < len(long):
+        if short[i] != long[j]:
+            mismatches += 1
+            if mismatches > 1:
+                return False
+            j += 1
+        else:
+            i += 1
+            j += 1
+    return True
+
+
+def contains_trigger(
+    text: str | dict, triggers: Optional[Iterable[str]] = None, *, fuzzy: bool = True
+) -> bool:
     """Return ``True`` when any trigger word is contained in ``text``.
 
-    The function is intentionally tolerant and accepts dictionaries as they are
-    often used to represent calendar events.  Normalisation handles case folding,
-    various Unicode dash characters and common German umlauts.
+    ``text`` may be a raw string or a dictionary representing a calendar event.
+    The function normalises relevant fields and performs a token based
+    comparison.  Optionally a fuzzy check (Levenshtein distance ≤ 1) can be
+    applied to catch common typos.
     """
     if not text:
         return False
-    norm = normalize_text(text)
+
+    if isinstance(text, dict):
+        fields = [
+            text.get("summary", ""),
+            text.get("description", ""),
+            text.get("location", ""),
+        ]
+        for att in text.get("attendees", []) or []:
+            if isinstance(att, dict):
+                fields.append(att.get("email", ""))
+        norm = " ".join(_normalize_text(f or "") for f in fields if f)
+    else:
+        norm = _normalize_text(text)
+
+    tokens = re.findall(r"\b\w+\b", norm)
     for trig in triggers or load_trigger_words():
-        if _normalize_text(trig) in norm:
+        trig_norm = _normalize_text(trig)
+        pattern = rf"\b{re.escape(trig_norm)}\b"
+        if re.search(pattern, norm):
             return True
+        if fuzzy and " " not in trig_norm:
+            for token in tokens:
+                if _levenshtein_leq1(token, trig_norm):
+                    return True
     return False
 
 

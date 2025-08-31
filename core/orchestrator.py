@@ -134,10 +134,13 @@ def _as_trigger_from_event(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     text = (ev.get("summary") or "") + " " + (ev.get("description") or "")
     if not contains_trigger(text):
         return None
-    creator = ev.get("creator") or ev.get("creatorEmail") or ""
-    if isinstance(creator, dict):
-        creator = creator.get("email") or ""
-    return {"source": "calendar", "creator": creator, "recipient": creator, "payload": ev}
+
+    return {
+        "source": "calendar",
+        "creator": ev.get("creator", {}).get("email") or ev.get("creatorEmail"),
+        "recipient": ev.get("organizer", {}).get("email"),
+        "payload": ev,
+    }
 
 
 def _as_trigger_from_contact(c: Dict[str, Any]) -> Dict[str, Any]:
@@ -175,9 +178,27 @@ def gather_triggers() -> List[Dict[str, Any]]:
         log_step("calendar", "fetch_return", {"count": len(events)})
 
         for ev in events or []:
-            t = _as_trigger_from_event(ev)
-            if t:
-                triggers.append(t)
+            trig = _as_trigger_from_event(ev)
+            if trig is None:
+                eid = ev.get("id") or ev.get("event_id")
+                log_step(
+                    "calendar",
+                    "event_discarded",
+                    {
+                        "reason": "no_trigger_match",
+                        "event": {"id": eid, "summary": ev.get("summary", "")},
+                    },
+                )
+                continue
+            if _missing_required("calendar", ev):
+                eid = ev.get("id") or ev.get("event_id")
+                log_step(
+                    "calendar",
+                    "event_discarded",
+                    {"reason": "missing_fields", "event": {"id": eid}},
+                )
+                continue
+            triggers.append(trig)
         for c in fetch_contacts() or []:
             t = _as_trigger_from_contact(c)
             if t:

@@ -111,6 +111,12 @@ def fetch_events() -> List[Normalized]:
                 "event_id": ev.get("id"),
                 "summary": ev.get("summary"),
                 "description": ev.get("description"),
+                "location": ev.get("location"),
+                "attendees": [
+                    {"email": a.get("email")}
+                    for a in ev.get("attendees", []) or []
+                    if isinstance(a, dict)
+                ],
                 "start": ev.get("start"),
                 "end": ev.get("end"),
                 "creatorEmail": (ev.get("creator") or {}).get("email"),

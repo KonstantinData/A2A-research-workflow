@@ -10,7 +10,7 @@ from typing import Any, Dict, List
 from agents.internal_company.run import run as internal_run
 from integrations import email_sender
 from core import tasks
-from core.utils import optional_fields, required_fields
+from core.utils import log_step, optional_fields, required_fields
 
 import importlib.util as _ilu
 
@@ -80,6 +80,11 @@ def run(trigger: Normalized) -> Normalized:
     company = payload.get("company") or payload.get("company_name") or "Unknown"
 
     if missing_required:
+        log_step(
+            "agent_internal_search_skipped",
+            "agent_internal_search_skipped",
+            {"reason": "missing_company_or_domain", "event": trigger},
+        )
         event_title = payload.get("title") or company
         start_raw = payload.get("start")
         end_raw = payload.get("end")
