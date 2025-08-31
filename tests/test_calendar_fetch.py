@@ -197,9 +197,8 @@ def test_orchestrator_no_triggers(monkeypatch, tmp_path):
     monkeypatch.setattr(orchestrator, "gather_triggers", lambda *a, **k: [])
     records = []
     monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
-    with pytest.raises(SystemExit) as exc:
-        orchestrator.run()
-    assert exc.value.code == 0
+    res = orchestrator.run()
+    assert res == {"status": "idle"}
     assert records and records[0]["status"] == "no_triggers"
     assert (
         records[0]["message"]

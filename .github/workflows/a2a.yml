@@ -33,7 +33,10 @@ jobs:
       - name: Install OS packages for WeasyPrint
         run: |
           sudo apt-get update
-          sudo apt-get install -y libcairo2 libpango-1.0-0 libpangoft2-1.0-0 libgdk-pixbuf2.0-0 libffi-dev libxml2 libxslt1.1 fonts-dejavu-core
+          sudo apt-get install -y \
+            libcairo2 libpango-1.0-0 libpangoft2-1.0-0 \
+            libgdk-pixbuf-2.0-0 libffi-dev libxml2 libxslt1.1 \
+            fonts-dejavu-core
 
       - name: Install dev dependencies
         run: |
@@ -59,7 +62,10 @@ jobs:
       - name: Install OS packages for WeasyPrint
         run: |
           sudo apt-get update
-          sudo apt-get install -y libcairo2 libpango-1.0-0 libpangoft2-1.0-0 libgdk-pixbuf2.0-0 libffi-dev libxml2 libxslt1.1 fonts-dejavu-core
+          sudo apt-get install -y \
+            libcairo2 libpango-1.0-0 libpangoft2-1.0-0 \
+            libgdk-pixbuf-2.0-0 libffi-dev libxml2 libxslt1.1 \
+            fonts-dejavu-core
 
       - name: Install dependencies
         run: |
@@ -69,54 +75,25 @@ jobs:
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
 
-      - name: Preflight env check
+      - name: Run orchestrator (LIVE)
         env:
-          GOOGLE_CLIENT_ID:      ${{ secrets.GOOGLE_CLIENT_ID || secrets.GOOGLE_CLIENT_ID_V2 || vars.GOOGLE_CLIENT_ID || vars.GOOGLE_CLIENT_ID_V2 }}
-          GOOGLE_CLIENT_SECRET:  ${{ secrets.GOOGLE_CLIENT_SECRET || secrets.GOOGLE_CLIENT_SECRET_V2 || vars.GOOGLE_CLIENT_SECRET || vars.GOOGLE_CLIENT_SECRET_V2 }}
-          GOOGLE_REFRESH_TOKEN:  ${{ secrets.GOOGLE_REFRESH_TOKEN || vars.GOOGLE_REFRESH_TOKEN }}
-          HUBSPOT_ACCESS_TOKEN:  ${{ secrets.HUBSPOT_ACCESS_TOKEN || vars.HUBSPOT_ACCESS_TOKEN }}
-          HUBSPOT_PORTAL_ID:     ${{ secrets.HUBSPOT_PORTAL_ID || vars.HUBSPOT_PORTAL_ID }}
-          SMTP_HOST:             ${{ secrets.SMTP_HOST || vars.SMTP_HOST }}
-          SMTP_PORT:             ${{ secrets.SMTP_PORT || vars.SMTP_PORT }}
-          SMTP_USER:             ${{ secrets.SMTP_USER || vars.SMTP_USER }}
-          SMTP_PASS:             ${{ secrets.SMTP_PASS || vars.SMTP_PASS }}
-          SMTP_SECURE:           ${{ secrets.SMTP_SECURE || vars.SMTP_SECURE }}
-          SMTP_FROM:             ${{ secrets.SMTP_FROM || secrets.MAIL_FROM || vars.SMTP_FROM || vars.MAIL_FROM }}
-        run: |
-          set -e
-          for v in GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REFRESH_TOKEN HUBSPOT_ACCESS_TOKEN HUBSPOT_PORTAL_ID SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASS SMTP_SECURE SMTP_FROM; do
-            if [ -z "${!v}" ]; then
-              echo "::error::Missing required env $v"
-              exit 1
-            else
-              echo "$v=✓"
-            fi
-          done
-
-      - name: Run orchestrator
-        if: ${{ always() }}
-        env:
-          PYTHONPATH:           ${{ env.PYTHONPATH }}
-          GOOGLE_CLIENT_ID:     ${{ secrets.GOOGLE_CLIENT_ID || secrets.GOOGLE_CLIENT_ID_V2 || vars.GOOGLE_CLIENT_ID || vars.GOOGLE_CLIENT_ID_V2 }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET || secrets.GOOGLE_CLIENT_SECRET_V2 || vars.GOOGLE_CLIENT_SECRET || vars.GOOGLE_CLIENT_SECRET_V2 }}
-          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN || vars.GOOGLE_REFRESH_TOKEN }}
-          HUBSPOT_ACCESS_TOKEN: ${{ secrets.HUBSPOT_ACCESS_TOKEN || vars.HUBSPOT_ACCESS_TOKEN }}
-          HUBSPOT_PORTAL_ID:    ${{ secrets.HUBSPOT_PORTAL_ID || vars.HUBSPOT_PORTAL_ID }}
-          SMTP_HOST:            ${{ secrets.SMTP_HOST || vars.SMTP_HOST }}
-          SMTP_PORT:            ${{ secrets.SMTP_PORT || vars.SMTP_PORT }}
-          SMTP_USER:            ${{ secrets.SMTP_USER || vars.SMTP_USER }}
-          SMTP_PASS:            ${{ secrets.SMTP_PASS || vars.SMTP_PASS }}
-          SMTP_SECURE:          ${{ secrets.SMTP_SECURE || vars.SMTP_SECURE }}
-          SMTP_FROM:            ${{ secrets.SMTP_FROM || secrets.MAIL_FROM || vars.SMTP_FROM || vars.MAIL_FROM }}
+          GOOGLE_CLIENT_ID:      ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET:  ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN:  ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          HUBSPOT_ACCESS_TOKEN:  ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
+          HUBSPOT_PORTAL_ID:     ${{ secrets.HUBSPOT_PORTAL_ID }}
+          SMTP_HOST:             ${{ secrets.SMTP_HOST }}
+          SMTP_PORT:             ${{ secrets.SMTP_PORT }}
+          SMTP_USER:             ${{ secrets.SMTP_USER }}
+          SMTP_PASS:             ${{ secrets.SMTP_PASS }}
+          SMTP_SECURE:           ${{ secrets.SMTP_SECURE }}
+          MAIL_FROM:             ${{ secrets.MAIL_FROM }}
         run: python -m core.orchestrator
 
-      - name: Upload outputs (optional)
-        if: always()
+      - name: Upload exports
         uses: actions/upload-artifact@v4
         with:
-          name: outputs
+          name: exports
           path: |
-            output/**
+            output/exports/**
             logs/workflows/**
-            **/*.pdf
-          if-no-files-found: ignore

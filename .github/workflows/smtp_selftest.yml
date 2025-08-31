@@ -19,13 +19,6 @@ on:
 jobs:
   send:
     runs-on: ubuntu-latest
-    env:
-      SMTP_HOST:   ${{ secrets.SMTP_HOST }}
-      SMTP_PORT:   ${{ secrets.SMTP_PORT }}
-      SMTP_USER:   ${{ secrets.SMTP_USER }}
-      SMTP_PASS:   ${{ secrets.SMTP_PASS }}
-      SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
-      SMTP_FROM:   ${{ secrets.SMTP_FROM || secrets.MAIL_FROM }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -41,6 +34,13 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Send test mail
+        env:
+          SMTP_HOST:   ${{ secrets.SMTP_HOST }}
+          SMTP_PORT:   ${{ secrets.SMTP_PORT }}
+          SMTP_USER:   ${{ secrets.SMTP_USER }}
+          SMTP_PASS:   ${{ secrets.SMTP_PASS }}
+          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+          MAIL_FROM:   ${{ secrets.MAIL_FROM }}
         run: |
           python - <<'PY'
           from integrations.email_sender import send_email

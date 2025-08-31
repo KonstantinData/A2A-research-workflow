@@ -7,7 +7,7 @@ ENV PYTHONUNBUFFERED=1 \
 
 # System deps for WeasyPrint (HTML → PDF)
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    build-essential libcairo2 libpango-1.0-0 libpangoft2-1.0-0 libgdk-pixbuf-xlib-2.0-0 \
+    build-essential libcairo2 libpango-1.0-0 libpangoft2-1.0-0 libgdk-pixbuf-2.0-0 \
     libffi-dev libjpeg62-turbo-dev libxml2 libxslt1.1 shared-mime-info fonts-dejavu-core \
  && rm -rf /var/lib/apt/lists/*
 
