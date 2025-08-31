@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Company Dossier</title>
+    <style>
+      body { font-family: DejaVu Sans, Arial, sans-serif; margin: 24px; }
+      h1 { margin: 0 0 12px 0; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #ddd; padding: 6px 8px; }
+      th { text-align: left; }
+      small { color: #666; }
+    </style>
+  </head>
+  <body>
+    <h1>Company Dossier</h1>
+    {% if meta and meta.reason %}<p><small>Note: {{ meta.reason }}</small></p>{% endif %}
+    <table>
+      <thead>
+        <tr>{% for f in fields %}<th>{{ f }}</th>{% endfor %}</tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>{% for f in fields %}<td>{{ r.get(f, "") }}</td>{% endfor %}</tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>
+
