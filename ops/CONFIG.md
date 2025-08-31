@@ -17,9 +17,17 @@ See repository README for common variables.
 - `SMTP_PORT`
 - `SMTP_USER`
 - `SMTP_PASS`
-- `SMTP_FROM`
 - `SMTP_SECURE`
+- `SMTP_FROM` (optional)
+- `MAIL_FROM` (preferred; falls back to `SMTP_FROM`)
 - `ALLOWLIST_EMAIL_DOMAIN` (optional)
+
+## IMAP (optional)
+- `IMAP_HOST`
+- `IMAP_PORT`
+- `IMAP_USER`
+- `IMAP_PASS`
+- `IMAP_FOLDER` (default: `INBOX`)
 
 ## Trigger Words
 - `TRIGGER_WORDS_FILE` (defaults to `config/trigger_words.txt`)
