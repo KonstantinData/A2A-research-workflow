@@ -2,26 +2,16 @@
 
 from __future__ import annotations
 
-import datetime as dt
-import json
-import os
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Callable
+from .google_oauth import build_user_credentials, which_variant
 
 # Google libs optional in Tests
 try:  # pragma: no cover
-    from google.oauth2.credentials import Credentials
     from google.auth.transport.requests import Request
     from googleapiclient.discovery import build
 except Exception:  # pragma: no cover
-    Credentials = None  # type: ignore
     Request = None  # type: ignore
     build = None  # type: ignore
-
-GOOGLE_TOKEN_URI = os.getenv("GOOGLE_TOKEN_URI", "https://oauth2.googleapis.com/token")
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_ID_V2")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET") or os.getenv("GOOGLE_CLIENT_SECRET_V2")
-GOOGLE_REFRESH_TOKEN = os.getenv("GOOGLE_REFRESH_TOKEN")
 
 # Scopes required for the People API. ``contacts.other.readonly`` enables
 # access to the "Other contacts" bucket which some accounts use for storing
@@ -32,27 +22,9 @@ SCOPES = [
     "https://www.googleapis.com/auth/contacts.other.readonly",
 ]
 
-
-def _creds():
-    if not (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET and GOOGLE_REFRESH_TOKEN):
-        return None
-    if Credentials is None:
-        return None
-    return Credentials(
-        token=None,
-        refresh_token=GOOGLE_REFRESH_TOKEN,
-        token_uri=GOOGLE_TOKEN_URI,
-        client_id=GOOGLE_CLIENT_ID,
-        client_secret=GOOGLE_CLIENT_SECRET,
-        scopes=SCOPES,
-    )
-
 from core.trigger_words import load_trigger_words
 from core import feature_flags, summarize, parser
 from core.utils import (
-    normalize_text,
-    already_processed,
-    mark_processed,
     required_fields,
     optional_fields,
     log_step,
@@ -91,9 +63,15 @@ def fetch_contacts(page_size: int = 200, page_limit: int = 10) -> List[Dict[str,
     if build is None or Request is None:  # pragma: no cover
         return []
 
-    creds = _creds()
-    if creds is None:  # pragma: no cover
-        raise RuntimeError("Missing Google OAuth env")
+    creds = build_user_credentials(SCOPES)
+    if not creds:  # pragma: no cover
+        log_step(
+            "contacts",
+            "missing_google_oauth_env",
+            {"variant": which_variant()},
+            severity="error",
+        )
+        return []
 
     try:
         creds.refresh(Request())
