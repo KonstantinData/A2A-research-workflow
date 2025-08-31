@@ -98,6 +98,9 @@ jobs:
           SMTP_PASS:             ${{ secrets.SMTP_PASS }}
           SMTP_SECURE:           ${{ secrets.SMTP_SECURE }}
           MAIL_FROM:             ${{ secrets.MAIL_FROM }}
+          CALENDAR_MINUTES_BACK: "1440"   # 24h rückwärts
+          CALENDAR_MINUTES_FWD:  "10080"  # 7 Tage vorwärts
+          A2A_TEST_MODE:         "0"
         run: python -m core.orchestrator
 
       - name: Upload exports
