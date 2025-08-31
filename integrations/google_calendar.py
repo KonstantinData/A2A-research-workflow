@@ -15,6 +15,25 @@ except Exception:
     Credentials = None
     build = None
 
+GOOGLE_TOKEN_URI = os.getenv("GOOGLE_TOKEN_URI", "https://oauth2.googleapis.com/token")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_ID_V2")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET") or os.getenv("GOOGLE_CLIENT_SECRET_V2")
+GOOGLE_REFRESH_TOKEN = os.getenv("GOOGLE_REFRESH_TOKEN")
+
+
+def _creds():
+    if not (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET and GOOGLE_REFRESH_TOKEN):
+        return None
+    if Credentials is None:
+        return None
+    return Credentials(
+        None,
+        refresh_token=GOOGLE_REFRESH_TOKEN,
+        token_uri=GOOGLE_TOKEN_URI,
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+    )
+
 Normalized = Dict[str, Any]
 
 # ---------- Hilfsfunktionen für Triggerprüfung etc. ----------
@@ -65,16 +84,10 @@ def fetch_events() -> List[Normalized]:
     events_result: Dict[str, Any] = {}
     items: List[Dict[str, Any]] = []
     try:
-        if Credentials and build:
-            creds = Credentials(
-                None,
-                refresh_token=os.getenv("GOOGLE_REFRESH_TOKEN"),
-                client_id=os.getenv("GOOGLE_CLIENT_ID")
-                or os.getenv("GOOGLE_CLIENT_ID_V2"),
-                client_secret=os.getenv("GOOGLE_CLIENT_SECRET")
-                or os.getenv("GOOGLE_CLIENT_SECRET_V2"),
-                token_uri=os.getenv("GOOGLE_TOKEN_URI"),
-            )
+        if build:
+            creds = _creds()
+            if creds is None:
+                raise RuntimeError("missing google oauth env")
 
             service = build(
                 "calendar", "v3", credentials=creds, cache_discovery=False
