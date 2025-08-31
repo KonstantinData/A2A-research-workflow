@@ -27,3 +27,33 @@ def test_gather_triggers_logs_discard_reasons(tmp_path, monkeypatch):
     reasons = [r.get("reason") for r in records if r.get("status") == "event_discarded"]
     assert "no_trigger_match" in reasons
     assert "missing_fields" in reasons
+
+
+def test_gather_triggers_logs_no_calendar_events(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(orchestrator, "fetch_events", lambda: [])
+    monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
+    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: True)
+    records = []
+    monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
+
+    triggers = orchestrator.gather_triggers()
+    assert triggers == []
+    assert any(r.get("status") == "no_calendar_events" for r in records)
+
+
+def test_gather_triggers_logs_contacts_fetch_failed(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(orchestrator, "fetch_events", lambda: [])
+
+    def raise_env_error():
+        raise RuntimeError("Missing Google OAuth env")
+
+    monkeypatch.setattr(orchestrator, "fetch_contacts", raise_env_error)
+    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: True)
+    records = []
+    monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
+
+    triggers = orchestrator.gather_triggers()
+    assert triggers == []
+    assert any(r.get("status") == "contacts_fetch_failed" for r in records)
