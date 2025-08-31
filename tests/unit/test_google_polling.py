@@ -2,12 +2,10 @@
 
 from pathlib import Path
 import sys
-import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from integrations import google_contacts  # noqa: E402
-from core import trigger_words  # noqa: E402
 
 
 def test_contacts_scheduled_poll_normalizes(monkeypatch):
@@ -74,11 +72,12 @@ def test_contacts_poll_falls_back_to_admin(monkeypatch):
     assert sent.get("to") == "admin@condata.io"
 
 
-def test_fetch_contacts_exits_early_when_no_triggers(tmp_path, monkeypatch):
-    path = tmp_path / "triggers.txt"
-    path.write_text("")
-    monkeypatch.setenv("TRIGGER_WORDS_FILE", str(path))
-    trigger_words.load_trigger_words.cache_clear()
+def test_fetch_contacts_missing_creds_logs(monkeypatch):
+    logs = []
+    monkeypatch.setattr(google_contacts, "build", object())
+    monkeypatch.setattr(google_contacts, "Request", object)
+    monkeypatch.setattr(google_contacts, "build_user_credentials", lambda scopes: None)
+    monkeypatch.setattr(google_contacts, "log_step", lambda *a, **k: logs.append((a, k)))
 
-    with pytest.raises(RuntimeError):
-        google_contacts.fetch_contacts()
+    assert google_contacts.fetch_contacts() == []
+    assert any(args[1] == "missing_google_oauth_env" for args, _ in logs)
