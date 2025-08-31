@@ -141,12 +141,13 @@ CRM.
 
 | Variable | Description | Default |
 | --- | --- | --- |
-| `EMAIL_SMTP_HOST` | SMTP server hostname | – |
-| `MAIL_SMTP_PORT` | SMTP server port | `587` |
-| `EMAIL_SMTP_USER` | SMTP username | – |
-| `EMAIL_SMTP_PASS` | SMTP password | – |
-| `MAIL_FROM` | Sender e‑mail address | `EMAIL_SMTP_USER` |
-| `MAIL_SMTP_SECURE` | Use SSL for SMTP (`true`/`false`) | `true` |
+| `SMTP_HOST` | SMTP server hostname | – |
+| `SMTP_PORT` | SMTP server port | `587` |
+| `SMTP_USER` | SMTP username | – |
+| `SMTP_PASS` | SMTP password | – |
+| `MAIL_FROM` | Sender e‑mail address | `SMTP_USER` |
+| `SMTP_SECURE` | SMTP security mode (`ssl`/`starttls`) | `ssl` |
+| `ALLOWLIST_EMAIL_DOMAIN` | Allow reminder emails only to addresses in this domain | – |
 | `MAIL_TO` | Recipient e‑mail for reports | – |
 | `TRIGGER_WORDS_FILE` | Path to trigger words list | `config/trigger_words.txt` |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID | – |
