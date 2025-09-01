@@ -19,7 +19,7 @@ from core.utils import (
 )  # noqa: F401  # required_fields/optional_fields imported for completeness
 from integrations.google_calendar import fetch_events
 from integrations.google_contacts import fetch_contacts
-from integrations.google_oauth import build_user_credentials, which_variant
+from integrations.google_oauth import build_user_credentials
 from core.trigger_words import contains_trigger
 
 # Expose integrations so tests can monkeypatch them
@@ -48,6 +48,7 @@ _spec.loader.exec_module(_mod)
 append_jsonl = _mod.append
 
 CAL_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+GOOGLE_OAUTH_VARIANT = "v2"
 
 
 # --------- LIVE readiness assertions ---------
@@ -56,8 +57,8 @@ def _assert_live_ready() -> None:
         return
     required = [
         "GOOGLE_REFRESH_TOKEN",
-        "GOOGLE_CLIENT_ID",
-        "GOOGLE_CLIENT_SECRET",
+        "GOOGLE_CLIENT_ID_V2",
+        "GOOGLE_CLIENT_SECRET_V2",
         "SMTP_HOST",
         "SMTP_PORT",
         "MAIL_FROM",
@@ -107,9 +108,9 @@ def log_event(record: Dict[str, Any]) -> None:
 def _preflight_google() -> bool:
     creds = build_user_credentials(CAL_SCOPES)
     if not creds:
-        log_event({"status": "preflight_oauth_missing", "provider": "google", "variant": which_variant()})
+        log_event({"status": "preflight_oauth_missing", "provider": "google", "variant": GOOGLE_OAUTH_VARIANT})
         return False
-    log_event({"status": "preflight_oauth_ok", "provider": "google", "variant": which_variant()})
+    log_event({"status": "preflight_oauth_ok", "provider": "google", "variant": GOOGLE_OAUTH_VARIANT})
     return True
 
 

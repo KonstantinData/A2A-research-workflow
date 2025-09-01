@@ -90,11 +90,11 @@ jobs:
 
       - name: Run orchestrator (LIVE)
         env:
-          GOOGLE_CLIENT_ID:     ${{ secrets.GOOGLE_CLIENT_ID || secrets.GOOGLE_CLIENT_ID_V2 }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET || secrets.GOOGLE_CLIENT_SECRET_V2 }}
-          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          GOOGLE_TOKEN_URI:     ${{ secrets.GOOGLE_TOKEN_URI || 'https://oauth2.googleapis.com/token' }}
-          GOOGLE_CALENDAR_IDS:  ${{ secrets.GOOGLE_CALENDAR_IDS || 'primary' }}
+          GOOGLE_CLIENT_ID_V2:     ${{ secrets.GOOGLE_CLIENT_ID_V2 }}
+          GOOGLE_CLIENT_SECRET_V2: ${{ secrets.GOOGLE_CLIENT_SECRET_V2 }}
+          GOOGLE_REFRESH_TOKEN:    ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_TOKEN_URI:        ${{ secrets.GOOGLE_TOKEN_URI || 'https://oauth2.googleapis.com/token' }}
+          GOOGLE_CALENDAR_IDS:     ${{ secrets.GOOGLE_CALENDAR_IDS || 'primary' }}
           CAL_LOOKAHEAD_DAYS:   30
           CAL_LOOKBACK_DAYS:    2
           HUBSPOT_ACCESS_TOKEN: ${{ secrets.HUBSPOT_ACCESS_TOKEN }}

@@ -10,12 +10,12 @@ def _clear():
             os.environ.pop(k, None)
 
 
-def test_v1_names_work(monkeypatch):
+def test_v1_names_rejected(monkeypatch):
     _clear()
     monkeypatch.setenv("GOOGLE_CLIENT_ID", "id")
     monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "sec")
     monkeypatch.setenv("GOOGLE_REFRESH_TOKEN", "rt")
-    assert build_user_credentials(SCOPES) is not None
+    assert build_user_credentials(SCOPES) is None
 
 
 def test_v2_names_work(monkeypatch):
