@@ -57,8 +57,8 @@ def _assert_live_ready() -> None:
         return
     required = [
         "GOOGLE_REFRESH_TOKEN",
-        "GOOGLE_CLIENT_ID",
-        "GOOGLE_CLIENT_SECRET",
+        "GOOGLE_CLIENT_ID_V2",
+        "GOOGLE_CLIENT_SECRET_V2",
         "SMTP_HOST",
         "SMTP_PORT",
         "MAIL_FROM",
