@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Callable
-from .google_oauth import build_user_credentials, which_variant, classify_oauth_error
+from .google_oauth import build_user_credentials, classify_oauth_error
 
 # Google libs optional in Tests
 try:  # pragma: no cover
@@ -69,7 +69,7 @@ def fetch_contacts(page_size: int = 200, page_limit: int = 10) -> List[Dict[str,
             log_step(
                 "contacts",
                 "missing_google_oauth_env",
-                {"variant": which_variant()},
+                {},
                 severity="error",
             )
             return []
@@ -111,7 +111,7 @@ def fetch_contacts(page_size: int = 200, page_limit: int = 10) -> List[Dict[str,
         log_step(
             "contacts",
             "fetch_error",
-            {"error": str(e), "code": code, "hint": hint, "variant": which_variant()},
+            {"error": str(e), "code": code, "hint": hint},
             severity="error",
         )
         return []
