@@ -85,6 +85,9 @@ jobs:
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
 
+      - name: No dummy content guard
+        run: python ops/no_demo_guard.py
+
       - name: Run orchestrator (LIVE)
         env:
           GOOGLE_CLIENT_ID:     ${{ secrets.GOOGLE_CLIENT_ID || secrets.GOOGLE_CLIENT_ID_V2 }}

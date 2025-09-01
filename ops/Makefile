@@ -1,7 +1,7 @@
 .PHONY: lint test build run
 
 lint:
-@echo "Lint placeholder"
+@echo "Lint stub"
 
 test:
 pytest

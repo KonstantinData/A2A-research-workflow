@@ -13,14 +13,20 @@ different calling conventions:
 
 ``render_pdf(rows, fields, meta=None)``
     New behaviour used by export safety tests.  The report is written to
-    ``output/exports/report.pdf`` and if ``rows`` is empty a placeholder PDF is
+    ``output/exports/report.pdf`` and if ``rows`` is empty an empty PDF is
     generated explaining why no data is available.
 """
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, Dict, List
+
+try:
+    from weasyprint import HTML  # type: ignore
+except Exception:  # pragma: no cover - optional dependency
+    HTML = None  # type: ignore
 
 try:  # jinja2 is optional and may not be installed
     from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -66,7 +72,7 @@ def _html_from_data(data: Dict[str, Any]) -> str:
     )
 
 
-def _write_placeholder_pdf(out_path: Path, reason: str | None) -> None:
+def _write_empty_pdf(out_path: Path, reason: str | None) -> None:
     """Create a tiny PDF file stating that no data was available."""
 
     try:
@@ -88,6 +94,14 @@ def _write_placeholder_pdf(out_path: Path, reason: str | None) -> None:
             f"No data to report. Reason: {reason or 'No valid triggers'}",
             encoding="utf-8",
         )
+
+
+def _write_html_pdf(html: str, out_path: Path) -> None:
+    if HTML is None:
+        if os.getenv("LIVE_MODE", "1") == "1":
+            raise RuntimeError("WeasyPrint not available in LIVE mode")
+        raise RuntimeError("WeasyPrint not available")
+    HTML(string=html).write_pdf(str(out_path))
 
 
 def render_pdf(
@@ -113,9 +127,7 @@ def render_pdf(
         out_path = Path(out_path_or_fields)
         html = _html_from_data(data_or_rows)
         try:
-            from weasyprint import HTML  # type: ignore
-
-            HTML(string=html).write_pdf(str(out_path))
+            _write_html_pdf(html, out_path)
         except Exception:
             out_path.write_text(html, encoding="utf-8")
         return
@@ -143,13 +155,11 @@ def render_pdf(
         }
         html = _html_from_data(empty)
         try:
-            from weasyprint import HTML  # type: ignore
-
-            HTML(string=html).write_pdf(str(out_path))
+            _write_html_pdf(html, out_path)
             return
         except Exception:
             try:
-                _write_placeholder_pdf(out_path, reason)
+                _write_empty_pdf(out_path, reason)
                 return
             except Exception:
                 out_path.write_text(html, encoding="utf-8")
@@ -158,9 +168,7 @@ def render_pdf(
     data = {"rows": rows, "fields": fields, "meta": meta or {}}
     html = _html_from_data(data)
     try:
-        from weasyprint import HTML  # type: ignore
-
-        HTML(string=html).write_pdf(str(out_path))
+        _write_html_pdf(html, out_path)
     except Exception:
         out_path.write_text(html, encoding="utf-8")
 

@@ -38,6 +38,8 @@ def upsert_company(data: Dict[str, Any]) -> Optional[str]:
     """Create or update a company in HubSpot."""
     token = _token()
     if not token:
+        if os.getenv("LIVE_MODE", "1") == "1":
+            raise RuntimeError("HUBSPOT_ACCESS_TOKEN missing in LIVE mode")
         return None
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     core = data.get("core") or data
@@ -94,6 +96,8 @@ def check_existing_report(company_id: str) -> Optional[Dict[str, Any]]:
     """Return latest report (id, name, createdAt) for ``company_id`` if present."""
     token = _token()
     if not token:
+        if os.getenv("LIVE_MODE", "1") == "1":
+            raise RuntimeError("HUBSPOT_ACCESS_TOKEN missing in LIVE mode")
         return None
 
     url = "https://api.hubapi.com/files/v3/files/search"
@@ -115,6 +119,8 @@ def check_existing_report(company_id: str) -> Optional[Dict[str, Any]]:
 def attach_pdf(pdf_path: Path, company_id: str) -> Optional[Dict[str, Any]]:
     token = _token()
     if not token:
+        if os.getenv("LIVE_MODE", "1") == "1":
+            raise RuntimeError("HUBSPOT_ACCESS_TOKEN missing in LIVE mode")
         return None
     headers = {"Authorization": f"Bearer {token}"}
     files = {"file": (pdf_path.name, pdf_path.read_bytes(), "application/pdf")}

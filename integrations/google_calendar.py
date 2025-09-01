@@ -93,6 +93,17 @@ def fetch_events() -> List[Normalized]:
                 )
                 return []
             service = build("calendar", "v3", credentials=creds, cache_discovery=False)
+            try:
+                service.calendarList().get(calendarId=CAL_IDS[0]).execute()
+            except Exception as e:
+                code, hint = classify_oauth_error(e)
+                log_step(
+                    "calendar",
+                    "fetch_error",
+                    {"error": str(e), "code": code, "hint": hint, "variant": which_variant()},
+                    severity="error",
+                )
+                return []
             tmin, tmax = _time_window()
             for cal_id in CAL_IDS:
                 token = None

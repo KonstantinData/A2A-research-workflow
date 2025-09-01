@@ -28,6 +28,10 @@ def _deliver(
     password = os.environ.get("SMTP_PASS")
     mail_from = os.environ.get("SMTP_FROM") or os.environ.get("MAIL_FROM", user)
     secure = os.environ.get("SMTP_SECURE", "ssl").lower()
+    if not host or not user or not password:
+        if os.getenv("LIVE_MODE", "1") == "1":
+            raise RuntimeError("SMTP not configured; cannot send emails in LIVE mode")
+        return
     _send_email(
         host,
         port,

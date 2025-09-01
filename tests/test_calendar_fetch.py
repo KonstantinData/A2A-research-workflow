@@ -32,6 +32,16 @@ class _StubService:
     def events(self):
         return _StubEvents(self.pages, self.rec)
 
+    class _CalList:
+        def get(self, calendarId=None):
+            return self
+
+        def execute(self):
+            return {}
+
+    def calendarList(self):
+        return self._CalList()
+
 
 @pytest.fixture
 def stub_time(monkeypatch):
