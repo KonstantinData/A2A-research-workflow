@@ -6,7 +6,7 @@ import datetime as dt
 from typing import Any, Dict, List
 
 from core.utils import log_step
-from .google_oauth import build_user_credentials, which_variant, classify_oauth_error
+from .google_oauth import build_user_credentials, classify_oauth_error
 
 try:
     from google.oauth2.credentials import Credentials
@@ -88,7 +88,7 @@ def fetch_events() -> List[Normalized]:
                 log_step(
                     "calendar",
                     "missing_google_oauth_env",
-                    {"variant": which_variant()},
+                    {"mode": "v2-only"},
                     severity="error",
                 )
                 return []
@@ -97,10 +97,16 @@ def fetch_events() -> List[Normalized]:
                 service.calendarList().get(calendarId=CAL_IDS[0]).execute()
             except Exception as e:
                 code, hint = classify_oauth_error(e)
+                cid_tail = (os.getenv("GOOGLE_CLIENT_ID_V2") or "")[-8:]
                 log_step(
                     "calendar",
                     "fetch_error",
-                    {"error": str(e), "code": code, "hint": hint, "variant": which_variant()},
+                    {
+                        "error": str(e),
+                        "code": code,
+                        "hint": hint,
+                        "client_id_tail": cid_tail,
+                    },
                     severity="error",
                 )
                 return []
@@ -129,10 +135,16 @@ def fetch_events() -> List[Normalized]:
             log_step("calendar", "fetch_ok", {"calendars": CAL_IDS, "count": len(results)})
     except Exception as e:  # pragma: no cover
         code, hint = classify_oauth_error(e)
+        cid_tail = (os.getenv("GOOGLE_CLIENT_ID_V2") or "")[-8:]
         log_step(
             "calendar",
             "fetch_error",
-            {"error": str(e), "code": code, "hint": hint, "variant": which_variant()},
+            {
+                "error": str(e),
+                "code": code,
+                "hint": hint,
+                "client_id_tail": cid_tail,
+            },
             severity="error",
         )
     return results
