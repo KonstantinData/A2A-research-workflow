@@ -49,9 +49,8 @@ def _normalize(ev: Dict[str, Any], cal_id: str) -> Normalized:
     }
 
 
-# ---------- Hilfsfunktionen für Triggerprüfung etc. ----------
 COMPANY_REGEX = r"\b([A-Z][A-Za-z0-9&.\- ]{2,}\s(?:GmbH|AG|KG|SE|Ltd|Inc|LLC))\b"
-DOMAIN_REGEX = r"\b([a-z0-9\-]+\.[a-z]{2,})(/[^\s]*)?\b"
+DOMAIN_REGEX  = r"\b([a-z0-9\-]+\.[a-z]{2,})(/[\S]*)?\b"
 
 
 def contains_trigger(text: str) -> bool:
@@ -78,7 +77,6 @@ def extract_domain(text: str) -> str | None:
     return None
 
 
-# ---------- Hauptfunktion fetch_events ----------
 def fetch_events() -> List[Normalized]:
     results: List[Normalized] = []
     try:
@@ -88,22 +86,30 @@ def fetch_events() -> List[Normalized]:
                 log_step(
                     "calendar",
                     "missing_google_oauth_env",
-                    {},
+                    {"mode": "v2-only"},
                     severity="error",
                 )
                 return []
+
             service = build("calendar", "v3", credentials=creds, cache_discovery=False)
             try:
                 service.calendarList().get(calendarId=CAL_IDS[0]).execute()
             except Exception as e:
                 code, hint = classify_oauth_error(e)
+                cid_tail = (os.getenv("GOOGLE_CLIENT_ID_V2") or "")[-8:]
                 log_step(
                     "calendar",
                     "fetch_error",
-                    {"error": str(e), "code": code, "hint": hint},
+                    {
+                        "error": str(e),
+                        "code": code,
+                        "hint": hint,
+                        "client_id_tail": cid_tail,
+                    },
                     severity="error",
                 )
                 return []
+
             tmin, tmax = _time_window()
             for cal_id in CAL_IDS:
                 token = None
@@ -126,13 +132,20 @@ def fetch_events() -> List[Normalized]:
                     token = resp.get("nextPageToken")
                     if not token:
                         break
+
             log_step("calendar", "fetch_ok", {"calendars": CAL_IDS, "count": len(results)})
     except Exception as e:  # pragma: no cover
         code, hint = classify_oauth_error(e)
+        cid_tail = (os.getenv("GOOGLE_CLIENT_ID_V2") or "")[-8:]
         log_step(
             "calendar",
             "fetch_error",
-            {"error": str(e), "code": code, "hint": hint},
+            {
+                "error": str(e),
+                "code": code,
+                "hint": hint,
+                "client_id_tail": cid_tail,
+            },
             severity="error",
         )
     return results
