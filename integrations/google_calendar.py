@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import os
-import re
-from datetime import datetime, timedelta, timezone
+import os, re
+import datetime as dt
 from typing import Any, Dict, List
 
 from core.utils import log_step
-from .google_oauth import build_user_credentials, which_variant
+from .google_oauth import build_user_credentials, which_variant, classify_oauth_error
 
 try:
     from google.oauth2.credentials import Credentials
@@ -17,6 +16,38 @@ except Exception:
     build = None
 
 Normalized = Dict[str, Any]
+
+LOOKAHEAD_DAYS = int(os.getenv("CAL_LOOKAHEAD_DAYS", "14"))
+LOOKBACK_DAYS = int(os.getenv("CAL_LOOKBACK_DAYS", "1"))
+CAL_IDS = [c.strip() for c in os.getenv("GOOGLE_CALENDAR_IDS", "primary").split(",") if c.strip()]
+SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+
+
+def _time_window() -> tuple[str, str]:
+    now = dt.datetime.utcnow().replace(tzinfo=dt.timezone.utc)
+    tmin = now - dt.timedelta(days=LOOKBACK_DAYS)
+    tmax = now + dt.timedelta(days=LOOKAHEAD_DAYS)
+    return tmin.isoformat(), tmax.isoformat()
+
+
+def _normalize(ev: Dict[str, Any], cal_id: str) -> Normalized:
+    return {
+        "event_id": ev.get("id"),
+        "summary": ev.get("summary"),
+        "description": ev.get("description"),
+        "location": ev.get("location"),
+        "attendees": [
+            {"email": a.get("email")}
+            for a in ev.get("attendees", []) or []
+            if isinstance(a, dict)
+        ],
+        "start": ev.get("start"),
+        "end": ev.get("end"),
+        "creatorEmail": (ev.get("creator") or {}).get("email"),
+        "creator": ev.get("creator"),
+        "calendarId": cal_id,
+    }
+
 
 # ---------- Hilfsfunktionen für Triggerprüfung etc. ----------
 COMPANY_REGEX = r"\b([A-Z][A-Za-z0-9&.\- ]{2,}\s(?:GmbH|AG|KG|SE|Ltd|Inc|LLC))\b"
@@ -48,21 +79,8 @@ def extract_domain(text: str) -> str | None:
 
 
 # ---------- Hauptfunktion fetch_events ----------
-SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
-
 def fetch_events() -> List[Normalized]:
-    """Fetch events from Google Calendar API within the configured time window."""
-
-    now = datetime.now(timezone.utc)
-    minutes_back = int(os.getenv("CALENDAR_MINUTES_BACK", "1440"))  # 24h
-    minutes_fwd = int(os.getenv("CALENDAR_MINUTES_FWD", "10080"))  # 7d
-    time_min = (now - timedelta(minutes=minutes_back)).isoformat()
-    time_max = (now + timedelta(minutes=minutes_fwd)).isoformat()
-
-    log_step("calendar", "fetch_call", {"time_min": time_min, "time_max": time_max})
-
-    events_result: Dict[str, Any] = {}
-    items: List[Dict[str, Any]] = []
+    results: List[Normalized] = []
     try:
         if build:
             creds = build_user_credentials(SCOPES)
@@ -74,66 +92,36 @@ def fetch_events() -> List[Normalized]:
                     severity="error",
                 )
                 return []
-            service = build(
-                "calendar", "v3", credentials=creds, cache_discovery=False
-            )
-
-            events_result = (
-                service.events()
-                .list(
-                    calendarId="primary",
-                    timeMin=time_min,
-                    timeMax=time_max,
-                    singleEvents=True,
-                    orderBy="startTime",
-                )
-                .execute()
-            )
-            items = events_result.get("items", [])
-        else:
-            log_step(
-                "calendar",
-                "fetch_error",
-                {"error": "google libraries not available"},
-                severity="critical",
-            )
-    except Exception as e:
-        log_step("calendar", "fetch_error", {"error": str(e)}, severity="critical")
-
-    log_step("calendar", "raw_api_response", {"response": events_result})
-
-    results: List[Dict[str, Any]] = []
-    for ev in items:
-        results.append(
-            {
-                "event_id": ev.get("id"),
-                "summary": ev.get("summary"),
-                "description": ev.get("description"),
-                "location": ev.get("location"),
-                "attendees": [
-                    {"email": a.get("email")}
-                    for a in ev.get("attendees", []) or []
-                    if isinstance(a, dict)
-                ],
-                "start": ev.get("start"),
-                "end": ev.get("end"),
-                "creatorEmail": (ev.get("creator") or {}).get("email"),
-                "creator": ev.get("creator"),
-            }
+            service = build("calendar", "v3", credentials=creds, cache_discovery=False)
+            tmin, tmax = _time_window()
+            for cal_id in CAL_IDS:
+                token = None
+                while True:
+                    resp = (
+                        service.events()
+                        .list(
+                            calendarId=cal_id,
+                            timeMin=tmin,
+                            timeMax=tmax,
+                            singleEvents=True,
+                            orderBy="startTime",
+                            maxResults=2500,
+                            pageToken=token,
+                        )
+                        .execute()
+                    )
+                    for item in resp.get("items", []):
+                        results.append(_normalize(item, cal_id))
+                    token = resp.get("nextPageToken")
+                    if not token:
+                        break
+            log_step("calendar", "fetch_ok", {"calendars": CAL_IDS, "count": len(results)})
+    except Exception as e:  # pragma: no cover
+        code, hint = classify_oauth_error(e)
+        log_step(
+            "calendar",
+            "fetch_error",
+            {"error": str(e), "code": code, "hint": hint, "variant": which_variant()},
+            severity="error",
         )
-
-    # 📊 Normalisiertes Log mit Übersicht
-    log_step(
-        "calendar",
-        "fetched_events",
-        {
-            "count": len(results),
-            "time_min": time_min,
-            "time_max": time_max,
-            "ids": [ev.get("event_id") for ev in results],
-            "summaries": [ev.get("summary") for ev in results],
-            "creator_emails": [ev.get("creatorEmail") for ev in results],
-        },
-    )
-
     return results

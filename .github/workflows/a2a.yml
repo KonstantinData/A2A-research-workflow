@@ -87,21 +87,22 @@ jobs:
 
       - name: Run orchestrator (LIVE)
         env:
-          GOOGLE_CLIENT_ID:      ${{ secrets.GOOGLE_CLIENT_ID || secrets.GOOGLE_CLIENT_ID_V2 || vars.GOOGLE_CLIENT_ID || vars.GOOGLE_CLIENT_ID_V2 }}
-          GOOGLE_CLIENT_SECRET:  ${{ secrets.GOOGLE_CLIENT_SECRET || secrets.GOOGLE_CLIENT_SECRET_V2 || vars.GOOGLE_CLIENT_SECRET || vars.GOOGLE_CLIENT_SECRET_V2 }}
-          GOOGLE_REFRESH_TOKEN:  ${{ secrets.GOOGLE_REFRESH_TOKEN || vars.GOOGLE_REFRESH_TOKEN }}
-          GOOGLE_TOKEN_URI:      ${{ secrets.GOOGLE_TOKEN_URI || 'https://oauth2.googleapis.com/token' }}
-          HUBSPOT_ACCESS_TOKEN:  ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
-          HUBSPOT_PORTAL_ID:     ${{ secrets.HUBSPOT_PORTAL_ID }}
-          SMTP_HOST:             ${{ secrets.SMTP_HOST }}
-          SMTP_PORT:             ${{ secrets.SMTP_PORT }}
-          SMTP_USER:             ${{ secrets.SMTP_USER }}
-          SMTP_PASS:             ${{ secrets.SMTP_PASS }}
-          SMTP_SECURE:           ${{ secrets.SMTP_SECURE }}
-          MAIL_FROM:             ${{ secrets.MAIL_FROM }}
-          CALENDAR_MINUTES_BACK: "1440"   # 24h rückwärts
-          CALENDAR_MINUTES_FWD:  "10080"  # 7 Tage vorwärts
-          A2A_TEST_MODE:         "0"
+          GOOGLE_CLIENT_ID:     ${{ secrets.GOOGLE_CLIENT_ID || secrets.GOOGLE_CLIENT_ID_V2 }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET || secrets.GOOGLE_CLIENT_SECRET_V2 }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_TOKEN_URI:     ${{ secrets.GOOGLE_TOKEN_URI || 'https://oauth2.googleapis.com/token' }}
+          GOOGLE_CALENDAR_IDS:  ${{ secrets.GOOGLE_CALENDAR_IDS || 'primary' }}
+          CAL_LOOKAHEAD_DAYS:   30
+          CAL_LOOKBACK_DAYS:    2
+          HUBSPOT_ACCESS_TOKEN: ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
+          HUBSPOT_PORTAL_ID:    ${{ secrets.HUBSPOT_PORTAL_ID }}
+          SMTP_HOST:            ${{ secrets.SMTP_HOST }}
+          SMTP_PORT:            ${{ secrets.SMTP_PORT }}
+          SMTP_USER:            ${{ secrets.SMTP_USER }}
+          SMTP_PASS:            ${{ secrets.SMTP_PASS }}
+          SMTP_SECURE:          ${{ secrets.SMTP_SECURE }}
+          MAIL_FROM:            ${{ secrets.MAIL_FROM }}
+          A2A_TEST_MODE:        "0"
         run: python -m core.orchestrator
 
       - name: Upload exports
