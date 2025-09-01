@@ -5,7 +5,7 @@ def extract_company(text: str) -> Optional[str]:
     """Extract a company name using a simple heuristic.
 
     Looks for patterns like ``Firma <Name>`` or ``Company: <Name>``. This is a
-    placeholder for later NER-based extraction.
+    stub for later NER-based extraction.
     """
     match = re.search(r"(?:firma|company)[:\s]+([^\n]+)", text, re.IGNORECASE)
     if match:

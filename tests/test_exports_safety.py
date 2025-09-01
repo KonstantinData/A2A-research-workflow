@@ -19,7 +19,7 @@ def test_csv_and_meta_on_empty(tmp_path):
     assert meta["reason"] == "no_triggers"
 
 
-def test_pdf_placeholder_on_empty(tmp_path):
+def test_pdf_created_on_empty(tmp_path):
     rows = []
     os.chdir(tmp_path)
     pdf_render.render_pdf(rows, ["company_name"], {"reason": "no_triggers"})

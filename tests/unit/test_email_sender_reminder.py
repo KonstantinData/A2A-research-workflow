@@ -24,13 +24,13 @@ def test_send_reminder_formats_subject_and_body(monkeypatch):
         creator_email='user@condata.io',
         creator_name='Alice',
         event_id='evt123',
-        event_title='Demo',
+        event_title='Team Sync',
         event_start=start,
         event_end=end,
         missing_fields=['Company', 'Web domain'],
     )
 
-    assert 'Demo' in captured['subject']
+    assert 'Team Sync' in captured['subject']
     assert '2024-05-17' in captured['subject']
     assert '09:00–10:00' in captured['subject']
     assert 'Unknown' not in captured['subject']

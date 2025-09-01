@@ -9,5 +9,6 @@ def test_main_handles_string_exit(monkeypatch):
 
     monkeypatch.setattr(orchestrator, "run", fake_run)
     monkeypatch.setattr(orchestrator, "build_user_credentials", lambda scopes: object())
+    monkeypatch.setenv("LIVE_MODE", "0")
     rc = orchestrator.main([])
     assert rc == 0

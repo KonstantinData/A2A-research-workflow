@@ -57,6 +57,10 @@ PDF generation relies on WeasyPrint system libraries, installed by the Dockerfil
 
 The refresh token is bound to the exact client (ID/secret); mixing clients causes `invalid_grant` errors. To re-issue a refresh token, generate a consent URL with `access_type=offline` and `prompt=consent`. The helper accepts the legacy `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, the v2 variants `GOOGLE_CLIENT_ID_V2`/`GOOGLE_CLIENT_SECRET_V2`, or a full JSON blob via `GOOGLE_OAUTH_JSON`.
 
+## LIVE mode
+
+`LIVE_MODE=1` (default) hard-fails when Google OAuth, SMTP or HubSpot configuration is missing. The calendar integration probes the token/client pair and may log `invalid_grant` if the refresh token was revoked or belongs to a different client. Re-issue the token with `access_type=offline` and `prompt=consent`.
+
 ## Workflow Description
 
 1. Poll Google Calendar and Contacts for new entries containing trigger words.

@@ -50,6 +50,26 @@ append_jsonl = _mod.append
 CAL_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 
+# --------- LIVE readiness assertions ---------
+def _assert_live_ready() -> None:
+    if os.getenv("LIVE_MODE", "1") != "1":
+        return
+    required = [
+        "GOOGLE_REFRESH_TOKEN",
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "SMTP_HOST",
+        "SMTP_PORT",
+        "MAIL_FROM",
+    ]
+    if os.getenv("REQUIRE_HUBSPOT", "1") == "1":
+        required.append("HUBSPOT_ACCESS_TOKEN")
+    missing = [k for k in required if not os.getenv(k)]
+    if missing:
+        raise RuntimeError("LIVE readiness failed; missing: " + ", ".join(missing))
+    log_event({"status": "live_assertions_passed"})
+
+
 # --------- kleine Logging-Helfer, von Tests gepatcht ---------
 def log_event(record: Dict[str, Any]) -> None:
     """Append ``record`` to a JSONL workflow log file using a common template.
@@ -338,18 +358,18 @@ def run(
         outdir.mkdir(parents=True, exist_ok=True)
         pdf_path = outdir / "report.pdf"
         csv_path = outdir / "data.csv"
-        placeholder = {
+        empty_report = {
             "fields": ["info"],
             "rows": [{"info": "No valid triggers in current window"}],
             "meta": {"reason": "no_triggers"}
         }
         try:
-            pdf_render.render_pdf(placeholder, pdf_path)
+            pdf_render.render_pdf(empty_report, pdf_path)
             log_event({"status": "artifact_pdf", "path": str(pdf_path)})
         except Exception as e:
             log_event({"status": "artifact_pdf_error", "error": str(e), "severity": "warning"})
         try:
-            csv_export.export_csv(placeholder, csv_path, reason="no_triggers")
+            csv_export.export_csv(empty_report, csv_path, reason="no_triggers")
             log_event({"status": "artifact_csv", "path": str(csv_path)})
         except Exception as e:
             log_event({"status": "artifact_csv_error", "error": str(e), "severity": "warning"})
@@ -513,6 +533,7 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument("--company", default="")
     parser.add_argument("--website", default="")
     args = parser.parse_args(argv)
+    _assert_live_ready()
     if not _preflight_google():
         raise SystemExit(2)
 
