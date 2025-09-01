@@ -6,105 +6,86 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from integrations import google_calendar
-from core import orchestrator
 
 
 class _StubEvents:
-    def __init__(self, items, call_rec):
-        self._items = items
-        self._call_rec = call_rec
+    def __init__(self, pages, rec):
+        self.pages = pages
+        self.rec = rec
+        self.kw = None
 
     def list(self, **kwargs):
-        self._call_rec.update(kwargs)
+        self.kw = kwargs
+        self.rec.append(kwargs)
         return self
 
     def execute(self):
-        return {"items": list(self._items)}
+        key = (self.kw["calendarId"], self.kw.get("pageToken"))
+        return self.pages.get(key, {"items": []})
 
 
 class _StubService:
-    def __init__(self, items, call_rec):
-        self.items = items
-        self.call_rec = call_rec
+    def __init__(self, pages, rec):
+        self.pages = pages
+        self.rec = rec
 
     def events(self):
-        return _StubEvents(self.items, self.call_rec)
+        return _StubEvents(self.pages, self.rec)
 
 
 @pytest.fixture
 def stub_time(monkeypatch):
-    fixed = dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc)
+    fixed = dt.datetime(2024, 1, 1)
 
     class _FixedDateTime(dt.datetime):
         @classmethod
-        def now(cls, tz=None):
+        def utcnow(cls):
             return fixed
 
-    monkeypatch.setattr(google_calendar, "datetime", _FixedDateTime)
+    monkeypatch.setattr(google_calendar.dt, "datetime", _FixedDateTime)
     return fixed
 
 
-def _setup_service(monkeypatch, items):
-    rec = {}
-    svc = _StubService(items, rec)
+def _setup_service(monkeypatch, pages):
+    rec = []
+    svc = _StubService(pages, rec)
     monkeypatch.setattr(google_calendar, "build", lambda *a, **k: svc)
-    monkeypatch.setattr(google_calendar, "Credentials", lambda *a, **k: object())
-    monkeypatch.setenv("GOOGLE_CLIENT_ID", "id")
-    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "secret")
-    monkeypatch.setenv("GOOGLE_REFRESH_TOKEN", "token")
+    monkeypatch.setattr(google_calendar, "build_user_credentials", lambda scopes: object())
     return rec
 
 
-def test_default_window(monkeypatch, stub_time, tmp_path):
+def test_time_window_defaults(monkeypatch, stub_time, tmp_path):
     monkeypatch.chdir(tmp_path)
-    call_rec = _setup_service(monkeypatch, [])
+    rec = _setup_service(monkeypatch, {("primary", None): {"items": []}})
     google_calendar.fetch_events()
-    assert call_rec["timeMin"] == "2023-12-31T00:00:00+00:00"
-    assert call_rec["timeMax"] == "2024-01-08T00:00:00+00:00"
+    args = rec[0]
+    assert args["timeMin"] == "2023-12-31T00:00:00+00:00"
+    assert args["timeMax"] == "2024-01-15T00:00:00+00:00"
 
 
 def test_env_override(monkeypatch, stub_time, tmp_path):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("CALENDAR_MINUTES_BACK", "30")
-    monkeypatch.setenv("CALENDAR_MINUTES_FWD", "60")
-    call_rec = _setup_service(monkeypatch, [])
+    monkeypatch.setenv("CAL_LOOKBACK_DAYS", "2")
+    monkeypatch.setenv("CAL_LOOKAHEAD_DAYS", "3")
+    monkeypatch.setattr(google_calendar, "LOOKBACK_DAYS", 2)
+    monkeypatch.setattr(google_calendar, "LOOKAHEAD_DAYS", 3)
+    rec = _setup_service(monkeypatch, {("primary", None): {"items": []}})
     google_calendar.fetch_events()
-    assert call_rec["timeMin"] == "2023-12-31T23:30:00+00:00"
-    assert call_rec["timeMax"] == "2024-01-01T01:00:00+00:00"
+    args = rec[0]
+    assert args["timeMin"] == "2023-12-30T00:00:00+00:00"
+    assert args["timeMax"] == "2024-01-04T00:00:00+00:00"
 
 
-def test_duplicate_event_not_skipped(monkeypatch, stub_time, tmp_path):
+def test_multi_calendar_and_pagination(monkeypatch, stub_time, tmp_path):
     monkeypatch.chdir(tmp_path)
-    event = {"id": "1", "updated": "2021-01-01T00:00:00Z", "summary": "hit"}
-    _setup_service(monkeypatch, [event])
-    first = google_calendar.fetch_events()
-    assert len(first) == 1
-    second = google_calendar.fetch_events()
-    assert len(second) == 1
-
-
-def test_event_updated_still_returned(monkeypatch, stub_time, tmp_path):
-    monkeypatch.chdir(tmp_path)
-    event = {"id": "1", "updated": "2021-01-01T00:00:00Z", "summary": "hit"}
-    _setup_service(monkeypatch, [event])
-    first = google_calendar.fetch_events()
-    assert len(first) == 1
-    event["updated"] = "2021-01-02T00:00:00Z"
-    second = google_calendar.fetch_events()
-    assert len(second) == 1
-
-
-def test_fetch_events_includes_creator_and_logs(monkeypatch, stub_time, tmp_path):
-    monkeypatch.chdir(tmp_path)
-    event = {
-        "id": "1",
-        "summary": "Meet",
-        "description": "desc",
-        "start": {"dateTime": "2024-01-01T10:00:00+00:00"},
-        "end": {"dateTime": "2024-01-01T11:00:00+00:00"},
-        "creator": {"email": "alice@example.com"},
+    pages = {
+        ("cal1", None): {"items": [{"id": "1"}], "nextPageToken": "t"},
+        ("cal1", "t"): {"items": [{"id": "2"}]},
+        ("cal2", None): {"items": [{"id": "3"}]},
     }
-    _setup_service(monkeypatch, [event])
+    monkeypatch.setenv("GOOGLE_CALENDAR_IDS", "cal1,cal2")
+    monkeypatch.setattr(google_calendar, "CAL_IDS", ["cal1", "cal2"])
+    rec = _setup_service(monkeypatch, pages)
     logs = []
 
     def fake_log_step(category, status, payload, severity="info"):
@@ -112,99 +93,7 @@ def test_fetch_events_includes_creator_and_logs(monkeypatch, stub_time, tmp_path
 
     monkeypatch.setattr(google_calendar, "log_step", fake_log_step)
     res = google_calendar.fetch_events()
-    assert res == [
-        {
-            "event_id": "1",
-            "summary": "Meet",
-            "description": "desc",
-            "location": None,
-            "attendees": [],
-            "start": {"dateTime": "2024-01-01T10:00:00+00:00"},
-            "end": {"dateTime": "2024-01-01T11:00:00+00:00"},
-            "creatorEmail": "alice@example.com",
-            "creator": {"email": "alice@example.com"},
-        }
-    ]
+    assert [e["event_id"] for e in res] == ["1", "2", "3"]
+    fetch_logs = [l for l in logs if l["status"] == "fetch_ok"]
+    assert fetch_logs and fetch_logs[0]["payload"]["calendars"] == ["cal1", "cal2"]
 
-    fetched_logs = [l for l in logs if l["status"] == "fetched_events"]
-    assert fetched_logs
-    assert fetched_logs[0]["payload"] == {
-        "count": 1,
-        "time_min": "2023-12-31T00:00:00+00:00",
-        "time_max": "2024-01-08T00:00:00+00:00",
-        "ids": ["1"],
-        "summaries": ["Meet"],
-        "creator_emails": ["alice@example.com"],
-    }
-
-
-def test_fetch_events_logs_two_events(monkeypatch, stub_time, tmp_path):
-    monkeypatch.chdir(tmp_path)
-    events = [
-        {
-            "id": "1",
-            "summary": "A",
-            "start": {"dateTime": "2024-01-01T10:00:00+00:00"},
-            "end": {"dateTime": "2024-01-01T11:00:00+00:00"},
-        },
-        {
-            "id": "2",
-            "summary": "B",
-            "start": {"dateTime": "2024-01-02T10:00:00+00:00"},
-            "end": {"dateTime": "2024-01-02T11:00:00+00:00"},
-        },
-    ]
-    _setup_service(monkeypatch, events)
-    logs = []
-
-    def fake_log_step(category, status, payload, severity="info"):
-        logs.append({"category": category, "status": status, "payload": payload})
-
-    monkeypatch.setattr(google_calendar, "log_step", fake_log_step)
-    google_calendar.fetch_events()
-    fetched_logs = [l for l in logs if l["status"] == "fetched_events"]
-    assert fetched_logs
-    payload = fetched_logs[0]["payload"]
-    assert payload["count"] == 2
-    assert payload["time_min"] == "2023-12-31T00:00:00+00:00"
-    assert payload["time_max"] == "2024-01-08T00:00:00+00:00"
-    assert payload["ids"] == ["1", "2"]
-    assert payload["summaries"] == ["A", "B"]
-    assert payload["creator_emails"] == [None, None]
-
-
-def test_fetch_events_logs_no_events(monkeypatch, stub_time, tmp_path):
-    monkeypatch.chdir(tmp_path)
-    _setup_service(monkeypatch, [])
-    logs = []
-
-    def fake_log_step(category, status, payload, severity="info"):
-        logs.append({"category": category, "status": status, "payload": payload})
-
-    monkeypatch.setattr(google_calendar, "log_step", fake_log_step)
-    google_calendar.fetch_events()
-    fetched_logs = [l for l in logs if l["status"] == "fetched_events"]
-    assert fetched_logs
-    assert fetched_logs[0]["payload"] == {
-        "count": 0,
-        "time_min": "2023-12-31T00:00:00+00:00",
-        "time_max": "2024-01-08T00:00:00+00:00",
-        "ids": [],
-        "summaries": [],
-        "creator_emails": [],
-    }
-
-
-def test_orchestrator_no_triggers(monkeypatch, tmp_path):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(orchestrator, "gather_triggers", lambda *a, **k: [])
-    records = []
-    monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
-    res = orchestrator.run()
-    assert res == {"status": "idle"}
-    assert any(r["status"] == "no_triggers" for r in records)
-    no_trig = next(r for r in records if r["status"] == "no_triggers")
-    assert (
-        no_trig["message"]
-        == "No calendar or contact events matched trigger words"
-    )

@@ -19,6 +19,7 @@ from core.utils import (
 )  # noqa: F401  # required_fields/optional_fields imported for completeness
 from integrations.google_calendar import fetch_events
 from integrations.google_contacts import fetch_contacts
+from integrations.google_oauth import build_user_credentials, which_variant
 from core.trigger_words import contains_trigger
 
 # Expose integrations so tests can monkeypatch them
@@ -45,6 +46,8 @@ _mod = _ilu.module_from_spec(_spec)
 assert _spec and _spec.loader
 _spec.loader.exec_module(_mod)
 append_jsonl = _mod.append
+
+CAL_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 
 # --------- kleine Logging-Helfer, von Tests gepatcht ---------
@@ -81,6 +84,15 @@ def log_event(record: Dict[str, Any]) -> None:
     append_jsonl(path, base)
 
 
+def _preflight_google() -> bool:
+    creds = build_user_credentials(CAL_SCOPES)
+    if not creds:
+        log_event({"status": "preflight_oauth_missing", "provider": "google", "variant": which_variant()})
+        return False
+    log_event({"status": "preflight_oauth_ok", "provider": "google", "variant": which_variant()})
+    return True
+
+
 def _event_id_exists(event_id: str) -> bool:
     """Return True if ``event_id`` already present in any workflow log."""
     if not event_id:
@@ -112,7 +124,7 @@ def _calendar_fetch_logged(wf_id: str) -> bool:
     path = Path("logs") / "workflows" / "calendar.jsonl"
     if not path.exists():
         return False
-    required = {"fetch_call", "raw_api_response", "fetched_events"}
+    required = {"fetch_ok"}
     statuses: set[str] = set()
     try:
         with path.open("r", encoding="utf-8") as fh:
@@ -305,8 +317,13 @@ def run(
             "status": "no_triggers_diagnostics",
             "details": {
                 "window": {
-                    "back_min": int(os.getenv("CALENDAR_MINUTES_BACK", "1440")),
-                    "fwd_min": int(os.getenv("CALENDAR_MINUTES_FWD", "10080")),
+                    "lookback_days": int(os.getenv("CAL_LOOKBACK_DAYS", "1")),
+                    "lookahead_days": int(os.getenv("CAL_LOOKAHEAD_DAYS", "14")),
+                    "calendar_ids": [
+                        c.strip()
+                        for c in os.getenv("GOOGLE_CALENDAR_IDS", "primary").split(",")
+                        if c.strip()
+                    ],
                 }
             },
             "severity": "info",
@@ -496,6 +513,8 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument("--company", default="")
     parser.add_argument("--website", default="")
     args = parser.parse_args(argv)
+    if not _preflight_google():
+        raise SystemExit(2)
 
     try:
         run()

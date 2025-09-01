@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Callable
-from .google_oauth import build_user_credentials, which_variant
+from .google_oauth import build_user_credentials, which_variant, classify_oauth_error
 
 # Google libs optional in Tests
 try:  # pragma: no cover
@@ -63,51 +63,58 @@ def fetch_contacts(page_size: int = 200, page_limit: int = 10) -> List[Dict[str,
     if build is None or Request is None:  # pragma: no cover
         return []
 
-    creds = build_user_credentials(SCOPES)
-    if not creds:  # pragma: no cover
+    try:
+        creds = build_user_credentials(SCOPES)
+        if not creds:
+            log_step(
+                "contacts",
+                "missing_google_oauth_env",
+                {"variant": which_variant()},
+                severity="error",
+            )
+            return []
+
+        creds.refresh(Request())
+
+        service = build("people", "v1", credentials=creds, cache_discovery=False)
         log_step(
             "contacts",
-            "missing_google_oauth_env",
-            {"variant": which_variant()},
+            "fetch_call",
+            {"page_size": page_size, "page_limit": page_limit},
+        )
+
+        out: List[Dict[str, Any]] = []
+        page_token: Optional[str] = None
+        pages = 0
+        while True:  # pragma: no cover (in CI meist gemonkeypatched)
+            resp = (
+                service.people()
+                .connections()
+                .list(
+                    resourceName="people/me",
+                    pageSize=page_size,
+                    pageToken=page_token,
+                    personFields="names,emailAddresses,organizations,metadata,biographies,urls,photos",
+                    sortOrder="LAST_MODIFIED_DESCENDING",
+                    requestSyncToken=False,
+                )
+                .execute()
+            )
+            out.extend(resp.get("connections", []) or [])
+            page_token = resp.get("nextPageToken")
+            pages += 1
+            if not page_token or pages >= page_limit:
+                break
+        return out
+    except Exception as e:
+        code, hint = classify_oauth_error(e)
+        log_step(
+            "contacts",
+            "fetch_error",
+            {"error": str(e), "code": code, "hint": hint, "variant": which_variant()},
             severity="error",
         )
         return []
-
-    try:
-        creds.refresh(Request())
-    except Exception:  # pragma: no cover - invalid/expired tokens
-        return []
-
-    service = build("people", "v1", credentials=creds, cache_discovery=False)
-    log_step(
-        "contacts",
-        "fetch_call",
-        {"page_size": page_size, "page_limit": page_limit},
-    )
-
-    out: List[Dict[str, Any]] = []
-    page_token: Optional[str] = None
-    pages = 0
-    while True:  # pragma: no cover (in CI meist gemonkeypatched)
-        resp = (
-            service.people()
-            .connections()
-            .list(
-                resourceName="people/me",
-                pageSize=page_size,
-                pageToken=page_token,
-                personFields="names,emailAddresses,organizations,metadata,biographies,urls,photos",
-                sortOrder="LAST_MODIFIED_DESCENDING",
-                requestSyncToken=False,
-            )
-            .execute()
-        )
-        out.extend(resp.get("connections", []) or [])
-        page_token = resp.get("nextPageToken")
-        pages += 1
-        if not page_token or pages >= page_limit:
-            break
-    return out
 
 
 # Für orchestrator.gather_triggers wird nur fetch_contacts gebraucht.

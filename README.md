@@ -53,6 +53,10 @@ flowchart LR
 
 PDF generation relies on WeasyPrint system libraries, installed by the Dockerfile and the CI workflow.
 
+## Google OAuth & Token Rotation
+
+The refresh token is bound to the exact client (ID/secret); mixing clients causes `invalid_grant` errors. To re-issue a refresh token, generate a consent URL with `access_type=offline` and `prompt=consent`. The helper accepts the legacy `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, the v2 variants `GOOGLE_CLIENT_ID_V2`/`GOOGLE_CLIENT_SECRET_V2`, or a full JSON blob via `GOOGLE_OAUTH_JSON`.
+
 ## Workflow Description
 
 1. Poll Google Calendar and Contacts for new entries containing trigger words.
@@ -174,8 +178,13 @@ CRM.
 | `TRIGGER_WORDS_FILE` | Path to trigger words list | `config/trigger_words.txt` |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID | – |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | – |
+| `GOOGLE_CLIENT_ID_V2` | Alternate client ID (auto-detected) | – |
+| `GOOGLE_CLIENT_SECRET_V2` | Alternate client secret (auto-detected) | – |
 | `GOOGLE_REFRESH_TOKEN` | Google OAuth refresh token | – |
-| `GOOGLE_CALENDAR_ID` | Calendar ID to poll | `primary` |
+| `GOOGLE_OAUTH_JSON` | Full client JSON blob | – |
+| `GOOGLE_CALENDAR_IDS` | Comma-separated calendar IDs to poll | `primary` |
+| `CAL_LOOKAHEAD_DAYS` | Days ahead to fetch events | `14` |
+| `CAL_LOOKBACK_DAYS` | Days back to include events | `1` |
 | `HUBSPOT_ACCESS_TOKEN` | HubSpot private app token | – |
 | `USE_PUSH_TRIGGERS` | Disable scheduled polling | `false` |
 | `ENABLE_PRO_SOURCES` | Allow pro research agents | `false` |
