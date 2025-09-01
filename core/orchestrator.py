@@ -48,13 +48,23 @@ _spec.loader.exec_module(_mod)
 append_jsonl = _mod.append
 
 CAL_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
-GOOGLE_OAUTH_VARIANT = "v2"
 
 
 # --------- LIVE readiness assertions ---------
 def _assert_live_ready() -> None:
     if os.getenv("LIVE_MODE", "1") != "1":
         return
+    # v2-only
+    if (
+        os.getenv("GOOGLE_CLIENT_ID")
+        or os.getenv("GOOGLE_CLIENT_SECRET")
+        or os.getenv("GOOGLE_0")
+        or os.getenv("GOOGLE_OAUTH_JSON")
+        or os.getenv("GOOGLE_CREDENTIALS_JSON")
+    ):
+        raise RuntimeError(
+            "Legacy Google OAuth env present. Remove them; v2-only is enforced."
+        )
     required = [
         "GOOGLE_REFRESH_TOKEN",
         "GOOGLE_CLIENT_ID_V2",
@@ -108,9 +118,17 @@ def log_event(record: Dict[str, Any]) -> None:
 def _preflight_google() -> bool:
     creds = build_user_credentials(CAL_SCOPES)
     if not creds:
-        log_event({"status": "preflight_oauth_missing", "provider": "google", "variant": GOOGLE_OAUTH_VARIANT})
+        log_event(
+            {
+                "status": "preflight_oauth_missing",
+                "provider": "google",
+                "mode": "v2-only",
+            }
+        )
         return False
-    log_event({"status": "preflight_oauth_ok", "provider": "google", "variant": GOOGLE_OAUTH_VARIANT})
+    log_event(
+        {"status": "preflight_oauth_ok", "provider": "google", "mode": "v2-only"}
+    )
     return True
 
 
