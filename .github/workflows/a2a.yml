@@ -85,6 +85,17 @@ jobs:
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
 
+      - name: Assert v2-only env
+        run: python ops/assert_v2_only.py
+
+      - name: Google OAuth selftest (v2-only)
+        env:
+          GOOGLE_CLIENT_ID_V2:     ${{ secrets.GOOGLE_CLIENT_ID_V2 }}
+          GOOGLE_CLIENT_SECRET_V2: ${{ secrets.GOOGLE_CLIENT_SECRET_V2 }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_TOKEN_URI:     ${{ secrets.GOOGLE_TOKEN_URI || 'https://oauth2.googleapis.com/token' }}
+        run: python ops/google_oauth_selftest.py
+
       - name: No dummy content guard
         run: python ops/no_demo_guard.py
 
