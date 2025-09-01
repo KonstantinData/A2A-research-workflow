@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 from typing import Any, Dict, List, Optional, Callable
 from .google_oauth import build_user_credentials, classify_oauth_error
 
@@ -69,7 +71,7 @@ def fetch_contacts(page_size: int = 200, page_limit: int = 10) -> List[Dict[str,
             log_step(
                 "contacts",
                 "missing_google_oauth_env",
-                {},
+                {"mode": "v2-only"},
                 severity="error",
             )
             return []
@@ -108,10 +110,11 @@ def fetch_contacts(page_size: int = 200, page_limit: int = 10) -> List[Dict[str,
         return out
     except Exception as e:
         code, hint = classify_oauth_error(e)
+        cid_tail = (os.getenv("GOOGLE_CLIENT_ID_V2") or "")[-8:]
         log_step(
             "contacts",
             "fetch_error",
-            {"error": str(e), "code": code, "hint": hint},
+            {"error": str(e), "code": code, "hint": hint, "client_id_tail": cid_tail},
             severity="error",
         )
         return []
