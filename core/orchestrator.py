@@ -17,7 +17,7 @@ from core.utils import (
     get_workflow_id,
     bundle_logs_into_exports,
 )  # noqa: F401  # required_fields/optional_fields imported for completeness
-from integrations.google_calendar import fetch_events
+from integrations.google_calendar import fetch_events, extract_company, extract_domain
 from integrations.google_contacts import fetch_contacts
 from integrations.google_oauth import build_user_credentials
 from core.trigger_words import contains_trigger
@@ -442,6 +442,14 @@ def run(
         payload = trig.setdefault("payload", {})
         event_id = payload.get("event_id")
         enriched: Dict[str, Any] | None = None
+        if not payload.get("company_name"):
+            extracted_company = extract_company(payload.get("summary")) or extract_company(payload.get("description"))
+            if extracted_company:
+                payload["company_name"] = extracted_company
+        if not payload.get("domain"):
+            extracted_domain = extract_domain(payload.get("summary")) or extract_domain(payload.get("description"))
+            if extracted_domain:
+                payload["domain"] = extracted_domain
         if event_id:
             enriched = field_completion_agent.run(trig)
             if enriched:

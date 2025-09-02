@@ -31,10 +31,14 @@ def _time_window() -> tuple[str, str]:
 
 
 def _normalize(ev: Dict[str, Any], cal_id: str) -> Normalized:
+    summary = ev.get("summary") or ""
+    description = ev.get("description") or ""
+    company = extract_company(summary) or extract_company(description)
+    domain = extract_domain(summary) or extract_domain(description)
     return {
         "event_id": ev.get("id"),
-        "summary": ev.get("summary"),
-        "description": ev.get("description"),
+        "summary": summary or None,
+        "description": description or None,
         "location": ev.get("location"),
         "attendees": [
             {"email": a.get("email")}
@@ -46,6 +50,8 @@ def _normalize(ev: Dict[str, Any], cal_id: str) -> Normalized:
         "creatorEmail": (ev.get("creator") or {}).get("email"),
         "creator": ev.get("creator"),
         "calendarId": cal_id,
+        "company_name": company,
+        "domain": domain,
     }
 
 
