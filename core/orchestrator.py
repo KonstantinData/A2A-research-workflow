@@ -54,22 +54,23 @@ CAL_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 def _assert_live_ready() -> None:
     if os.getenv("LIVE_MODE", "1") != "1":
         return
-    # v2-only
+    # v2-only: hard-fail if *any* legacy envs are set
     legacy = [
-        "GOOGLE_" + "CLIENT_ID",
-        "GOOGLE_" + "CLIENT_SECRET",
-        "GOOGLE_" + "0",
-        "GOOGLE_" + "OAUTH_JSON",
-        "GOOGLE_" + "CREDENTIALS_JSON",
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "GOOGLE_0",
+        "GOOGLE_OAUTH_JSON",
+        "GOOGLE_CREDENTIALS_JSON",
     ]
     if any(os.getenv(k) for k in legacy):
         raise RuntimeError(
             "Legacy Google OAuth env present. Remove them; v2-only is enforced."
         )
+    # required LIVE envs
     required = [
-        "GOOGLE_REFRESH_TOKEN",
         "GOOGLE_CLIENT_ID_V2",
         "GOOGLE_CLIENT_SECRET_V2",
+        "GOOGLE_REFRESH_TOKEN",
         "SMTP_HOST",
         "SMTP_PORT",
         "MAIL_FROM",
@@ -79,7 +80,7 @@ def _assert_live_ready() -> None:
     missing = [k for k in required if not os.getenv(k)]
     if missing:
         raise RuntimeError("LIVE readiness failed; missing: " + ", ".join(missing))
-    log_event({"status": "live_assertions_passed"})
+    log_event({"status": "live_assertions_passed", "mode": "v2-only"})
 
 
 # --------- kleine Logging-Helfer, von Tests gepatcht ---------
