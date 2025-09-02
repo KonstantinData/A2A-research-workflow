@@ -110,7 +110,7 @@ def check_existing_report(company_id: str) -> Optional[Dict[str, Any]]:
         "limit": 1,
         "sorts": ["-createdAt"],
     }
-    resp = requests.post(url, headers=headers, json=payload, timeout=30)
+    resp = requests.post(url, headers=headers, json=payload, timeout=DEFAULT_TIMEOUT)
     resp.raise_for_status()
     results = resp.json().get("results", [])
     return results[0] if results else None

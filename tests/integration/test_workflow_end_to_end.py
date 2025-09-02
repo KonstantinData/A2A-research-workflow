@@ -164,3 +164,53 @@ def test_reminder_and_escalation(monkeypatch):
     assert escalate_calls and escalate_calls[0]["to"] == "admin@condata.io"
     assert '"status": "reminder_sent"' in logs
     assert '"status": "escalation_sent"' in logs
+
+
+def test_existing_report_prompt(monkeypatch):
+    trig = {
+        "source": "calendar",
+        "creator": "a@b",
+        "recipient": "a@b",
+        "payload": {"event_id": "e6", "company_name": "ACME", "domain": "acme.com"},
+    }
+    send_calls = []
+    monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda **k: send_calls.append(k))
+    monkeypatch.setattr(orchestrator.email_reader, "fetch_replies", lambda: [{"creator": "a@b", "text": "Nein"}])
+    orchestrator.run(
+        triggers=[trig],
+        researchers=[],
+        consolidate_fn=lambda r: {},
+        pdf_renderer=_stub_pdf,
+        csv_exporter=_stub_csv,
+        hubspot_upsert=lambda d: None,
+        hubspot_attach=lambda p, c: None,
+        hubspot_check_existing=lambda cid: {"id": "1"},
+    )
+    logs = _collect_logs()
+    assert '"status": "report_exists_query"' in logs
+    assert '"status": "report_skipped"' in logs
+    assert send_calls
+
+
+def test_existing_report_continue(monkeypatch):
+    trig = {
+        "source": "calendar",
+        "creator": "a@b",
+        "recipient": "a@b",
+        "payload": {"event_id": "e7", "company_name": "ACME", "domain": "acme.com"},
+    }
+    monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda **k: None)
+    monkeypatch.setattr(orchestrator.email_reader, "fetch_replies", lambda: [{"creator": "a@b", "text": "Ja"}])
+    orchestrator.run(
+        triggers=[trig],
+        researchers=[],
+        consolidate_fn=lambda r: {},
+        pdf_renderer=_stub_pdf,
+        csv_exporter=_stub_csv,
+        hubspot_upsert=lambda d: None,
+        hubspot_attach=lambda p, c: None,
+        hubspot_check_existing=lambda cid: {"id": "1"},
+    )
+    logs = _collect_logs()
+    assert '"status": "report_exists_query"' in logs
+    assert '"status": "report_skipped"' not in logs

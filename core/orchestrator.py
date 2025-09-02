@@ -502,16 +502,36 @@ def run(
 
     first_id = (triggers or [{}])[0].get("payload", {}).get("event_id")
     existing = hubspot_check_existing(company_id) if hubspot_check_existing else None
-    if existing and existing.get("createdAt"):
+    if existing:
+        creator = (triggers or [{}])[0].get("creator")
         try:
-            created = datetime.fromisoformat(str(existing["createdAt"]).replace("Z", "+00:00"))
-            if (datetime.now(timezone.utc) - created).days < 7:
-                log_event({"event_id": first_id, "status": "report_skipped"})
-                finalize_summary()
-                bundle_logs_into_exports()
-                return consolidated
+            email_sender.send_email(
+                to=creator,
+                subject="Existing report found",
+                body="A report already exists for this company. Reply with Ja to continue or Nein to skip.",
+                task_id=first_id,
+            )
         except Exception:
             pass
+        log_event({"event_id": first_id, "status": "report_exists_query"})
+        decision = "yes"
+        try:
+            replies = email_reader.fetch_replies()
+        except Exception:
+            replies = []
+        for rep in replies:
+            if rep.get("creator") == creator:
+                text = str(rep.get("text") or "").strip().lower()
+                if text in {"nein", "no"}:
+                    decision = "no"
+                elif text in {"ja", "yes"}:
+                    decision = "yes"
+                break
+        if decision != "yes":
+            log_event({"event_id": first_id, "status": "report_skipped"})
+            finalize_summary()
+            bundle_logs_into_exports()
+            return consolidated
 
     if duplicate_checker and duplicate_checker(consolidated, existing):
         finalize_summary()
