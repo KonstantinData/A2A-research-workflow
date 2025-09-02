@@ -175,8 +175,10 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
             (t for t in trigger_words if contains_trigger(summary_text, [t])),
             None,
         )
+        confirmed_trigger = person.get("confirmed_trigger")
+        if confirmed_trigger:
+            matched_trigger = confirmed_trigger
         contact_id = person.get("resourceName") or person.get("id") or ""
-        suggestions: List[str] = []
         if matched_trigger:
             log_step(
                 "contacts",
@@ -211,6 +213,12 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
                         {"contact_id": contact_id, "error": str(e)},
                         severity="error",
                     )
+            log_step(
+                "contacts",
+                "no_trigger_match",
+                {"contact_id": contact_id, "name": joined_names},
+            )
+            continue
 
         company = parser.extract_company(notes) or parser.extract_company(joined_names) or ""
         domain = parser.extract_domain(notes) or parser.extract_domain(joined_names) or ""

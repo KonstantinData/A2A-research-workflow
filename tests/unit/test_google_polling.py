@@ -12,7 +12,7 @@ def test_contacts_scheduled_poll_normalizes(monkeypatch):
     contact = {
         "emailAddresses": [{"value": "bob@example.com"}],
         "names": [{"displayName": "Bob"}],
-        "notes": "Firma ACME Corp\nacme.com\n+49 987654321",
+        "notes": "Firma ACME Corp\nacme.com\nResearch project\n+49 987654321",
     }
     monkeypatch.setattr(google_contacts, "fetch_contacts", lambda: [contact])
     monkeypatch.setattr(google_contacts.email_sender, "send", lambda *a, **k: None)
@@ -30,7 +30,7 @@ def test_contacts_scheduled_poll_normalizes(monkeypatch):
                 "domain": "acme.com",
                 "email": "bob@example.com",
                 "phone": "+49 987654321",
-                "notes_blob": "Firma ACME Corp\nacme.com\n+49 987654321",
+                "notes_blob": "Firma ACME Corp\nacme.com\nResearch project\n+49 987654321",
                 "notes_extracted": {
                     "company": "ACME Corp",
                     "domain": "acme.com",
@@ -46,7 +46,7 @@ def test_contacts_scheduled_poll_summarizes_notes(monkeypatch):
     contact = {
         "emailAddresses": [{"value": "bob@example.com"}],
         "names": [{"displayName": "Bob"}],
-        "notes": "Bob is great. Loves testing.\nFirma Foo\nfoo.com\n+49 1111111",
+        "notes": "Bob is great. Loves testing.\nFirma Foo\nfoo.com\n+49 1111111\nResearch meeting",
     }
 
     monkeypatch.setattr(google_contacts, "fetch_contacts", lambda: [contact])
@@ -62,7 +62,7 @@ def test_contacts_poll_falls_back_to_admin(monkeypatch):
     """If a contact has no e-mail address, admin is notified."""
     contact = {
         "names": [{"displayName": "Bob"}],
-        "notes": "Firma ACME",  # missing domain triggers reminder
+        "notes": "Firma ACME\nResearch topic",  # missing domain triggers reminder
     }
     monkeypatch.setattr(google_contacts, "fetch_contacts", lambda: [contact])
     sent = {}
@@ -101,3 +101,21 @@ def test_contacts_scheduled_poll_requests_confirmation_on_similar_trigger(monkey
 
     assert sent.get("to") == "bob@example.com"
     assert any(args[1] == "trigger_confirmation_pending" for args, _ in logs)
+
+
+def test_contacts_without_triggers_are_omitted(monkeypatch):
+    """Contacts lacking trigger words are skipped."""
+    contact = {
+        "emailAddresses": [{"value": "bob@example.com"}],
+        "names": [{"displayName": "Bob"}],
+        "notes": "Just some notes without keywords",
+    }
+    monkeypatch.setattr(google_contacts, "fetch_contacts", lambda: [contact])
+    logs = []
+    monkeypatch.setattr(google_contacts, "log_step", lambda *a, **k: logs.append((a, k)))
+    monkeypatch.setattr(google_contacts.email_sender, "send", lambda *a, **k: None)
+
+    result = google_contacts.scheduled_poll()
+
+    assert result == []
+    assert any(args[1] == "no_trigger_match" for args, _ in logs)
