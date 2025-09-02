@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 
 from typing import Any, Dict, List, Optional, Callable
+
+from config.settings import SETTINGS
 from .google_oauth import build_user_credentials, classify_oauth_error
 
 # Google libs optional in Tests
@@ -60,8 +62,14 @@ def _notes_blob(person: Dict[str, Any]) -> str:
     return notes
 
 
-def fetch_contacts(page_size: int = 200, page_limit: int = 10) -> List[Dict[str, Any]]:
+def fetch_contacts(
+    page_size: int | None = None, page_limit: int | None = None
+) -> List[Dict[str, Any]]:
     """Live-Fetch (in Tests typischerweise gemonkeypatched)."""
+    if page_size is None:
+        page_size = SETTINGS.contacts_page_size
+    if page_limit is None:
+        page_limit = SETTINGS.contacts_page_limit
     if build is None or Request is None:  # pragma: no cover
         log_step("contacts", "google_api_client_missing", {}, severity="error")
         from core.orchestrator import log_event
