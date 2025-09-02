@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Callable, Optional
+import shutil
 
 from core import feature_flags
 from core.utils import (
@@ -15,7 +16,6 @@ from core.utils import (
     log_step,
     finalize_summary,
     get_workflow_id,
-    bundle_logs_into_exports,
 )  # noqa: F401  # required_fields/optional_fields imported for completeness
 from integrations.google_calendar import fetch_events, extract_company, extract_domain
 from integrations.google_contacts import fetch_contacts
@@ -118,6 +118,26 @@ def log_event(record: Dict[str, Any]) -> None:
             base["details"].update(v)
 
     append_jsonl(path, base)
+
+
+def _copy_run_logs_to_export(workflow_id: str) -> None:
+    src = Path("logs/workflows")
+    dst = Path("output/exports/run_logs")
+    dst.mkdir(parents=True, exist_ok=True)
+    # Copy only current run files
+    for name in (
+        f"{workflow_id}.jsonl",
+        "calendar.jsonl",
+        "contacts.jsonl",
+        "summary.json",
+    ):
+        s = src / name
+        if s.exists():
+            shutil.copy2(s, dst / name)
+
+
+def bundle_logs_into_exports() -> None:  # pragma: no cover - backward compat
+    _copy_run_logs_to_export(get_workflow_id())
 
 
 def _preflight_google() -> bool:
@@ -525,7 +545,7 @@ def run(
             log_event({"status": "artifact_csv_error", "error": str(e), "severity": "warning"})
         # Zusammenfassung/Logs bündeln und normal zurückkehren
         finalize_summary()
-        bundle_logs_into_exports()
+        _copy_run_logs_to_export(get_workflow_id())
         log_event({"status": "workflow_completed"})
         return {"status": "idle"}
 
@@ -631,12 +651,12 @@ def run(
         if decision != "yes":
             log_event({"event_id": first_id, "status": "report_skipped"})
             finalize_summary()
-            bundle_logs_into_exports()
+            _copy_run_logs_to_export(get_workflow_id())
             return consolidated
 
     if duplicate_checker and duplicate_checker(consolidated, existing):
         finalize_summary()
-        bundle_logs_into_exports()
+        _copy_run_logs_to_export(get_workflow_id())
         return consolidated
 
     out_dir = Path(os.getenv("OUTPUT_DIR", "output")) / "exports"
@@ -665,7 +685,7 @@ def run(
             {"event_id": first_id, "error": str(e)},
             severity="critical",
         )
-        finalize_summary(); bundle_logs_into_exports()
+        finalize_summary(); _copy_run_logs_to_export(get_workflow_id())
         log_event({"status": "workflow_completed", "severity":"warning"})
         return consolidated
 
@@ -703,7 +723,7 @@ def run(
                     {"event_id": first_id},
                     severity="warning",
                 )
-                finalize_summary(); bundle_logs_into_exports()
+                finalize_summary(); _copy_run_logs_to_export(get_workflow_id())
                 return consolidated
 
         recipient = (triggers or [{}])[0].get("recipient")
@@ -731,7 +751,7 @@ def run(
                     {"event_id": first_id, "error": str(e)},
                     severity="critical",
                 )
-                finalize_summary(); bundle_logs_into_exports()
+                finalize_summary(); _copy_run_logs_to_export(get_workflow_id())
                 return consolidated
         else:
             log_event({"event_id": first_id, "status": statuses.REPORT_NOT_SENT, "severity": "warning"})
@@ -743,11 +763,11 @@ def run(
             )
     except Exception as e:
         recovery_agent.handle_failure(first_id, e)
-        finalize_summary(); bundle_logs_into_exports()
+        finalize_summary(); _copy_run_logs_to_export(get_workflow_id())
         return consolidated
 
     finalize_summary()
-    bundle_logs_into_exports()
+    _copy_run_logs_to_export(get_workflow_id())
     if restart_event_id:
         log_event({"event_id": restart_event_id, "status": "resumed"})
     return consolidated
@@ -773,7 +793,7 @@ def main(argv: List[str] | None = None) -> int:
         return 0
     finally:
         try:
-            finalize_summary(); bundle_logs_into_exports()
+            finalize_summary(); _copy_run_logs_to_export(get_workflow_id())
         finally:
             log_event({"status": "workflow_completed"})
     return 0
