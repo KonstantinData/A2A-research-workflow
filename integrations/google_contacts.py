@@ -63,6 +63,7 @@ def _notes_blob(person: Dict[str, Any]) -> str:
 def fetch_contacts(page_size: int = 200, page_limit: int = 10) -> List[Dict[str, Any]]:
     """Live-Fetch (in Tests typischerweise gemonkeypatched)."""
     if build is None or Request is None:  # pragma: no cover
+        log_step("contacts", "google_api_client_missing", {}, severity="error")
         return []
 
     try:

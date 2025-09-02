@@ -85,64 +85,65 @@ def extract_domain(text: str) -> str | None:
 
 def fetch_events() -> List[Normalized]:
     results: List[Normalized] = []
+    if not build or not Credentials:
+        log_step("calendar", "google_api_client_missing", {}, severity="error")
+        return results
     try:
-        if build:
-            creds = build_user_credentials(SCOPES)
-            if not creds:
-                log_step(
-                    "calendar",
-                    "missing_google_oauth_env",
-                    {"mode": "v2-only"},
-                    severity="error",
-                )
-                return []
+        creds = build_user_credentials(SCOPES)
+        if not creds:
+            log_step(
+                "calendar",
+                "missing_google_oauth_env",
+                {"mode": "v2-only"},
+                severity="error",
+            )
+            return []
+        service = build("calendar", "v3", credentials=creds, cache_discovery=False)
+        try:
+            service.calendarList().get(calendarId=CAL_IDS[0]).execute()
+        except Exception as e:
+            code, hint = classify_oauth_error(e)
+            cid_tail = (os.getenv("GOOGLE_CLIENT_ID_V2") or "")[-8:]
+            log_step(
+                "calendar",
+                "fetch_error",
+                {
+                    "error": str(e),
+                    "code": code,
+                    "hint": hint,
+                    "client_id_tail": cid_tail,
+                },
+                severity="error",
+            )
+            return []
 
-            service = build("calendar", "v3", credentials=creds, cache_discovery=False)
-            try:
-                service.calendarList().get(calendarId=CAL_IDS[0]).execute()
-            except Exception as e:
-                code, hint = classify_oauth_error(e)
-                cid_tail = (os.getenv("GOOGLE_CLIENT_ID_V2") or "")[-8:]
-                log_step(
-                    "calendar",
-                    "fetch_error",
-                    {
-                        "error": str(e),
-                        "code": code,
-                        "hint": hint,
-                        "client_id_tail": cid_tail,
-                    },
-                    severity="error",
-                )
-                return []
-
-            tmin, tmax = _time_window()
-            for cal_id in CAL_IDS:
-                token = None
-                while True:
-                    resp = (
-                        service.events()
-                        .list(
-                            calendarId=cal_id,
-                            timeMin=tmin,
-                            timeMax=tmax,
-                            singleEvents=True,
-                            orderBy="startTime",
-                            maxResults=2500,
-                            pageToken=token,
-                        )
-                        .execute()
+        tmin, tmax = _time_window()
+        for cal_id in CAL_IDS:
+            token = None
+            while True:
+                resp = (
+                    service.events()
+                    .list(
+                        calendarId=cal_id,
+                        timeMin=tmin,
+                        timeMax=tmax,
+                        singleEvents=True,
+                        orderBy="startTime",
+                        maxResults=2500,
+                        pageToken=token,
                     )
-                    for item in resp.get("items", []):
-                        norm = _normalize(item, cal_id)
-                        ev = dict(norm)
-                        ev["payload"] = dict(norm)
-                        results.append(ev)
-                    token = resp.get("nextPageToken")
-                    if not token:
-                        break
+                    .execute()
+                )
+                for item in resp.get("items", []):
+                    norm = _normalize(item, cal_id)
+                    ev = dict(norm)
+                    ev["payload"] = dict(norm)
+                    results.append(ev)
+                token = resp.get("nextPageToken")
+                if not token:
+                    break
 
-            log_step("calendar", "fetch_ok", {"calendars": CAL_IDS, "count": len(results)})
+        log_step("calendar", "fetch_ok", {"calendars": CAL_IDS, "count": len(results)})
     except Exception as e:  # pragma: no cover
         code, hint = classify_oauth_error(e)
         cid_tail = (os.getenv("GOOGLE_CLIENT_ID_V2") or "")[-8:]

@@ -17,3 +17,6 @@ termin vorbereitung
 vorbereitung meeting
 kunden termin
 kundentermin
+customer meeting
+kundengespräch
+meetingpreparation

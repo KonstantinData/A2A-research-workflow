@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+from pathlib import Path
 from difflib import SequenceMatcher
 from functools import lru_cache
 from typing import Iterable, List, Optional
@@ -20,6 +21,7 @@ openai = _openai
 
 logger = logging.getLogger(__name__)
 
+# Built-in fallback triggers, used only when the external file is missing
 TRIGGERS: List[str] = [
     "research",
     "meeting preparation",
@@ -48,15 +50,30 @@ def normalize_text(text: str) -> str:
 
 @lru_cache(maxsize=1)
 def load_trigger_words() -> List[str]:
-    """Return trigger words from an optional file or the built-in defaults."""
+    """Load trigger words from ``config/trigger_words.txt`` and expand variants."""
     path = os.getenv("TRIGGER_WORDS_FILE")
-    if path and os.path.exists(path):  # pragma: no cover - trivial file IO
+    if not path:
+        base = Path(__file__).resolve().parent.parent / "config" / "trigger_words.txt"
+        path = str(base)
+
+    words: List[str] = []
+    if os.path.exists(path):  # pragma: no cover - trivial file IO
         try:
             with open(path, "r", encoding="utf-8") as fh:
-                return [line.strip() for line in fh if line.strip()]
+                words = [line.strip() for line in fh if line.strip()]
         except Exception as exc:  # pragma: no cover - logging only
             logger.warning("Failed to read trigger words file %s: %s", path, exc)
-    return TRIGGERS
+
+    if not words:
+        words = TRIGGERS
+
+    variants = set(words)
+    for w in list(words):
+        variants.add(w.replace("-", " "))
+        variants.add(w.replace(" ", "-"))
+        variants.add(w.replace(" ", ""))
+        variants.add(w.replace("-", ""))
+    return sorted(variants)
 
 
 
