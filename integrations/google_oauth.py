@@ -16,7 +16,7 @@ def build_user_credentials(scopes: List[str]) -> Optional["Credentials"]:
     client_id = os.getenv("GOOGLE_CLIENT_ID_V2")
     client_secret = os.getenv("GOOGLE_CLIENT_SECRET_V2")
     refresh_token = os.getenv("GOOGLE_REFRESH_TOKEN")
-    token_uri = os.getenv("GOOGLE_TOKEN_URI", DEFAULT_TOKEN_URI)
+    token_uri = os.getenv("GOOGLE_TOKEN_URI") or DEFAULT_TOKEN_URI
     if not (client_id and client_secret and refresh_token):
         return None
     # Hard block if legacy vars are present to avoid accidental mixing.
