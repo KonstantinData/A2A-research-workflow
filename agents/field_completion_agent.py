@@ -35,10 +35,12 @@ DOMAIN_REGEX = r"\b([a-z0-9\-]+\.[a-z]{2,})(/[^\s]*)?\b"
 
 
 def run(trig: Dict[str, Any]) -> Dict[str, Any]:
-    """Attempt to fill missing ``company_name`` and ``domain``.
+    """Attempt to fill missing company related fields.
 
-    The agent first tries to use the OpenAI API. If that fails or yields no
-    data, a lightweight regex-based parser is applied to the same text.
+    The agent looks for two fields: ``company_name`` and ``domain``.  It
+    returns a dictionary containing whichever of these values it can infer.  The
+    agent first tries to use the OpenAI API. If that fails or yields no data, a
+    lightweight regex-based parser is applied to the same text.
     """
     text = _collect_text(trig)
     if not text:
