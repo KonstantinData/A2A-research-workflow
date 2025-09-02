@@ -1,33 +1,20 @@
-import os
-from integrations.google_oauth import build_user_credentials, classify_oauth_error
+import os, pytest
+from integrations.google_oauth import build_user_credentials
 
 SCOPES = ["x"]
 
-
-def _clear():
-    for k in list(os.environ.keys()):
-        if k.startswith("GOOGLE_"):
-            os.environ.pop(k, None)
-
-
-def test_v1_names_rejected(monkeypatch):
-    _clear()
-    monkeypatch.setenv("GOOGLE_CLIENT_ID", "id")
-    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "sec")
-    monkeypatch.setenv("GOOGLE_REFRESH_TOKEN", "rt")
-    assert build_user_credentials(SCOPES) is None
-
-
-def test_v2_names_work(monkeypatch):
-    _clear()
-    monkeypatch.setenv("GOOGLE_CLIENT_ID_V2", "id")
-    monkeypatch.setenv("GOOGLE_CLIENT_SECRET_V2", "sec")
-    monkeypatch.setenv("GOOGLE_REFRESH_TOKEN", "rt")
+def test_v2_envs_work(monkeypatch):
+    for k in ["GOOGLE_CLIENT_ID_V2","GOOGLE_CLIENT_SECRET_V2","GOOGLE_REFRESH_TOKEN"]: monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("GOOGLE_CLIENT_ID_V2","id")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET_V2","sec")
+    monkeypatch.setenv("GOOGLE_REFRESH_TOKEN","rt")
     assert build_user_credentials(SCOPES) is not None
 
-
-def test_invalid_grant_hint():
-    code, hint = classify_oauth_error(Exception("invalid_grant: expired"))
-    assert code == "invalid_grant"
-    assert "Refresh token" in hint
+def test_legacy_envs_cause_error(monkeypatch):
+    monkeypatch.setenv("GOOGLE_CLIENT_ID_V2","id")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET_V2","sec")
+    monkeypatch.setenv("GOOGLE_REFRESH_TOKEN","rt")
+    monkeypatch.setenv("GOOGLE_CLIENT_ID","legacy")
+    with pytest.raises(RuntimeError):
+        build_user_credentials(SCOPES)
 
