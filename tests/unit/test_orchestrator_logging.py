@@ -29,6 +29,10 @@ def test_gather_triggers_logs_discard_reasons(tmp_path, monkeypatch):
     assert "no_trigger_match" in reasons
     assert "missing_fields" not in reasons
 
+    wf_log = next((Path("logs") / "workflows").glob("wf-*.jsonl"))
+    wf_records = [json.loads(line) for line in wf_log.read_text().splitlines()]
+    assert any(r.get("status") == "not_relevant" and r.get("event_id") == "1" for r in wf_records)
+
 
 def test_gather_triggers_logs_no_calendar_events(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)

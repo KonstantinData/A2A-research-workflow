@@ -128,7 +128,10 @@ def fetch_events() -> List[Normalized]:
                         .execute()
                     )
                     for item in resp.get("items", []):
-                        results.append(_normalize(item, cal_id))
+                        norm = _normalize(item, cal_id)
+                        ev = dict(norm)
+                        ev["payload"] = dict(norm)
+                        results.append(ev)
                     token = resp.get("nextPageToken")
                     if not token:
                         break

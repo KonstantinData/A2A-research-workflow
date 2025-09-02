@@ -194,14 +194,15 @@ def _calendar_fetch_logged(wf_id: str) -> bool:
 # --------- Trigger-Gathering für Kalender + Kontakte ----------
 def _as_trigger_from_event(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     # prüft summary, description, location, attendees[].email usw.
-    if not contains_trigger(ev):
+    payload = ev.get("payload") or ev
+    if not contains_trigger(payload):
         return None
 
     return {
         "source": "calendar",
-        "creator": ev.get("creator", {}).get("email") or ev.get("creatorEmail"),
-        "recipient": ev.get("organizer", {}).get("email"),
-        "payload": ev,
+        "creator": (payload.get("creator") or {}).get("email") or payload.get("creatorEmail"),
+        "recipient": (payload.get("organizer") or {}).get("email"),
+        "payload": payload,
     }
 
 
@@ -253,15 +254,18 @@ def gather_triggers(
         for ev in events or []:
             trig = _as_trigger_from_event(ev)
             if trig is None:
-                eid = ev.get("id") or ev.get("event_id")
+                payload = ev.get("payload") or ev
+                eid = payload.get("event_id") or payload.get("id")
                 log_step(
                     "calendar",
                     "event_discarded",
                     {
                         "reason": "no_trigger_match",
-                        "event": {"id": eid, "summary": ev.get("summary", "")},
+                        "event": {"id": eid, "summary": payload.get("summary", "")},
                     },
                 )
+                if eid:
+                    log_event({"event_id": eid, "status": "not_relevant"})
                 continue
             triggers.append(trig)
         if contacts is None:
