@@ -451,7 +451,8 @@ def run(
             if extracted_domain:
                 payload["domain"] = extracted_domain
         if event_id:
-            enriched = field_completion_agent.run(trig)
+            enriched = field_completion_agent.run(trig) or {}
+            added_fields = {k: v for k, v in enriched.items() if not payload.get(k)}
             if enriched:
                 payload.update(enriched)
             missing = _missing_required(trig.get("source", ""), payload)
@@ -467,8 +468,14 @@ def run(
                 except Exception:
                     pass
                 continue
-            elif enriched:
-                log_event({"event_id": event_id, "status": "enriched_by_ai"})
+            elif added_fields:
+                log_event(
+                    {
+                        "event_id": event_id,
+                        "status": "enriched_by_ai",
+                        "fields": list(added_fields.keys()),
+                    }
+                )
         if researchers:
             log_event({"event_id": event_id, "status": "pending", "creator": trig.get("creator")})
         trig_results: List[Dict[str, Any]] = []
