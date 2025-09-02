@@ -53,6 +53,7 @@ append_jsonl = _mod.append
 
 CAL_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
+_finalized = False
 
 # --------- LIVE readiness assertions ---------
 def _assert_live_ready() -> None:
@@ -138,6 +139,18 @@ def _copy_run_logs_to_export(workflow_id: str) -> None:
 
 def bundle_logs_into_exports() -> None:  # pragma: no cover - backward compat
     _copy_run_logs_to_export(get_workflow_id())
+
+
+def finalize_run(**event: Any) -> None:
+    global _finalized
+    if _finalized:
+        return
+    _finalized = True
+    try:
+        finalize_summary()
+        _copy_run_logs_to_export(get_workflow_id())
+    finally:
+        log_event({"status": "workflow_completed", **event})
 
 
 def _preflight_google() -> bool:
@@ -544,9 +557,7 @@ def run(
         except Exception as e:
             log_event({"status": "artifact_csv_error", "error": str(e), "severity": "warning"})
         # Zusammenfassung/Logs bündeln und normal zurückkehren
-        finalize_summary()
-        _copy_run_logs_to_export(get_workflow_id())
-        log_event({"status": "workflow_completed"})
+        finalize_run()
         return {"status": "idle"}
 
     if researchers is None:
@@ -650,13 +661,11 @@ def run(
                 break
         if decision != "yes":
             log_event({"event_id": first_id, "status": "report_skipped"})
-            finalize_summary()
-            _copy_run_logs_to_export(get_workflow_id())
+            finalize_run()
             return consolidated
 
     if duplicate_checker and duplicate_checker(consolidated, existing):
-        finalize_summary()
-        _copy_run_logs_to_export(get_workflow_id())
+        finalize_run()
         return consolidated
 
     out_dir = Path(os.getenv("OUTPUT_DIR", "output")) / "exports"
@@ -685,8 +694,7 @@ def run(
             {"event_id": first_id, "error": str(e)},
             severity="critical",
         )
-        finalize_summary(); _copy_run_logs_to_export(get_workflow_id())
-        log_event({"status": "workflow_completed", "severity":"warning"})
+        finalize_run(severity="warning")
         return consolidated
 
     try:
@@ -723,7 +731,7 @@ def run(
                     {"event_id": first_id},
                     severity="warning",
                 )
-                finalize_summary(); _copy_run_logs_to_export(get_workflow_id())
+                finalize_run()
                 return consolidated
 
         recipient = (triggers or [{}])[0].get("recipient")
@@ -751,7 +759,7 @@ def run(
                     {"event_id": first_id, "error": str(e)},
                     severity="critical",
                 )
-                finalize_summary(); _copy_run_logs_to_export(get_workflow_id())
+                finalize_run()
                 return consolidated
         else:
             log_event({"event_id": first_id, "status": statuses.REPORT_NOT_SENT, "severity": "warning"})
@@ -763,13 +771,12 @@ def run(
             )
     except Exception as e:
         recovery_agent.handle_failure(first_id, e)
-        finalize_summary(); _copy_run_logs_to_export(get_workflow_id())
+        finalize_run()
         return consolidated
 
-    finalize_summary()
-    _copy_run_logs_to_export(get_workflow_id())
     if restart_event_id:
         log_event({"event_id": restart_event_id, "status": "resumed"})
+    finalize_run()
     return consolidated
 
 
@@ -792,10 +799,7 @@ def main(argv: List[str] | None = None) -> int:
         print(code)
         return 0
     finally:
-        try:
-            finalize_summary(); _copy_run_logs_to_export(get_workflow_id())
-        finally:
-            log_event({"status": "workflow_completed"})
+        finalize_run()
     return 0
 
 
