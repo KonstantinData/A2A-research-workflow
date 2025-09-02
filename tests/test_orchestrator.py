@@ -74,7 +74,8 @@ def test_run_processes_event_missing_fields(monkeypatch, tmp_path):
     events = [{"id": "1", "event_id": "e1", "summary": "Research meeting"}]
     monkeypatch.setattr(orchestrator, "fetch_events", lambda: events)
     monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
-    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: True)
+    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: None)
+    monkeypatch.setattr(orchestrator, "_contacts_fetch_logged", lambda wf_id: None)
     monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
     monkeypatch.setattr(reminder_service, "check_and_notify", lambda t: None)
     monkeypatch.setattr(field_completion_agent, "run", lambda t: {"company_name": "ACME", "domain": "acme.com"})
