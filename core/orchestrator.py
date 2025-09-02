@@ -181,11 +181,12 @@ def _missing_required(source: str, payload: Dict[str, Any]) -> List[str]:
     return [f for f in req if not (payload or {}).get(f)]
 
 
-def _calendar_fetch_logged(wf_id: str) -> bool:
-    """Verify required calendar fetch log entries exist for this workflow."""
+def _calendar_fetch_logged(wf_id: str) -> Optional[str]:
+    """Return ``None`` if a successful calendar fetch was logged, else a code."""
+
     path = Path("logs") / "workflows" / "calendar.jsonl"
     if not path.exists():
-        return False
+        return "missing"
     required = {"fetch_ok"}
     statuses: set[str] = set()
     try:
@@ -198,8 +199,41 @@ def _calendar_fetch_logged(wf_id: str) -> bool:
                 if rec.get("workflow_id") == wf_id:
                     statuses.add(rec.get("status"))
     except Exception:
-        return False
-    return required.issubset(statuses)
+        return "missing"
+    if required.issubset(statuses):
+        return None
+    if "google_api_client_missing" in statuses:
+        return "missing_client"
+    if "missing_google_oauth_env" in statuses or "fetch_error" in statuses:
+        return "oauth_error"
+    return "missing"
+
+
+def _contacts_fetch_logged(wf_id: str) -> Optional[str]:
+    """Return ``None`` if contacts fetch logs exist, else a failure code."""
+
+    path = Path("logs") / "workflows" / "contacts.jsonl"
+    if not path.exists():
+        return "missing"
+    statuses: set[str] = set()
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    continue
+                if rec.get("workflow_id") == wf_id:
+                    statuses.add(rec.get("status"))
+    except Exception:
+        return "missing"
+    if "fetch_call" in statuses:
+        return None
+    if "google_api_client_missing" in statuses:
+        return "missing_client"
+    if "missing_google_oauth_env" in statuses or "fetch_error" in statuses:
+        return "oauth_error"
+    return "missing"
 
 
 def _calendar_last_error(wf_id: str) -> Optional[Dict[str, Any]]:
@@ -290,10 +324,11 @@ def gather_triggers(
                         }
                     )
 
-        if not _calendar_fetch_logged(wf_id):
+        cal_code = _calendar_fetch_logged(wf_id)
+        if cal_code:
             log_event(
                 {
-                    "status": "calendar_fetch_missing",
+                    "status": f"calendar_fetch_{cal_code}",
                     "severity": "warning",
                     "message": "Proceeding without calendar logs",
                 }
@@ -334,6 +369,15 @@ def gather_triggers(
                     }
                 )
                 contacts = []
+            con_code = _contacts_fetch_logged(wf_id)
+            if con_code:
+                log_event(
+                    {
+                        "status": f"contacts_fetch_{con_code}",
+                        "severity": "warning",
+                        "message": "Proceeding without contacts logs",
+                    }
+                )
         if not contacts:
             log_event({"status": "no_contacts", "severity": "warning"})
         for c in contacts or []:

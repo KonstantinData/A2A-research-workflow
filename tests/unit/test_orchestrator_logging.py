@@ -17,7 +17,8 @@ def test_gather_triggers_logs_discard_reasons(tmp_path, monkeypatch):
     ]
     monkeypatch.setattr(orchestrator, "fetch_events", lambda: events)
     monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
-    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: True)
+    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: None)
+    monkeypatch.setattr(orchestrator, "_contacts_fetch_logged", lambda wf_id: None)
 
     triggers = orchestrator.gather_triggers()
     assert len(triggers) == 1
@@ -38,7 +39,8 @@ def test_gather_triggers_logs_no_calendar_events(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(orchestrator, "fetch_events", lambda: [])
     monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
-    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: True)
+    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: None)
+    monkeypatch.setattr(orchestrator, "_contacts_fetch_logged", lambda wf_id: None)
     records = []
     monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
 
@@ -55,7 +57,8 @@ def test_gather_triggers_logs_contacts_fetch_failed(tmp_path, monkeypatch):
         raise RuntimeError("Missing Google OAuth env")
 
     monkeypatch.setattr(orchestrator, "fetch_contacts", raise_env_error)
-    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: True)
+    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: None)
+    monkeypatch.setattr(orchestrator, "_contacts_fetch_logged", lambda wf_id: None)
     records = []
     monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
 
@@ -115,9 +118,50 @@ def test_fetch_functions_log_ingested(tmp_path, monkeypatch):
 
     monkeypatch.setattr(orchestrator, "fetch_events", fake_fetch_events)
     monkeypatch.setattr(orchestrator, "fetch_contacts", fake_fetch_contacts)
-    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: True)
+    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: None)
+    monkeypatch.setattr(orchestrator, "_contacts_fetch_logged", lambda wf_id: None)
 
     orchestrator.gather_triggers()
 
     assert any(r.get("status") == "ingested" and r.get("event_id") == "e1" for r in records)
     assert any(r.get("status") == "ingested" and r.get("event_id") == "c1" for r in records)
+
+
+@pytest.mark.parametrize(
+    "code,expected",
+    [
+        ("missing", "calendar_fetch_missing"),
+        ("missing_client", "calendar_fetch_missing_client"),
+        ("oauth_error", "calendar_fetch_oauth_error"),
+    ],
+)
+def test_gather_triggers_logs_calendar_fetch_codes(tmp_path, monkeypatch, code, expected):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(orchestrator, "fetch_events", lambda: [])
+    monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
+    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: code)
+    monkeypatch.setattr(orchestrator, "_contacts_fetch_logged", lambda wf_id: None)
+    records = []
+    monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
+    orchestrator.gather_triggers()
+    assert any(r.get("status") == expected for r in records)
+
+
+@pytest.mark.parametrize(
+    "code,expected",
+    [
+        ("missing", "contacts_fetch_missing"),
+        ("missing_client", "contacts_fetch_missing_client"),
+        ("oauth_error", "contacts_fetch_oauth_error"),
+    ],
+)
+def test_gather_triggers_logs_contacts_fetch_codes(tmp_path, monkeypatch, code, expected):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(orchestrator, "fetch_events", lambda: [])
+    monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
+    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: None)
+    monkeypatch.setattr(orchestrator, "_contacts_fetch_logged", lambda wf_id: code)
+    records = []
+    monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
+    orchestrator.gather_triggers()
+    assert any(r.get("status") == expected for r in records)
