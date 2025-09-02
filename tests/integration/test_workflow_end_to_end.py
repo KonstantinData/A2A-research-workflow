@@ -110,9 +110,11 @@ def test_ai_failure_triggers_email(monkeypatch):
         hubspot_check_existing=lambda cid: None,
     )
     logs = _collect_logs()
-    assert '"status": "missing_fields_pending"' in logs
-    assert len(send_calls) == 1
-    assert send_calls[0]["subject"] == "Your A2A research report"
+    assert '"status": "pending"' in logs
+    assert len(send_calls) == 2
+    subjects = {c["subject"] for c in send_calls}
+    assert "Your A2A research report" in subjects
+    assert "Missing information for research" in subjects
 
 
 def test_email_reply_resumes(monkeypatch):
@@ -142,6 +144,7 @@ def test_email_reply_resumes(monkeypatch):
     logs = _collect_logs()
     assert '"status": "email_reply_received"' in logs
     assert '"status": "pending_email_reply_resolved"' in logs
+    assert '"status": "resumed"' in logs
 
 
 def test_reminder_and_escalation(monkeypatch):
