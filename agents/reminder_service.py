@@ -11,7 +11,7 @@ from pathlib import Path
 import json
 import logging
 
-from core import tasks, task_history
+from core import tasks, task_history, statuses as status_defs
 from core.utils import get_workflow_id
 from integrations import email_client, email_sender
 from agents.templates import build_reminder_email
@@ -191,7 +191,7 @@ def check_and_notify(triggers: list[dict]) -> None:
         event_id = payload.get("event_id") or trig.get("event_id")
         if not event_id:
             continue
-        if statuses.get(event_id) not in {"pending", "pending_admin"}:
+        if statuses.get(event_id) not in {status_defs.PENDING, status_defs.PENDING_ADMIN}:
             continue
         email = build_reminder_email(
             source=trig["source"],
