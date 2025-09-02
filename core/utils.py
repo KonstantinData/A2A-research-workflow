@@ -10,6 +10,7 @@ to function.  We therefore ensure all standard library imports are present.
 
 from __future__ import annotations
 
+import csv
 import json
 import unicodedata
 import uuid
@@ -137,6 +138,31 @@ def finalize_summary() -> None:
         payload["run_mode"] = "calendar_fetch"
     else:
         payload["run_mode"] = "reminder_only"
+
+    def _csv_rows(path: Path) -> int:
+        if not path.exists():
+            return 0
+        with path.open("r", encoding="utf-8", newline="") as fh:
+            return sum(1 for _ in csv.reader(fh)) - 1  # minus header if present
+
+    pdf_path = Path("output/exports/report.pdf")
+    csv_path = Path("output/exports/data.csv")
+    pdf_ok = pdf_path.exists()
+    csv_ok = csv_path.exists()
+
+    payload["artifact_health"] = {
+        "pdf_ok": pdf_ok,
+        "pdf_size": (pdf_path.stat().st_size if pdf_ok else 0),
+        "csv_ok": csv_ok,
+        "csv_rows": _csv_rows(csv_path) if csv_ok else 0,
+        "empty_run": bool(
+            payload.get("events_detected", 0) == 0
+            and payload.get("contacts_detected", 0) == 0
+        ),
+    }
+
+    # Counters should reflect artifact creation, not only triggers
+    payload["reports_generated"] = int(pdf_ok)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
