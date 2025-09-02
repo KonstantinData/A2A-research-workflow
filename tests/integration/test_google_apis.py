@@ -12,7 +12,7 @@ def test_contacts_scheduled_poll_integration(monkeypatch):
     contact = {
         "emailAddresses": [{"value": "bob@example.com"}],
         "names": [{"displayName": "Bob"}],
-        "notes": "Firma Bar Inc\nbar.com\n+49 3333333",
+        "notes": "Firma Bar Inc\nbar.com\nResearch initiative\n+49 3333333",
     }
     monkeypatch.setattr(google_contacts, "fetch_contacts", lambda: [contact])
     monkeypatch.setattr(google_contacts.email_sender, "send", lambda *a, **k: None)
@@ -30,7 +30,7 @@ def test_contacts_scheduled_poll_integration(monkeypatch):
                 "domain": "bar.com",
                 "email": "bob@example.com",
                 "phone": "+49 3333333",
-                "notes_blob": "Firma Bar Inc\nbar.com\n+49 3333333",
+                "notes_blob": "Firma Bar Inc\nbar.com\nResearch initiative\n+49 3333333",
                 "notes_extracted": {
                     "company": "Bar Inc",
                     "domain": "bar.com",
