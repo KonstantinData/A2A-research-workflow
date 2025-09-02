@@ -17,6 +17,7 @@ from core.utils import (
     finalize_summary,
     get_workflow_id,
 )  # noqa: F401  # required_fields/optional_fields imported for completeness
+from config.settings import SETTINGS
 from integrations.google_calendar import fetch_events, extract_company, extract_domain
 from integrations.google_contacts import fetch_contacts
 from integrations.google_oauth import build_user_credentials
@@ -516,19 +517,15 @@ def run(
     triggers = filtered
 
     if not triggers:
+        details = {
+            "lookback_days": SETTINGS.cal_lookback_days,
+            "lookahead_days": SETTINGS.cal_lookahead_days,
+            "calendar_ids": SETTINGS.google_calendar_ids or ["primary"],
+        }
+        log_step("orchestrator", "no_triggers_diagnostics", details, severity="info")
         log_event({
             "status": "no_triggers_diagnostics",
-            "details": {
-                "window": {
-                    "lookback_days": int(os.getenv("CAL_LOOKBACK_DAYS", "1")),
-                    "lookahead_days": int(os.getenv("CAL_LOOKAHEAD_DAYS", "14")),
-                    "calendar_ids": [
-                        c.strip()
-                        for c in os.getenv("GOOGLE_CALENDAR_IDS", "primary").split(",")
-                        if c.strip()
-                    ],
-                }
-            },
+            "details": details,
             "severity": "info",
         })
         log_event({

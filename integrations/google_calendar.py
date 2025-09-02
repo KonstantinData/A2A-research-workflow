@@ -5,6 +5,7 @@ import os, re
 import datetime as dt
 from typing import Any, Dict, List
 
+from config.settings import SETTINGS
 from core.utils import log_step
 from .google_oauth import build_user_credentials, classify_oauth_error
 
@@ -17,9 +18,9 @@ except Exception:
 
 Normalized = Dict[str, Any]
 
-LOOKAHEAD_DAYS = int(os.getenv("CAL_LOOKAHEAD_DAYS", "14"))
-LOOKBACK_DAYS = int(os.getenv("CAL_LOOKBACK_DAYS", "1"))
-CAL_IDS = [c.strip() for c in os.getenv("GOOGLE_CALENDAR_IDS", "primary").split(",") if c.strip()]
+LOOKAHEAD_DAYS = SETTINGS.cal_lookahead_days
+LOOKBACK_DAYS = SETTINGS.cal_lookback_days
+CAL_IDS = SETTINGS.google_calendar_ids or ["primary"]
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 
