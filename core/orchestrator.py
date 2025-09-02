@@ -443,9 +443,13 @@ def run(
         event_id = payload.get("event_id")
         enriched: Dict[str, Any] | None = None
         if not payload.get("company_name"):
-            payload["company_name"] = extract_company(payload.get("summary")) or extract_company(payload.get("description"))
+            extracted_company = extract_company(payload.get("summary")) or extract_company(payload.get("description"))
+            if extracted_company:
+                payload["company_name"] = extracted_company
         if not payload.get("domain"):
-            payload["domain"] = extract_domain(payload.get("summary")) or extract_domain(payload.get("description"))
+            extracted_domain = extract_domain(payload.get("summary")) or extract_domain(payload.get("description"))
+            if extracted_domain:
+                payload["domain"] = extracted_domain
         if event_id:
             enriched = field_completion_agent.run(trig)
             if enriched:
