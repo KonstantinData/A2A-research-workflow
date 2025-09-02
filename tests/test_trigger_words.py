@@ -1,6 +1,6 @@
 import pytest
 import pytest
-from core.trigger_words import contains_trigger, load_trigger_words
+from core.trigger_words import contains_trigger, load_trigger_words, suggest_similar
 
 TRIGGERS = ["besuchsvorbereitung", "meeting"]
 
@@ -35,6 +35,10 @@ def test_two_typos_fallback():
 def test_no_trigger_match():
     ev = {"summary": "Lunch with colleagues"}
     assert not contains_trigger(ev, TRIGGERS)
+
+
+def test_suggest_similar_finds_close_trigger():
+    assert suggest_similar("planning rserch tomorrow") == ["research"]
 
 
 def test_customer_meeting_synonym():

@@ -82,3 +82,22 @@ def test_fetch_contacts_missing_creds_logs(monkeypatch):
 
     assert google_contacts.fetch_contacts() == []
     assert any(args[1] == "missing_google_oauth_env" for args, _ in logs)
+
+
+def test_contacts_scheduled_poll_requests_confirmation_on_similar_trigger(monkeypatch):
+    """Email confirmation is sent when notes contain near-trigger words."""
+    contact = {
+        "emailAddresses": [{"value": "bob@example.com"}],
+        "names": [{"displayName": "Bob"}],
+        "notes": "Firma ACME\nacme.com\nLet's do rserch soon\n+49 123456",
+    }
+    monkeypatch.setattr(google_contacts, "fetch_contacts", lambda: [contact])
+    sent = {}
+    monkeypatch.setattr(google_contacts.email_sender, "send", lambda **k: sent.update(k))
+    logs = []
+    monkeypatch.setattr(google_contacts, "log_step", lambda *a, **k: logs.append((a, k)))
+
+    google_contacts.scheduled_poll()
+
+    assert sent.get("to") == "bob@example.com"
+    assert any(args[1] == "trigger_confirmation_pending" for args, _ in logs)

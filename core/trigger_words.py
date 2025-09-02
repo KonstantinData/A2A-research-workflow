@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from difflib import SequenceMatcher
 from functools import lru_cache
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Tuple
 
 from core.utils import normalize_text as _normalize_text
 
@@ -164,6 +164,34 @@ def contains_trigger(
     return False
 
 
+def suggest_similar(text: str, *, threshold: float = 0.85, max_results: int = 3) -> List[str]:
+    """Return trigger words that are similar to words in ``text``.
+
+    The function performs a fuzzy comparison between each word in ``text`` and the
+    known trigger words. Triggers with a similarity ratio above ``threshold`` are
+    returned, ordered by descending similarity. At most ``max_results`` triggers
+    are included in the returned list.
+    """
+    if not text:
+        return []
+
+    norm = normalize_text(text)
+    words = re.findall(r"\b\w+\b", norm)
+    candidates: List[Tuple[float, str]] = []
+    for trig in load_trigger_words():
+        norm_trig = normalize_text(trig)
+        best = 0.0
+        for w in words:
+            score = SequenceMatcher(None, w, norm_trig).ratio()
+            if score > best:
+                best = score
+        if best >= threshold:
+            candidates.append((best, trig))
+
+    candidates.sort(reverse=True)
+    return [t for _, t in candidates[:max_results]]
+
+
 def extract_company(title: str, trigger: str) -> str:
     """Extract the company name from an event ``title``.
 
@@ -211,5 +239,6 @@ __all__ = [
     "normalize_text",
     "load_trigger_words",
     "contains_trigger",
+    "suggest_similar",
     "extract_company",
 ]

@@ -24,7 +24,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/contacts.other.readonly",
 ]
 
-from core.trigger_words import load_trigger_words, contains_trigger
+from core.trigger_words import load_trigger_words, contains_trigger, suggest_similar
 from core import feature_flags, summarize, parser
 from core.utils import (
     required_fields,
@@ -155,12 +155,41 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
             None,
         )
         contact_id = person.get("resourceName") or person.get("id") or ""
+        suggestions: List[str] = []
         if matched_trigger:
             log_step(
                 "contacts",
                 "trigger_detected",
                 {"contact_id": contact_id, "name": joined_names, "trigger": matched_trigger},
             )
+        else:
+            suggestions = suggest_similar(summary_text)
+            if suggestions:
+                try:
+                    email_sender.send(
+                        to=email or "admin@condata.io",
+                        subject="[Research Agent] Possible trigger detected",
+                        body=(
+                            f"We noticed a possible trigger word ({suggestions[0]}) in your notes. "
+                            "Would you like a company analysis?"
+                        ),
+                    )
+                    log_step(
+                        "contacts",
+                        "trigger_confirmation_pending",
+                        {
+                            "contact_id": contact_id,
+                            "name": joined_names,
+                            "suggestions": suggestions,
+                        },
+                    )
+                except Exception as e:
+                    log_step(
+                        "contacts",
+                        "trigger_confirmation_error",
+                        {"contact_id": contact_id, "error": str(e)},
+                        severity="error",
+                    )
 
         company = parser.extract_company(notes) or parser.extract_company(joined_names) or ""
         domain = parser.extract_domain(notes) or parser.extract_domain(joined_names) or ""
