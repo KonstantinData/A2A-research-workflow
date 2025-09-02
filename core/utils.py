@@ -88,11 +88,31 @@ def log_step(source: str, stage: str, data: Dict[str, Any], *, severity: str = "
         _update_summary(source, stage, severity)
 
 
+def _aggregate_severities(workflow_id: str) -> dict:
+    p = Path("logs/workflows") / f"{workflow_id}.jsonl"
+    errors = warnings = 0
+    if p.exists():
+        with p.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    continue
+                sev = (rec.get("severity") or "").lower()
+                if sev == "error":
+                    errors += 1
+                elif sev == "warning":
+                    warnings += 1
+    return {"errors": errors, "warnings": warnings}
+
 def finalize_summary() -> None:
     """Write a digest summary for the current workflow run."""
     wf_id = get_workflow_id()
     path = Path("logs") / "workflows" / "summary.json"
     payload = {"workflow_id": wf_id, **SUMMARY}
+
+    sev = _aggregate_severities(wf_id)
+    payload.update(sev)
 
     cal_path = Path("logs") / "workflows" / "calendar.jsonl"
     calendar_logs: List[Dict[str, Any]] = []
