@@ -304,6 +304,7 @@ def run(
     hubspot_check_existing: Callable[[Any], Any] | None = lambda cid: None,
     duplicate_checker: Callable[[Dict[str, Any], Any], bool] | None = lambda rec, existing: False,
     company_id: Any | None = None,
+    restart_event_id: str | None = None,
 ) -> Dict[str, Any]:
     """Orchestrate the research workflow for provided triggers."""
 
@@ -648,6 +649,8 @@ def run(
 
     finalize_summary()
     bundle_logs_into_exports()
+    if restart_event_id:
+        log_event({"event_id": restart_event_id, "status": "resumed"})
     return consolidated
 
 

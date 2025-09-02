@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import os
 from pathlib import Path
+import shutil
 
 from integrations import email_sender
 
@@ -50,3 +51,26 @@ def handle_failure(event_id: str | None, error: Exception) -> None:
             "severity": "critical",
         }
     )
+
+
+def restart(event_id: str) -> None:
+    """Restart the workflow for ``event_id``."""
+    orchestrator = importlib.import_module("core.orchestrator")
+    orchestrator.run(
+        triggers=[{"payload": {"event_id": event_id}}],
+        restart_event_id=event_id,
+    )
+
+
+def abort(event_id: str) -> None:
+    """Abort processing for ``event_id`` and clean up temporary data."""
+    orchestrator = importlib.import_module("core.orchestrator")
+    log_event = orchestrator.log_event
+    tmp_paths = [Path("artifacts") / event_id, Path("output") / "exports" / event_id]
+    for path in tmp_paths:
+        if path.exists():
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+    log_event({"event_id": event_id, "status": "aborted"})
