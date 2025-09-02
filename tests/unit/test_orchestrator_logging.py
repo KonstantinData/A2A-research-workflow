@@ -97,3 +97,27 @@ def test_run_invokes_recovery_on_failure(tmp_path, monkeypatch):
 
     assert called["event_id"] == "42"
     assert any(r.get("status") == statuses.NEEDS_ADMIN_FIX for r in records)
+
+
+def test_fetch_functions_log_ingested(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    records = []
+    monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
+
+    def fake_fetch_events():
+        orchestrator.log_event({"event_id": "e1", "status": "ingested"})
+        return [{"event_id": "e1", "summary": "Research meeting"}]
+
+    def fake_fetch_contacts():
+        orchestrator.log_event({"event_id": "c1", "status": "ingested"})
+        return [{"resourceName": "c1", "emailAddresses": [{"value": "a@b"}]}]
+
+    monkeypatch.setattr(orchestrator, "fetch_events", fake_fetch_events)
+    monkeypatch.setattr(orchestrator, "fetch_contacts", fake_fetch_contacts)
+    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: True)
+
+    orchestrator.gather_triggers()
+
+    assert any(r.get("status") == "ingested" and r.get("event_id") == "e1" for r in records)
+    assert any(r.get("status") == "ingested" and r.get("event_id") == "c1" for r in records)

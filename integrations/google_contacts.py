@@ -89,6 +89,7 @@ def fetch_contacts(page_size: int = 200, page_limit: int = 10) -> List[Dict[str,
         out: List[Dict[str, Any]] = []
         page_token: Optional[str] = None
         pages = 0
+        from core.orchestrator import log_event
         while True:  # pragma: no cover (in CI meist gemonkeypatched)
             resp = (
                 service.people()
@@ -103,7 +104,11 @@ def fetch_contacts(page_size: int = 200, page_limit: int = 10) -> List[Dict[str,
                 )
                 .execute()
             )
-            out.extend(resp.get("connections", []) or [])
+            for person in resp.get("connections", []) or []:
+                cid = person.get("resourceName") or person.get("id")
+                if cid:
+                    log_event({"event_id": cid, "status": "ingested"})
+                out.append(person)
             page_token = resp.get("nextPageToken")
             pages += 1
             if not page_token or pages >= page_limit:
