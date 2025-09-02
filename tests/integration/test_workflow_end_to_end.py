@@ -84,8 +84,8 @@ def test_ai_enrichment_success(monkeypatch):
         hubspot_check_existing=lambda cid: None,
     )
     logs = _collect_logs()
-    assert '"status": "fields_missing"' in logs
     assert '"status": "enriched_by_ai"' in logs
+    assert '"status": "fields_missing"' not in logs
     assert not any("Missing Information" in c.get("subject", "") for c in send_calls)
 
 
