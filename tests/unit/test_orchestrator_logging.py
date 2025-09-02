@@ -62,3 +62,38 @@ def test_gather_triggers_logs_contacts_fetch_failed(tmp_path, monkeypatch):
     triggers = orchestrator.gather_triggers()
     assert triggers == []
     assert any(r.get("status") == "contacts_fetch_failed" for r in records)
+
+
+def test_run_invokes_recovery_on_failure(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    records = []
+    monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
+    monkeypatch.setattr(orchestrator.reminder_service, "check_and_notify", lambda triggers: None)
+
+    called = {}
+
+    def fake_handle_failure(event_id, error):
+        called["event_id"] = event_id
+        records.append({"event_id": event_id, "status": "needs_admin_fix"})
+
+    monkeypatch.setattr(orchestrator.recovery_agent, "handle_failure", fake_handle_failure)
+
+    def fail_hubspot(data):
+        raise RuntimeError("boom")
+
+    trig = [{"payload": {"event_id": "42", "company_name": "Acme", "domain": "acme.com"}}]
+
+    orchestrator.run(
+        triggers=trig,
+        researchers=[],
+        pdf_renderer=lambda d, p: None,
+        csv_exporter=lambda d, p: None,
+        hubspot_upsert=fail_hubspot,
+        hubspot_attach=lambda p, c: None,
+        hubspot_check_existing=lambda c: None,
+        duplicate_checker=lambda d, e: False,
+        company_id=None,
+    )
+
+    assert called["event_id"] == "42"
+    assert any(r.get("status") == "needs_admin_fix" for r in records)

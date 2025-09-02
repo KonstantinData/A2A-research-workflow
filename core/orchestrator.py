@@ -36,6 +36,7 @@ from agents import (
     reminder_service,
     email_listener,
     field_completion_agent,
+    recovery_agent,
 )
 
 import importlib.util as _ilu
@@ -557,6 +558,7 @@ def run(
         log_event({"event_id": first_id, "status": "artifact_csv", "path": str(csv_path)})
         log_step("orchestrator","report_generated",{"event_id": first_id, "path": str(pdf_path)})
     except Exception as e:
+        recovery_agent.handle_failure(first_id, e)
         log_step(
             "orchestrator",
             "report_error",
@@ -567,36 +569,21 @@ def run(
         log_event({"status": "workflow_completed", "severity":"warning"})
         return consolidated
 
-    if company_id is None and hubspot_upsert:
-        company_id = hubspot_upsert(consolidated)
+    try:
+        if company_id is None and hubspot_upsert:
+            company_id = hubspot_upsert(consolidated)
 
-    if (
-        feature_flags.ATTACH_PDF_TO_HUBSPOT
-        and company_id
-        and pdf_path.exists()
-        and hubspot_attach
-    ):
-        try:
+        if (
+            feature_flags.ATTACH_PDF_TO_HUBSPOT
+            and company_id
+            and pdf_path.exists()
+            and hubspot_attach
+        ):
             hubspot_attach(pdf_path, company_id)
             log_event({"event_id": first_id, "status": "report_uploaded"})
-        except Exception as e:
-            log_step(
-                "orchestrator",
-                "report_error",
-                {"event_id": first_id, "error": str(e)},
-                severity="critical",
-            )
-            log_event({"event_id": first_id, "status": "report_upload_failed", "severity": "critical"})
-            log_step(
-                "orchestrator",
-                "report_upload_failed",
-                {"event_id": first_id},
-                severity="warning",
-            )
 
-    recipient = (triggers or [{}])[0].get("recipient")
-    if recipient and pdf_path.exists():
-        try:
+        recipient = (triggers or [{}])[0].get("recipient")
+        if recipient and pdf_path.exists():
             email_sender.send_email(
                 to=recipient,
                 subject="Your A2A research report",
@@ -604,22 +591,18 @@ def run(
                 attachments=[str(pdf_path)],
             )
             log_event({"event_id": first_id, "status": "report_sent"})
-        except Exception as e:
-            log_event({"event_id": first_id, "status": "report_not_sent", "severity": "critical"})
+        else:
+            log_event({"event_id": first_id, "status": "report_not_sent", "severity": "warning"})
             log_step(
                 "orchestrator",
                 "report_not_sent",
-                {"event_id": first_id, "error": str(e)},
-                severity="critical",
+                {"event_id": first_id},
+                severity="warning",
             )
-    else:
-        log_event({"event_id": first_id, "status": "report_not_sent", "severity": "warning"})
-        log_step(
-            "orchestrator",
-            "report_not_sent",
-            {"event_id": first_id},
-            severity="warning",
-        )
+    except Exception as e:
+        recovery_agent.handle_failure(first_id, e)
+        finalize_summary(); bundle_logs_into_exports()
+        return consolidated
 
     finalize_summary()
     bundle_logs_into_exports()
