@@ -30,6 +30,7 @@ def test_contacts_scheduled_poll_normalizes(monkeypatch):
                 "domain": "acme.com",
                 "email": "bob@example.com",
                 "phone": "+49 987654321",
+                "notes_blob": "Firma ACME Corp\nacme.com\n+49 987654321",
                 "notes_extracted": {
                     "company": "ACME Corp",
                     "domain": "acme.com",

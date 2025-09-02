@@ -24,7 +24,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/contacts.other.readonly",
 ]
 
-from core.trigger_words import load_trigger_words
+from core.trigger_words import load_trigger_words, contains_trigger
 from core import feature_flags, summarize, parser
 from core.utils import (
     required_fields,
@@ -136,15 +136,18 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
     if fetch_fn is None:
         fetch_fn = fetch_contacts
     contacts = fetch_fn() or []
-    trigger_words = [t.lower() for t in load_trigger_words()]
+    trigger_words = load_trigger_words()
     triggers: List[Dict[str, Any]] = []
     for person in contacts:
         email = _primary_email(person) or ""
         notes = _notes_blob(person)
         names = [n.get("displayName") for n in person.get("names", []) if n.get("displayName")]
         joined_names = " ".join(names)
-        summary_text = f"{notes} {joined_names}".lower()
-        matched_trigger = next((t for t in trigger_words if t in summary_text), None)
+        summary_text = f"{notes} {joined_names}"
+        matched_trigger = next(
+            (t for t in trigger_words if contains_trigger(summary_text, [t])),
+            None,
+        )
         contact_id = person.get("resourceName") or person.get("id") or ""
         if matched_trigger:
             log_step(
@@ -163,6 +166,7 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
             "domain": domain,
             "email": email,
             "phone": phone,
+            "notes_blob": notes,
             "notes_extracted": {"company": company, "domain": domain, "phone": phone},
         }
         if feature_flags.ENABLE_SUMMARY:

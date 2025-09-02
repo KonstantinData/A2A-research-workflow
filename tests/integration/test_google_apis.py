@@ -30,6 +30,7 @@ def test_contacts_scheduled_poll_integration(monkeypatch):
                 "domain": "bar.com",
                 "email": "bob@example.com",
                 "phone": "+49 3333333",
+                "notes_blob": "Firma Bar Inc\nbar.com\n+49 3333333",
                 "notes_extracted": {
                     "company": "Bar Inc",
                     "domain": "bar.com",
