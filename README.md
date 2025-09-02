@@ -55,6 +55,8 @@ PDF generation relies on WeasyPrint system libraries, installed by the Dockerfil
 
 ## Google OAuth & Token Rotation
 
+> **Note:** <span style="color:red">v2-only</span> – legacy environment names (`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` or JSON variants) will fail at startup.
+
 The refresh token is bound to the exact client (ID/secret); mixing clients causes `invalid_grant` errors. To re-issue a refresh token, generate a consent URL with `access_type=offline` and `prompt=consent`. Only the v2 client (`GOOGLE_CLIENT_ID_V2`/`GOOGLE_CLIENT_SECRET_V2`) is supported.
 
 ## LIVE mode
