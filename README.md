@@ -28,6 +28,8 @@ flowchart LR
    ```bash
    pip install -r requirements.txt
    ```
+   Missing Google API libraries log a `google_api_client_missing` step for
+   Calendar and Contacts.
 3. Set required environment variables as needed. SMTP/IMAP/HubSpot/Google variables are listed in [`.env.example`](.env.example) and documented in [`ops/CONFIG.md`](ops/CONFIG.md).
 4. Adjust trigger words in `config/trigger_words.txt` or point `TRIGGER_WORDS_FILE` to a custom list.
 
