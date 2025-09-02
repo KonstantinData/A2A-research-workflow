@@ -202,6 +202,26 @@ def _calendar_fetch_logged(wf_id: str) -> bool:
     return required.issubset(statuses)
 
 
+def _calendar_last_error(wf_id: str) -> Optional[Dict[str, Any]]:
+    """Return the last error record from the calendar log for this workflow."""
+    path = Path("logs") / "workflows" / "calendar.jsonl"
+    if not path.exists():
+        return None
+    last: Optional[Dict[str, Any]] = None
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    continue
+                if rec.get("workflow_id") == wf_id and rec.get("severity") == "error":
+                    last = rec
+    except Exception:
+        return None
+    return last
+
+
 
 # --------- Trigger-Gathering für Kalender + Kontakte ----------
 def _as_trigger_from_event(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -244,10 +264,32 @@ def gather_triggers(
 
     triggers: List[Dict[str, Any]] = []
     try:
+        wf_id = get_workflow_id()
         if events is None:
             events = fetch_events()
+            if events == []:
+                err = _calendar_last_error(wf_id)
+                if err:
+                    details = {
+                        k: v
+                        for k, v in err.items()
+                        if k
+                        not in {
+                            "workflow_id",
+                            "trigger_source",
+                            "status",
+                            "severity",
+                            "variant",
+                        }
+                    }
+                    log_event(
+                        {
+                            "status": err.get("status"),
+                            "severity": err.get("severity", "error"),
+                            **details,
+                        }
+                    )
 
-        wf_id = get_workflow_id()
         if not _calendar_fetch_logged(wf_id):
             log_event(
                 {

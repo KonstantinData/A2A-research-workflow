@@ -89,6 +89,7 @@ def fetch_events() -> List[Normalized]:
     results: List[Normalized] = []
     if not build or not Credentials:
         log_step("calendar", "google_api_client_missing", {}, severity="error")
+        log_event({"status": "google_api_client_missing", "severity": "error"})
         return results
     try:
         creds = build_user_credentials(SCOPES)
@@ -98,6 +99,13 @@ def fetch_events() -> List[Normalized]:
                 "missing_google_oauth_env",
                 {"mode": "v2-only"},
                 severity="error",
+            )
+            log_event(
+                {
+                    "status": "missing_google_oauth_env",
+                    "mode": "v2-only",
+                    "severity": "error",
+                }
             )
             return []
         service = build("calendar", "v3", credentials=creds, cache_discovery=False)
