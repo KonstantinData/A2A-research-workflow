@@ -81,12 +81,20 @@ def test_check_existing_report_error(monkeypatch):
         hubspot_api.check_existing_report("123")
 
 
-def _run_base(monkeypatch, tmp_path, check_result):
+def _run_base(monkeypatch, tmp_path, check_result, reply=None):
     monkeypatch.setattr(feature_flags, "ATTACH_PDF_TO_HUBSPOT", True)
     monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "tok")
     monkeypatch.setenv("HUBSPOT_PORTAL_ID", "portal")
     monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
     monkeypatch.setenv("OUTPUT_DIR", str(tmp_path))
+    if reply is None:
+        monkeypatch.setattr(orchestrator.email_reader, "fetch_replies", lambda: [])
+    else:
+        monkeypatch.setattr(
+            orchestrator.email_reader,
+            "fetch_replies",
+            lambda: [{"creator": TRIGGER["creator"], "text": reply}],
+        )
 
     called = {"attach": 0}
 
@@ -120,18 +128,14 @@ def test_run_uploads_when_no_report(monkeypatch, tmp_path):
     assert _run_base(monkeypatch, tmp_path, None) == 1
 
 
-def test_run_skips_recent_report(monkeypatch, tmp_path):
-    recent = {"createdAt": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")}
-    assert _run_base(monkeypatch, tmp_path, recent) == 0
+def test_run_prompts_and_continues(monkeypatch, tmp_path):
+    existing = {"id": "r1"}
+    assert _run_base(monkeypatch, tmp_path, existing, "Ja") == 1
 
 
-def test_run_uploads_when_old_report(monkeypatch, tmp_path):
-    old = {
-        "createdAt": (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=8))
-        .isoformat()
-        .replace("+00:00", "Z")
-    }
-    assert _run_base(monkeypatch, tmp_path, old) == 1
+def test_run_prompts_and_skips(monkeypatch, tmp_path):
+    existing = {"id": "r1"}
+    assert _run_base(monkeypatch, tmp_path, existing, "Nein") == 0
 
 
 def test_run_propagates_check_error(monkeypatch, tmp_path):
@@ -172,6 +176,7 @@ def _run_no_upload(monkeypatch, tmp_path, upsert_return, pdf_write):
     monkeypatch.setenv("OUTPUT_DIR", str(tmp_path))
     monkeypatch.setenv("A2A_TEST_MODE", "1")
     monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
+    monkeypatch.setattr(orchestrator.email_reader, "fetch_replies", lambda: [])
 
     called = {"attach": 0}
 
