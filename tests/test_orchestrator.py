@@ -28,7 +28,7 @@ def test_run_exits_when_no_triggers(monkeypatch, tmp_path):
     assert res == {"status": "idle"}
 
     log_dir = Path("logs/workflows")
-    files = list(log_dir.glob("*.jsonl"))
+    files = sorted(log_dir.glob("wf-*.jsonl"))
     assert files, "log file not written"
     content = files[0].read_text()
     assert '"status": "no_triggers"' in content

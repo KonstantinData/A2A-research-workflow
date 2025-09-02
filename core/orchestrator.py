@@ -133,25 +133,35 @@ def _preflight_google() -> bool:
     return True
 
 
-def _event_id_exists(event_id: str) -> bool:
-    """Return True if ``event_id`` already present in any workflow log."""
+def _latest_status(event_id: str) -> Optional[str]:
+    """Return the last non-``fetched`` status for ``event_id`` from workflow logs."""
     if not event_id:
-        return False
+        return None
     base = Path("logs") / "workflows"
     if not base.exists():
-        return False
-    for path in base.glob("wf-*.jsonl"):
+        return None
+    latest: Optional[str] = None
+    for path in sorted(base.glob("wf-*.jsonl")):
         try:
             with path.open("r", encoding="utf-8") as fh:
                 for line in fh:
                     try:
-                        if json.loads(line).get("event_id") == event_id:
-                            return True
+                        rec = json.loads(line)
                     except Exception:
                         continue
+                    if rec.get("event_id") == event_id:
+                        status = rec.get("status")
+                        if status != "fetched":
+                            latest = status
         except Exception:
             continue
-    return False
+    return latest
+
+
+def is_event_active(event_id: str) -> bool:
+    """Return True if ``event_id`` exists and last status is pending/pending_admin."""
+    status = _latest_status(event_id)
+    return status in {"pending", "pending_admin"}
 
 
 def _missing_required(source: str, payload: Dict[str, Any]) -> List[str]:
@@ -213,20 +223,26 @@ def _as_trigger_from_contact(c: Dict[str, Any]) -> Dict[str, Any]:
 
 
 
-def gather_triggers() -> List[Dict[str, Any]]:
+def gather_triggers(
+    events: Optional[List[Dict[str, Any]]] = None,
+    contacts: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
     """Standardisiere Trigger in gemeinsames Format {source, creator, recipient, payload}."""
 
     triggers: List[Dict[str, Any]] = []
     try:
-        events = fetch_events()
+        if events is None:
+            events = fetch_events()
 
         wf_id = get_workflow_id()
         if not _calendar_fetch_logged(wf_id):
-            log_event({
-                "status": "calendar_fetch_missing",
-                "severity": "warning",
-                "message": "Proceeding without calendar logs"
-            })
+            log_event(
+                {
+                    "status": "calendar_fetch_missing",
+                    "severity": "warning",
+                    "message": "Proceeding without calendar logs",
+                }
+            )
 
         if not events or not any(e.get("event_id") for e in events):
             log_event({"status": "no_calendar_events", "severity": "warning"})
@@ -248,16 +264,19 @@ def gather_triggers() -> List[Dict[str, Any]]:
                 )
                 continue
             triggers.append(trig)
-        try:
-            contacts = fetch_contacts() or []
-        except Exception as e:
-            log_event({
-                "status": "contacts_fetch_failed",
-                "severity": "warning",
-                "error": str(e),
-            })
-            contacts = []
-        for c in contacts:
+        if contacts is None:
+            try:
+                contacts = fetch_contacts() or []
+            except Exception as e:
+                log_event(
+                    {
+                        "status": "contacts_fetch_failed",
+                        "severity": "warning",
+                        "error": str(e),
+                    }
+                )
+                contacts = []
+        for c in contacts or []:
             t = _as_trigger_from_contact(c)
             if t:
                 triggers.append(t)
@@ -300,14 +319,34 @@ def run(
         if feature_flags.USE_PUSH_TRIGGERS:
             triggers = []
         else:
-            triggers = gather_triggers()
+            events = fetch_events() or []
+            for ev in events:
+                eid = ev.get("event_id") or ev.get("id")
+                if eid:
+                    log_event({"event_id": eid, "status": "fetched"})
+            try:
+                contacts = fetch_contacts() or []
+            except Exception as e:
+                log_event(
+                    {
+                        "status": "contacts_fetch_failed",
+                        "severity": "warning",
+                        "error": str(e),
+                    }
+                )
+                contacts = []
+            for c in contacts:
+                cid = c.get("contact_id") or c.get("id") or c.get("resourceName")
+                if cid:
+                    log_event({"event_id": cid, "status": "fetched"})
+            triggers = gather_triggers(events, contacts)
 
     # Remove duplicates based on event_id
     filtered: List[Dict[str, Any]] = []
     for trig in triggers or []:
         eid = trig.get("payload", {}).get("event_id")
-        if eid and _event_id_exists(str(eid)):
-            log_event({"event_id": eid, "status": "duplicate_event"})
+        if eid and is_event_active(str(eid)):
+            log_event({"event_id": eid, "status": "duplicate_skipped"})
         else:
             filtered.append(trig)
     triggers = filtered
