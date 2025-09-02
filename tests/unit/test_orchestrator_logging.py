@@ -20,13 +20,14 @@ def test_gather_triggers_logs_discard_reasons(tmp_path, monkeypatch):
     monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: True)
 
     triggers = orchestrator.gather_triggers()
-    assert triggers == []
+    assert len(triggers) == 1
+    assert triggers[0]["payload"]["event_id"] == "2"
 
     log_file = Path("logs") / "workflows" / "calendar.jsonl"
     records = [json.loads(line) for line in log_file.read_text().splitlines()]
     reasons = [r.get("reason") for r in records if r.get("status") == "event_discarded"]
     assert "no_trigger_match" in reasons
-    assert "missing_fields" in reasons
+    assert "missing_fields" not in reasons
 
 
 def test_gather_triggers_logs_no_calendar_events(tmp_path, monkeypatch):

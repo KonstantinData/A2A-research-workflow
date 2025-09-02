@@ -247,14 +247,6 @@ def gather_triggers() -> List[Dict[str, Any]]:
                     },
                 )
                 continue
-            if _missing_required("calendar", ev):
-                eid = ev.get("id") or ev.get("event_id")
-                log_step(
-                    "calendar",
-                    "event_discarded",
-                    {"reason": "missing_fields", "event": {"id": eid}},
-                )
-                continue
             triggers.append(trig)
         try:
             contacts = fetch_contacts() or []
@@ -319,12 +311,6 @@ def run(
         else:
             filtered.append(trig)
     triggers = filtered
-
-    # Send reminders for triggers flagged as missing info
-    try:
-        reminder_service.check_and_notify(triggers)
-    except Exception:
-        pass
 
     # Allow e-mail replies to fill missing fields and update task store
     replies: List[Dict[str, Any]] = []
@@ -412,17 +398,17 @@ def run(
     for trig in triggers:
         payload = trig.setdefault("payload", {})
         event_id = payload.get("event_id")
-        missing = _missing_required(trig.get("source", ""), payload) if event_id else []
-        if missing:
-            log_event({"event_id": event_id, "status": "fields_missing", "missing": missing})
+        enriched: Dict[str, Any] | None = None
+        if event_id:
             enriched = field_completion_agent.run(trig)
             if enriched:
                 payload.update(enriched)
-                missing = _missing_required(trig.get("source", ""), payload)
-                if not missing:
-                    log_event({"event_id": event_id, "status": "enriched_by_ai"})
+            missing = _missing_required(trig.get("source", ""), payload)
             if missing:
+                log_event({"event_id": event_id, "status": "fields_missing", "missing": missing})
                 log_event({"event_id": event_id, "status": "missing_fields_pending", "missing": missing})
+            elif enriched:
+                log_event({"event_id": event_id, "status": "enriched_by_ai"})
         if researchers:
             log_event({"event_id": event_id, "status": "pending", "creator": trig.get("creator")})
         trig_results: List[Dict[str, Any]] = []
@@ -437,6 +423,12 @@ def run(
             # skip further processing for this trigger but continue others
             continue
         results.extend(trig_results)
+
+    # Send reminders for triggers still missing info
+    try:
+        reminder_service.check_and_notify(triggers)
+    except Exception:
+        pass
 
     consolidated = consolidate_fn(results) if consolidate_fn else {}
     log_event({"status": "consolidated", "count": len(results)})
