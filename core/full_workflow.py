@@ -183,7 +183,7 @@ def run_full_workflow(
         except Exception:
             pass
         try:
-            csv_export.export_csv(consolidated, csv_path)
+            csv_export.export_csv(consolidated.get("rows", []), csv_path)
         except Exception:
             pass
         # Upsert and attach report in HubSpot if configured

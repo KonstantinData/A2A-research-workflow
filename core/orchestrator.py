@@ -417,7 +417,7 @@ def run(
     researchers: List[Callable[[Dict[str, Any]], Dict[str, Any]]] | None = None,
     consolidate_fn: Callable[[List[Dict[str, Any]]], Dict[str, Any]] | None = lambda r: {},
     pdf_renderer: Callable[[Dict[str, Any], Path], None] | None = None,
-    csv_exporter: Callable[[Dict[str, Any], Path], None] | None = None,
+    csv_exporter: Callable[[List[Dict[str, Any]], Path], None] | None = None,
     hubspot_upsert: Callable[[Dict[str, Any]], Any] | None = lambda d: None,
     hubspot_attach: Callable[[Path, Any], None] | None = lambda p, c: None,
     hubspot_check_existing: Callable[[Any], Any] | None = lambda cid: None,
@@ -539,7 +539,7 @@ def run(
         except Exception as e:
             log_event({"status": "artifact_pdf_error", "error": str(e), "severity": "warning"})
         try:
-            csv_export.export_csv(empty_report, csv_path, reason="no_triggers")
+            csv_export.export_csv([], csv_path)
             log_event({"status": "artifact_csv", "path": str(csv_path)})
         except Exception as e:
             log_event({"status": "artifact_csv_error", "error": str(e), "severity": "warning"})
@@ -665,13 +665,13 @@ def run(
     csv_path = out_dir / "data.csv"
     try:
         pdf_renderer(consolidated, pdf_path)
-        csv_exporter(consolidated, csv_path)
+        csv_exporter(consolidated.get("rows", []), csv_path)
         # Artefakt-Integrität absichern (kein 3-Byte-Stub etc.)
         try:
             if pdf_path.exists() and pdf_path.stat().st_size < 1000:
                 _pdf.render_pdf({"fields":["info"],"rows":[{"info":"invalid_artifact_detected"}],"meta":{}}, pdf_path)
             if csv_path.exists() and csv_path.stat().st_size < 5:
-                _csv.export_csv({"info":"invalid_artifact_detected"}, csv_path)
+                _csv.export_csv([], csv_path)
         except Exception:
             pass
         log_event({"event_id": first_id, "status": "artifact_pdf", "path": str(pdf_path)})
