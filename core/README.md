@@ -16,3 +16,6 @@ Standard Python libraries only in this skeleton.
 
 ## Usage
 The orchestrator coordinates agents, consolidation, duplicate detection, rendering, and notifications; invoke with `python -m core.orchestrator`.
+
+## Documentation
+- [Status model](../docs/status_model.md)

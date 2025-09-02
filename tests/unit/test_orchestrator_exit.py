@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 
-from core import orchestrator
+from core import orchestrator, statuses
 from agents import recovery_agent
 
 
@@ -27,7 +27,7 @@ def test_abort_cleans_temp_and_logs(tmp_path, monkeypatch):
     recovery_agent.abort("42")
 
     assert not tmp.exists()
-    assert any(r.get("status") == "aborted" and r.get("event_id") == "42" for r in records)
+    assert any(r.get("status") == statuses.ABORTED and r.get("event_id") == "42" for r in records)
 
 
 def test_run_logs_resumed_on_restart(tmp_path, monkeypatch):

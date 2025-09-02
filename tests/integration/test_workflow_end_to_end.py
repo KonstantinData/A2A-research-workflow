@@ -4,7 +4,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from core import orchestrator, tasks, task_history
+from core import orchestrator, tasks, task_history, statuses
 from agents import field_completion_agent, reminder_service
 from integrations import email_sender, email_client
 
@@ -57,7 +57,7 @@ def test_duplicate_event_logged(monkeypatch):
             "domain": "acme.com",
         },
     }
-    orchestrator.log_event({"event_id": "e1", "status": "pending"})
+    orchestrator.log_event({"event_id": "e1", "status": statuses.PENDING})
     _orchestrator_run([trig], monkeypatch)
     logs = _collect_logs()
     assert '"status": "duplicate_skipped"' in logs
@@ -110,7 +110,7 @@ def test_ai_failure_triggers_email(monkeypatch):
         hubspot_check_existing=lambda cid: None,
     )
     logs = _collect_logs()
-    assert '"status": "pending"' in logs
+    assert f'"status": "{statuses.PENDING}"' in logs
     assert len(send_calls) == 2
     subjects = {c["subject"] for c in send_calls}
     assert "Your A2A research report" in subjects

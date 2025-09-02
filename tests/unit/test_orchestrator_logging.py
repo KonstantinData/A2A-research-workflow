@@ -6,7 +6,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from core import orchestrator
+from core import orchestrator, statuses
 
 
 def test_gather_triggers_logs_discard_reasons(tmp_path, monkeypatch):
@@ -31,7 +31,7 @@ def test_gather_triggers_logs_discard_reasons(tmp_path, monkeypatch):
 
     wf_log = next((Path("logs") / "workflows").glob("wf-*.jsonl"))
     wf_records = [json.loads(line) for line in wf_log.read_text().splitlines()]
-    assert any(r.get("status") == "not_relevant" and r.get("event_id") == "1" for r in wf_records)
+    assert any(r.get("status") == statuses.NOT_RELEVANT and r.get("event_id") == "1" for r in wf_records)
 
 
 def test_gather_triggers_logs_no_calendar_events(tmp_path, monkeypatch):
@@ -74,7 +74,7 @@ def test_run_invokes_recovery_on_failure(tmp_path, monkeypatch):
 
     def fake_handle_failure(event_id, error):
         called["event_id"] = event_id
-        records.append({"event_id": event_id, "status": "needs_admin_fix"})
+        records.append({"event_id": event_id, "status": statuses.NEEDS_ADMIN_FIX})
 
     monkeypatch.setattr(orchestrator.recovery_agent, "handle_failure", fake_handle_failure)
 
@@ -96,4 +96,4 @@ def test_run_invokes_recovery_on_failure(tmp_path, monkeypatch):
     )
 
     assert called["event_id"] == "42"
-    assert any(r.get("status") == "needs_admin_fix" for r in records)
+    assert any(r.get("status") == statuses.NEEDS_ADMIN_FIX for r in records)

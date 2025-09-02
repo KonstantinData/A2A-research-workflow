@@ -7,7 +7,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from agents.reminder_service import ReminderScheduler, check_and_notify
-from core import tasks, task_history
+from core import tasks, task_history, statuses
 from core.utils import get_workflow_id
 from integrations import email_client, email_sender
 import json
@@ -125,9 +125,9 @@ def test_check_and_notify_logs(monkeypatch, tmp_path):
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"{wf_id}.jsonl"
     entries = [
-        {"event_id": "e1", "status": "pending"},
+        {"event_id": "e1", "status": statuses.PENDING},
         {"event_id": "e2", "status": "done"},
-        {"event_id": "e3", "status": "pending_admin"},
+        {"event_id": "e3", "status": statuses.PENDING_ADMIN},
     ]
     with log_path.open("w", encoding="utf-8") as fh:
         for rec in entries:

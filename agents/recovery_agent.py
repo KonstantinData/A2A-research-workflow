@@ -7,6 +7,8 @@ import shutil
 
 from integrations import email_sender
 
+from core import statuses
+
 
 def handle_failure(event_id: str | None, error: Exception) -> None:
     """Attempt to recover from a workflow failure.
@@ -46,7 +48,7 @@ def handle_failure(event_id: str | None, error: Exception) -> None:
     log_event(
         {
             "event_id": event_id,
-            "status": "needs_admin_fix",
+            "status": statuses.NEEDS_ADMIN_FIX,
             "error": str(error),
             "severity": "critical",
         }
@@ -73,4 +75,4 @@ def abort(event_id: str) -> None:
                 shutil.rmtree(path)
             else:
                 path.unlink()
-    log_event({"event_id": event_id, "status": "aborted"})
+    log_event({"event_id": event_id, "status": statuses.ABORTED})

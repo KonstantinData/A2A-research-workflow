@@ -22,6 +22,9 @@ from integrations.google_contacts import fetch_contacts
 from integrations.google_oauth import build_user_credentials
 from core.trigger_words import contains_trigger
 
+# Common status definitions
+from core import statuses
+
 # Expose integrations so tests can monkeypatch them
 from integrations import email_sender as email_sender  # noqa: F401
 from integrations import email_reader as email_reader  # noqa: F401
@@ -162,7 +165,7 @@ def _latest_status(event_id: str) -> Optional[str]:
 def is_event_active(event_id: str) -> bool:
     """Return True if ``event_id`` exists and last status is pending/pending_admin."""
     status = _latest_status(event_id)
-    return status in {"pending", "pending_admin"}
+    return status in {statuses.PENDING, statuses.PENDING_ADMIN}
 
 
 def _missing_required(source: str, payload: Dict[str, Any]) -> List[str]:
@@ -266,7 +269,7 @@ def gather_triggers(
                     },
                 )
                 if eid:
-                    log_event({"event_id": eid, "status": "not_relevant"})
+                    log_event({"event_id": eid, "status": statuses.NOT_RELEVANT})
                 continue
             triggers.append(trig)
         if contacts is None:
@@ -459,7 +462,7 @@ def run(
                 payload.update(enriched)
             missing = _missing_required(trig.get("source", ""), payload)
             if missing:
-                log_event({"event_id": event_id, "status": "pending", "missing": missing})
+                log_event({"event_id": event_id, "status": statuses.PENDING, "missing": missing})
                 try:
                     email_sender.send_email(
                         to=trig.get("creator"),
@@ -479,7 +482,7 @@ def run(
                     }
                 )
         if researchers:
-            log_event({"event_id": event_id, "status": "pending", "creator": trig.get("creator")})
+            log_event({"event_id": event_id, "status": statuses.PENDING, "creator": trig.get("creator")})
         trig_results: List[Dict[str, Any]] = []
         for researcher in researchers or []:
             if getattr(researcher, "pro", False) and not feature_flags.ENABLE_PRO_SOURCES:
@@ -616,13 +619,13 @@ def run(
                     body="Please find the attached report.",
                     attachments=[str(pdf_path)],
                 )
-                log_event({"event_id": first_id, "status": "report_sent"})
+                log_event({"event_id": first_id, "status": statuses.REPORT_SENT})
             except Exception as e:
                 recovery_agent.handle_failure(first_id, e)
                 log_event(
                     {
                         "event_id": first_id,
-                        "status": "report_not_sent",
+                        "status": statuses.REPORT_NOT_SENT,
                         "severity": "critical",
                     }
                 )
@@ -635,7 +638,7 @@ def run(
                 finalize_summary(); bundle_logs_into_exports()
                 return consolidated
         else:
-            log_event({"event_id": first_id, "status": "report_not_sent", "severity": "warning"})
+            log_event({"event_id": first_id, "status": statuses.REPORT_NOT_SENT, "severity": "warning"})
             log_step(
                 "orchestrator",
                 "report_not_sent",
