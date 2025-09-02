@@ -84,6 +84,8 @@ def extract_domain(text: str) -> str | None:
 
 
 def fetch_events() -> List[Normalized]:
+    from core.orchestrator import log_event
+
     results: List[Normalized] = []
     if not build or not Credentials:
         log_step("calendar", "google_api_client_missing", {}, severity="error")
@@ -136,6 +138,7 @@ def fetch_events() -> List[Normalized]:
                 )
                 for item in resp.get("items", []):
                     norm = _normalize(item, cal_id)
+                    log_event({"event_id": norm.get("event_id"), "status": "ingested"})
                     ev = dict(norm)
                     ev["payload"] = dict(norm)
                     results.append(ev)

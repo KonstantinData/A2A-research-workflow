@@ -60,7 +60,7 @@ def test_duplicate_event_logged(monkeypatch):
     orchestrator.log_event({"event_id": "e1", "status": statuses.PENDING})
     _orchestrator_run([trig], monkeypatch)
     logs = _collect_logs()
-    assert '"status": "duplicate_skipped"' in logs
+    assert '"status": "duplicate_event"' in logs
 
 
 def test_ai_enrichment_success(monkeypatch):

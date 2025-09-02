@@ -381,7 +381,7 @@ def run(
     for trig in triggers or []:
         eid = trig.get("payload", {}).get("event_id")
         if eid and is_event_active(str(eid)):
-            log_event({"event_id": eid, "status": "duplicate_skipped"})
+            log_event({"event_id": eid, "status": "duplicate_event"})
         else:
             filtered.append(trig)
     triggers = filtered
