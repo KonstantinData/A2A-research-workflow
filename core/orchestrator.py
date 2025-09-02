@@ -334,6 +334,8 @@ def gather_triggers(
                     }
                 )
                 contacts = []
+        if not contacts:
+            log_event({"status": "no_contacts", "severity": "warning"})
         for c in contacts or []:
             t = _as_trigger_from_contact(c)
             if t:

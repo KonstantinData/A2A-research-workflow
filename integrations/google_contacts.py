@@ -64,6 +64,8 @@ def fetch_contacts(page_size: int = 200, page_limit: int = 10) -> List[Dict[str,
     """Live-Fetch (in Tests typischerweise gemonkeypatched)."""
     if build is None or Request is None:  # pragma: no cover
         log_step("contacts", "google_api_client_missing", {}, severity="error")
+        from core.orchestrator import log_event
+        log_event({"status": "google_api_client_missing", "severity": "error"})
         return []
 
     try:
@@ -74,6 +76,14 @@ def fetch_contacts(page_size: int = 200, page_limit: int = 10) -> List[Dict[str,
                 "missing_google_oauth_env",
                 {"mode": "v2-only"},
                 severity="error",
+            )
+            from core.orchestrator import log_event
+            log_event(
+                {
+                    "status": "missing_google_oauth_env",
+                    "severity": "error",
+                    "mode": "v2-only",
+                }
             )
             return []
 
@@ -122,6 +132,17 @@ def fetch_contacts(page_size: int = 200, page_limit: int = 10) -> List[Dict[str,
             "fetch_error",
             {"error": str(e), "code": code, "hint": hint, "client_id_tail": cid_tail},
             severity="error",
+        )
+        from core.orchestrator import log_event
+        log_event(
+            {
+                "status": "contacts_fetch_error",
+                "error": str(e),
+                "code": code,
+                "hint": hint,
+                "client_id_tail": cid_tail,
+                "severity": "error",
+            }
         )
         return []
 
