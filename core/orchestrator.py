@@ -163,9 +163,17 @@ def _latest_status(event_id: str) -> Optional[str]:
 
 
 def is_event_active(event_id: str) -> bool:
-    """Return True if ``event_id`` exists and last status is pending/pending_admin."""
+    """Return True if the latest status is final or paused for ``event_id``.
+
+    This uses ``_latest_status`` to retrieve the most recent workflow status for
+    the given ``event_id``.  Events that have reached a final state or are
+    paused awaiting input should not be reprocessed, so the function returns
+    ``True`` for statuses in ``FINAL_STATUSES`` or ``PAUSE_STATUSES``.  Only
+    events with other statuses (e.g. ``resumed``) return ``False`` and are
+    eligible for processing.
+    """
     status = _latest_status(event_id)
-    return status in {statuses.PENDING, statuses.PENDING_ADMIN}
+    return status in (statuses.FINAL_STATUSES | statuses.PAUSE_STATUSES)
 
 
 def _missing_required(source: str, payload: Dict[str, Any]) -> List[str]:
