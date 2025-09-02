@@ -345,16 +345,6 @@ def run(
                     log_event({"event_id": cid, "status": "fetched"})
             triggers = gather_triggers(events, contacts)
 
-    # Remove duplicates based on event_id
-    filtered: List[Dict[str, Any]] = []
-    for trig in triggers or []:
-        eid = trig.get("payload", {}).get("event_id")
-        if eid and is_event_active(str(eid)):
-            log_event({"event_id": eid, "status": "duplicate_skipped"})
-        else:
-            filtered.append(trig)
-    triggers = filtered
-
     # Allow e-mail replies to fill missing fields and update task store
     replies: List[Dict[str, Any]] = []
     if email_listener.has_pending_events():
@@ -362,7 +352,7 @@ def run(
             replies = email_reader.fetch_replies()
         except Exception:
             replies = []
-    for trig in triggers:
+    for trig in triggers or []:
         tid = (
             trig.get("payload", {}).get("task_id")
             or trig.get("payload", {}).get("id")
@@ -380,6 +370,16 @@ def run(
                 log_event({"status": "pending_email_reply_resolved", "event_id": ev_id})
                 log_event({"status": "resumed", "event_id": ev_id, "creator": rep.get("creator")})
                 replies.remove(rep)
+
+    # Remove duplicates based on event_id
+    filtered: List[Dict[str, Any]] = []
+    for trig in triggers or []:
+        eid = trig.get("payload", {}).get("event_id")
+        if eid and is_event_active(str(eid)):
+            log_event({"event_id": eid, "status": "duplicate_skipped"})
+        else:
+            filtered.append(trig)
+    triggers = filtered
 
     if not triggers:
         log_event({
@@ -456,8 +456,17 @@ def run(
                 payload.update(enriched)
             missing = _missing_required(trig.get("source", ""), payload)
             if missing:
-                log_event({"event_id": event_id, "status": "fields_missing", "missing": missing})
-                log_event({"event_id": event_id, "status": "missing_fields_pending", "missing": missing})
+                log_event({"event_id": event_id, "status": "pending", "missing": missing})
+                try:
+                    email_sender.send_email(
+                        to=trig.get("creator"),
+                        subject="Missing information for research",
+                        body="Please reply with: " + ", ".join(missing),
+                        task_id=payload.get("task_id") or event_id,
+                    )
+                except Exception:
+                    pass
+                continue
             elif enriched:
                 log_event({"event_id": event_id, "status": "enriched_by_ai"})
         if researchers:
