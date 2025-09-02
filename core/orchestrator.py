@@ -579,18 +579,60 @@ def run(
             and pdf_path.exists()
             and hubspot_attach
         ):
-            hubspot_attach(pdf_path, company_id)
-            log_event({"event_id": first_id, "status": "report_uploaded"})
+            try:
+                hubspot_attach(pdf_path, company_id)
+                log_event({"event_id": first_id, "status": "report_uploaded"})
+            except Exception as e:
+                recovery_agent.handle_failure(first_id, e)
+                log_event(
+                    {
+                        "event_id": first_id,
+                        "status": "report_upload_failed",
+                        "severity": "critical",
+                    }
+                )
+                log_step(
+                    "orchestrator",
+                    "report_error",
+                    {"event_id": first_id, "error": str(e)},
+                    severity="critical",
+                )
+                log_step(
+                    "orchestrator",
+                    "report_upload_failed",
+                    {"event_id": first_id},
+                    severity="warning",
+                )
+                finalize_summary(); bundle_logs_into_exports()
+                return consolidated
 
         recipient = (triggers or [{}])[0].get("recipient")
         if recipient and pdf_path.exists():
-            email_sender.send_email(
-                to=recipient,
-                subject="Your A2A research report",
-                body="Please find the attached report.",
-                attachments=[str(pdf_path)],
-            )
-            log_event({"event_id": first_id, "status": "report_sent"})
+            try:
+                email_sender.send_email(
+                    to=recipient,
+                    subject="Your A2A research report",
+                    body="Please find the attached report.",
+                    attachments=[str(pdf_path)],
+                )
+                log_event({"event_id": first_id, "status": "report_sent"})
+            except Exception as e:
+                recovery_agent.handle_failure(first_id, e)
+                log_event(
+                    {
+                        "event_id": first_id,
+                        "status": "report_not_sent",
+                        "severity": "critical",
+                    }
+                )
+                log_step(
+                    "orchestrator",
+                    "report_not_sent",
+                    {"event_id": first_id, "error": str(e)},
+                    severity="critical",
+                )
+                finalize_summary(); bundle_logs_into_exports()
+                return consolidated
         else:
             log_event({"event_id": first_id, "status": "report_not_sent", "severity": "warning"})
             log_step(
