@@ -3,6 +3,8 @@
 Document environment variables and secrets required for the workflow.
 See repository README for common variables.
 
+> **Note:** <span style="color:red">v2-only</span> – legacy environment names (`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` or JSON variants) will fail at startup.
+
 ## Secrets
 - `HUBSPOT_ACCESS_TOKEN`
 - `GOOGLE_CLIENT_ID_V2`
