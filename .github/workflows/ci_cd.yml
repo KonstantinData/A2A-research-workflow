@@ -35,6 +35,9 @@ jobs:
       - name: Validate CI/CD workflow YAML
         run: python -c "import yaml; yaml.safe_load(open('.github/workflows/ci_cd.yml'))"
 
+      - name: No-legacy-OAuth guard
+        run: python ops/no_legacy_oauth_guard.py
+
       - name: Run tests
         run: |
           python -m pytest \
