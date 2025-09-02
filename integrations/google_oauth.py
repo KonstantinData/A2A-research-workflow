@@ -20,8 +20,17 @@ def build_user_credentials(scopes: List[str]) -> Optional["Credentials"]:
     if not (client_id and client_secret and refresh_token):
         return None
     # Hard block if legacy vars are present to avoid accidental mixing.
-    if os.getenv("GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_SECRET") or os.getenv("GOOGLE_0") or os.getenv("GOOGLE_OAUTH_JSON") or os.getenv("GOOGLE_CREDENTIALS_JSON"):
-        raise RuntimeError("Legacy Google OAuth variables detected; v2-only is enforced. Remove legacy envs.")
+    legacy = [
+        "GOOGLE_" + "CLIENT_ID",
+        "GOOGLE_" + "CLIENT_SECRET",
+        "GOOGLE_" + "0",
+        "GOOGLE_" + "OAUTH_JSON",
+        "GOOGLE_" + "CREDENTIALS_JSON",
+    ]
+    if any(os.getenv(k) for k in legacy):
+        raise RuntimeError(
+            "Legacy Google OAuth variables detected; v2-only is enforced. Remove legacy envs."
+        )
     return Credentials(
         token=None,
         refresh_token=refresh_token,

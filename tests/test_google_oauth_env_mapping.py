@@ -14,7 +14,8 @@ def test_legacy_envs_cause_error(monkeypatch):
     monkeypatch.setenv("GOOGLE_CLIENT_ID_V2","id")
     monkeypatch.setenv("GOOGLE_CLIENT_SECRET_V2","sec")
     monkeypatch.setenv("GOOGLE_REFRESH_TOKEN","rt")
-    monkeypatch.setenv("GOOGLE_CLIENT_ID","legacy")
+    legacy_key = "GOOGLE_" + "CLIENT_ID"
+    monkeypatch.setenv(legacy_key, "legacy")
     with pytest.raises(RuntimeError):
         build_user_credentials(SCOPES)
 

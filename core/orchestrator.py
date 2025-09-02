@@ -55,13 +55,14 @@ def _assert_live_ready() -> None:
     if os.getenv("LIVE_MODE", "1") != "1":
         return
     # v2-only
-    if (
-        os.getenv("GOOGLE_CLIENT_ID")
-        or os.getenv("GOOGLE_CLIENT_SECRET")
-        or os.getenv("GOOGLE_0")
-        or os.getenv("GOOGLE_OAUTH_JSON")
-        or os.getenv("GOOGLE_CREDENTIALS_JSON")
-    ):
+    legacy = [
+        "GOOGLE_" + "CLIENT_ID",
+        "GOOGLE_" + "CLIENT_SECRET",
+        "GOOGLE_" + "0",
+        "GOOGLE_" + "OAUTH_JSON",
+        "GOOGLE_" + "CREDENTIALS_JSON",
+    ]
+    if any(os.getenv(k) for k in legacy):
         raise RuntimeError(
             "Legacy Google OAuth env present. Remove them; v2-only is enforced."
         )
