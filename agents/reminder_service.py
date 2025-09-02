@@ -8,6 +8,7 @@ from datetime import datetime, time as dtime, timedelta, timezone
 import importlib.util as _ilu
 from pathlib import Path
 
+import json
 import logging
 
 from core import tasks, task_history
@@ -167,27 +168,51 @@ class ReminderScheduler:
 
 
 def check_and_notify(triggers: list[dict]) -> None:
-    """Send reminder e-mails for triggers missing information."""
+    """Send reminder e-mails for triggers with pending/pending_admin status."""
+    wf_id = get_workflow_id()
+    log_path = Path("logs") / "workflows" / f"{wf_id}.jsonl"
+    statuses: dict[str, str] = {}
+    if log_path.exists():
+        try:
+            with log_path.open("r", encoding="utf-8") as fh:
+                for line in fh:
+                    try:
+                        rec = json.loads(line)
+                    except Exception:
+                        continue
+                    eid = rec.get("event_id")
+                    if eid:
+                        statuses[eid] = rec.get("status")
+        except Exception:
+            statuses = {}
+
     for trig in triggers:
-        if trig.get("status") == "missing_info":
-            email = build_reminder_email(
-                source=trig["source"],
-                recipient=trig["recipient"],
-                missing=trig["missing"],
-            )
-            email_sender.send(
-                to=email["recipient"],
-                subject=email["subject"],
-                body=email["body"],
-            )
-            log_event = {
+        payload = trig.get("payload") or {}
+        event_id = payload.get("event_id") or trig.get("event_id")
+        if not event_id:
+            continue
+        if statuses.get(event_id) not in {"pending", "pending_admin"}:
+            continue
+        email = build_reminder_email(
+            source=trig["source"],
+            recipient=trig["recipient"],
+            missing=trig["missing"],
+        )
+        email_sender.send(
+            to=email["recipient"],
+            subject=email["subject"],
+            body=email["body"],
+        )
+        append_jsonl(
+            _REMINDER_LOG,
+            {
                 "timestamp": datetime.utcnow().isoformat() + "Z",
                 "status": "reminder_sent",
                 "source": trig["source"],
                 "recipient": trig["recipient"],
                 "missing": trig["missing"],
-            }
-            append_jsonl(_REMINDER_LOG, log_event)
+            },
+        )
 
 
 __all__ = ["ReminderScheduler", "check_and_notify"]
