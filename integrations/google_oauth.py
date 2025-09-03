@@ -1,7 +1,13 @@
 """Google OAuth (v2-only): requires GOOGLE_CLIENT_ID_V2 / GOOGLE_CLIENT_SECRET_V2 / GOOGLE_REFRESH_TOKEN."""
 from __future__ import annotations
+
 import os
 from typing import Optional, List, Tuple
+
+import requests
+
+from config.settings import SETTINGS
+from core.utils import log_step
 
 try:
     from google.oauth2.credentials import Credentials  # type: ignore
@@ -9,6 +15,11 @@ except Exception:
     Credentials = None  # type: ignore
 
 DEFAULT_TOKEN_URI = "https://oauth2.googleapis.com/token"
+
+
+class OAuthError(Exception):
+    """Raised when refreshing an OAuth token fails."""
+
 
 def build_user_credentials(scopes: List[str]) -> Optional["Credentials"]:
     if Credentials is None:
@@ -54,3 +65,35 @@ def classify_oauth_error(err: Exception) -> Tuple[str, str]:
     if "invalid_scope" in msg:
         return ("invalid_scope", "Enable Calendar/People scopes on the consent screen.")
     return ("unknown_oauth_error", "See full exception in logs.")
+
+
+def refresh_access_token() -> str:
+    payload = {
+        "client_id": getattr(SETTINGS, "google_client_id", ""),
+        "client_secret": getattr(SETTINGS, "google_client_secret", ""),
+        "refresh_token": getattr(SETTINGS, "google_refresh_token", ""),
+        "grant_type": "refresh_token",
+    }
+    token_uri = getattr(SETTINGS, "google_token_uri", DEFAULT_TOKEN_URI)
+    r = requests.post(token_uri, data=payload, timeout=30)
+    if r.status_code == 400 and "invalid_grant" in r.text:
+        log_step(
+            "oauth", "google_invalid_grant", {"message": r.text}, severity="error"
+        )
+        try:
+            from integrations.email_sender import send_email
+
+            send_email(
+                to="admin@yourdomain.com",
+                subject="[A2A] Google OAuth invalid_grant – action required",
+                body=f"Refresh token is invalid/expired.\nResponse: {r.text}",
+            )
+        except Exception:
+            pass
+        raise OAuthError("Google refresh token invalid_grant")
+    r.raise_for_status()
+    token = r.json().get("access_token", "")
+    if not token:
+        raise OAuthError("No access_token in response")
+    log_step("oauth", "google_token_refreshed", {}, severity="info")
+    return token
