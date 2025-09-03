@@ -125,6 +125,8 @@ def log_event(record: Dict[str, Any]) -> None:
 def _copy_run_logs_to_export(workflow_id: str) -> None:
     src = Path("logs/workflows")
     dst = Path("output/exports/run_logs")
+    # Replace any previous run logs so this directory mirrors the current run
+    shutil.rmtree(dst, ignore_errors=True)
     dst.mkdir(parents=True, exist_ok=True)
     # Copy only current run files
     for name in (
