@@ -7,7 +7,12 @@ import os
 from typing import Any, Dict, List, Optional, Callable
 
 from config.settings import SETTINGS
-from .google_oauth import build_user_credentials, classify_oauth_error
+from .google_oauth import (
+    build_user_credentials,
+    classify_oauth_error,
+    refresh_access_token,
+    OAuthError,
+)
 
 # Google libs optional in Tests
 try:  # pragma: no cover
@@ -95,7 +100,17 @@ def fetch_contacts(
             )
             return []
 
-        creds.refresh(Request())
+        if all(
+            getattr(SETTINGS, a, None)
+            for a in ("google_client_id", "google_client_secret", "google_refresh_token")
+        ):
+            try:
+                creds.token = refresh_access_token()
+            except OAuthError:
+                from core.orchestrator import log_event
+
+                log_event({"status": "google_invalid_grant", "severity": "error"})
+                return []
 
         service = build("people", "v1", credentials=creds, cache_discovery=False)
         log_step(

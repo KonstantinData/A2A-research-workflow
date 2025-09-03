@@ -7,7 +7,12 @@ from typing import Any, Dict, List
 
 from config.settings import SETTINGS
 from core.utils import log_step
-from .google_oauth import build_user_credentials, classify_oauth_error
+from .google_oauth import (
+    build_user_credentials,
+    classify_oauth_error,
+    refresh_access_token,
+    OAuthError,
+)
 
 try:
     from google.oauth2.credentials import Credentials
@@ -109,6 +114,15 @@ def fetch_events() -> List[Normalized]:
                 }
             )
             return []
+        if all(
+            getattr(SETTINGS, a, None)
+            for a in ("google_client_id", "google_client_secret", "google_refresh_token")
+        ):
+            try:
+                creds.token = refresh_access_token()
+            except OAuthError:
+                log_event({"status": "google_invalid_grant", "severity": "error"})
+                return []
         service = build("calendar", "v3", credentials=creds, cache_discovery=False)
         try:
             service.calendarList().get(calendarId=CAL_IDS[0]).execute()
