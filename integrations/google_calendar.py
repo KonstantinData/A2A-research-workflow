@@ -96,6 +96,8 @@ def fetch_events() -> List[Normalized]:
     if not build or not Credentials:
         log_step("calendar", "google_api_client_missing", {}, severity="error")
         log_event({"status": "google_api_client_missing", "severity": "error"})
+        if os.getenv("LIVE_MODE", "1") == "1":
+            raise RuntimeError("google_api_client_missing")
         return results
     try:
         creds = build_user_credentials(SCOPES)

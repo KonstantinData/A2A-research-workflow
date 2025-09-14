@@ -79,6 +79,8 @@ def fetch_contacts(
         log_step("contacts", "google_api_client_missing", {}, severity="error")
         from core.orchestrator import log_event
         log_event({"status": "google_api_client_missing", "severity": "error"})
+        if os.getenv("LIVE_MODE", "1") == "1":
+            raise RuntimeError("google_api_client_missing")
         return []
 
     try:
