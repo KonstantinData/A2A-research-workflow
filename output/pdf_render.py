@@ -34,6 +34,15 @@ except Exception:  # pragma: no cover - fallback when dependency missing
     Environment = FileSystemLoader = select_autoescape = None  # type: ignore
 
 
+def _ensure_weasyprint() -> None:
+    """Verify that the WeasyPrint dependency is installed."""
+
+    if HTML is None:
+        raise RuntimeError(
+            "WeasyPrint is required for PDF rendering. Install with 'pip install weasyprint'."
+        )
+
+
 def _html_from_data(data: Dict[str, Any]) -> str:
     """Return an HTML document representing ``data``.
 
@@ -122,6 +131,11 @@ def render_pdf(
         exports.
     """
 
+    live_mode = os.getenv("LIVE_MODE", "1") == "1"
+
+    if live_mode:
+        _ensure_weasyprint()
+
     # --- Legacy behaviour: render_pdf(data, out_path) -------------------
     if isinstance(out_path_or_fields, (str, Path)):
         out_path = Path(out_path_or_fields)
@@ -129,6 +143,8 @@ def render_pdf(
         try:
             _write_html_pdf(html, out_path)
         except Exception:
+            if live_mode:
+                raise
             out_path.write_text(html, encoding="utf-8")
         return
 
@@ -158,6 +174,8 @@ def render_pdf(
             _write_html_pdf(html, out_path)
             return
         except Exception:
+            if live_mode:
+                raise
             try:
                 _write_empty_pdf(out_path, reason)
                 return
@@ -170,6 +188,8 @@ def render_pdf(
     try:
         _write_html_pdf(html, out_path)
     except Exception:
+        if live_mode:
+            raise
         out_path.write_text(html, encoding="utf-8")
 
 
