@@ -245,10 +245,8 @@ def find_company_by_name(name: str) -> List[Dict[str, Any]]:
 def list_company_reports(company_id: str) -> List[Dict[str, Any]]:
     """Return a list of previously generated reports for ``company_id``.
 
-    Since this environment does not persist real HubSpot attachments,
-    this helper returns an empty list.  In a production system the
-    implementation would call ``GET /crm/v3/objects/companies/{companyId}/associations/files``
-    or similar to list associated files.
+    The function queries HubSpot for files associated with the given
+    company via ``GET /crm/v3/objects/companies/{companyId}/associations/files``.
 
     Parameters
     ----------
@@ -259,14 +257,23 @@ def list_company_reports(company_id: str) -> List[Dict[str, Any]]:
     -------
     List[Dict[str, Any]]
         A list of dictionaries describing each report.  Each element
-        may contain keys such as ``id``, ``reportDate`` and
-        ``createdAt``.  An empty list indicates no previous reports.
+        may contain keys such as ``id`` and ``type``.  An empty list
+        indicates no previous reports.
     """
-    # Without a backend service we cannot know if a company has any
-    # existing reports, so return an empty list.  The internal company
-    # research will interpret this as no reports and therefore avoid
-    # caching outdated results.
-    return []
+    token = _token()
+    if not token:
+        if os.getenv("LIVE_MODE", "1") == "1":
+            raise RuntimeError("HUBSPOT_ACCESS_TOKEN missing in LIVE mode")
+        return []
+
+    url = f"{HS_BASE}/crm/v3/objects/companies/{company_id}/associations/files"
+    headers = {"Authorization": f"Bearer {token}"}
+    try:
+        resp = requests.get(url, headers=headers, timeout=DEFAULT_TIMEOUT)
+        resp.raise_for_status()
+    except requests.RequestException as exc:  # pragma: no cover - network errors
+        raise RuntimeError("Failed to list company reports") from exc
+    return (resp.json() or {}).get("results") or []
 
 
 def find_similar_companies(
@@ -274,14 +281,10 @@ def find_similar_companies(
 ) -> List[Dict[str, Any]]:
     """Suggest companies with similar characteristics.
 
-    This helper scans the static dataset for companies that share the
-    same industry group or industry.  Classification numbers are
-    no longer used as primary matching criteria.  If no criteria are
-    provided an empty list is returned.  Each suggestion includes
-    ``company_name``, ``company_domain``, ``industry_group``, ``industry``,
-    ``description`` (copied from the static dataset) and a confidence score.
-    The score is a simple heuristic based on how many attributes match; it
-    ranges from 0.0 to 1.0.
+    The function delegates to HubSpot's search API and maps the
+    returned results into a simplified structure.  Only ``industry``
+    and ``industry_group`` are used for matching; ``description`` is
+    accepted for API parity but currently ignored.
 
     Parameters
     ----------
@@ -290,47 +293,64 @@ def find_similar_companies(
     industry: Optional[str]
         The specific industry description to match against.
     description: Optional[str]
-        A free text description (unused in this static implementation).
+        Free text description (unused).
 
     Returns
     -------
     List[Dict[str, Any]]
-        A list of candidate companies with associated data and confidence
-        scores.  An empty list is returned if no criteria are provided
-        or if the static dataset is unavailable.
+        A list of candidate companies with associated data and a simple
+        confidence score.  An empty list is returned if no criteria are
+        provided or if the HubSpot token is missing in non‑LIVE mode.
     """
-    if lookup_company is None:
+    token = _token()
+    if not token:
+        if os.getenv("LIVE_MODE", "1") == "1":
+            raise RuntimeError("HUBSPOT_ACCESS_TOKEN missing in LIVE mode")
         return []
-    if not (industry_group or industry or description):
+
+    filters: List[Dict[str, str]] = []
+    if industry_group:
+        filters.append({"propertyName": "industry_group", "operator": "EQ", "value": industry_group})
+    if industry:
+        filters.append({"propertyName": "industry", "operator": "EQ", "value": industry})
+    if not filters:
         return []
+
+    payload = {"filterGroups": [{"filters": filters}], "properties": ["name", "domain", "industry_group", "industry", "description"]}
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    try:
+        resp = requests.post(
+            f"{HS_BASE}/crm/v3/objects/companies/search",
+            headers=headers,
+            json=payload,
+            timeout=DEFAULT_TIMEOUT,
+        )
+        resp.raise_for_status()
+    except requests.RequestException as exc:  # pragma: no cover - network errors
+        raise RuntimeError("Failed to search for similar companies") from exc
+
+    results = (resp.json() or {}).get("results") or []
     suggestions: List[Dict[str, Any]] = []
-    for name in all_company_names():
-        ci = lookup_company(name)
-        if not ci:
-            continue
+    for item in results:
+        props = item.get("properties") or {}
         matches = 0
         total = 0
-        # Compare industry group if provided
         if industry_group:
             total += 1
-            if ci.industry_group.lower() == industry_group.lower():
+            if (props.get("industry_group") or "").lower() == industry_group.lower():
                 matches += 1
-        # Compare industry if provided
         if industry:
             total += 1
-            if ci.industry.lower() == industry.lower():
+            if (props.get("industry") or "").lower() == industry.lower():
                 matches += 1
-        # Description could be compared via text similarity; omitted here
-        if total == 0:
-            continue
         confidence = matches / total if total else 0.0
         suggestions.append(
             {
-                "company_name": ci.company_name,
-                "company_domain": ci.company_domain,
-                "industry_group": ci.industry_group,
-                "industry": ci.industry,
-                "description": ci.description,
+                "company_name": props.get("name"),
+                "company_domain": props.get("domain"),
+                "industry_group": props.get("industry_group"),
+                "industry": props.get("industry"),
+                "description": props.get("description"),
                 "confidence": confidence,
             }
         )

@@ -81,6 +81,67 @@ def test_check_existing_report_error(monkeypatch):
         hubspot_api.check_existing_report("123")
 
 
+def test_list_company_reports(monkeypatch):
+    captured = {}
+
+    def fake_get(url, headers=None, timeout=30):
+        captured["url"] = url
+        return DummyResp({"results": [{"id": "f1"}]})
+
+    monkeypatch.setattr(hubspot_api.requests, "get", fake_get)
+    monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "tok")
+    result = hubspot_api.list_company_reports("123")
+    assert result == [{"id": "f1"}]
+    assert "associations/files" in captured["url"]
+
+
+def test_list_company_reports_error(monkeypatch):
+    def fake_get(*a, **k):
+        return DummyResp({}, status=500)
+
+    monkeypatch.setattr(hubspot_api.requests, "get", fake_get)
+    monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "tok")
+    with pytest.raises(RuntimeError):
+        hubspot_api.list_company_reports("123")
+
+
+def test_find_similar_companies(monkeypatch):
+    captured = {}
+
+    def fake_post(url, headers=None, json=None, timeout=30):
+        captured["json"] = json
+        data = {
+            "results": [
+                {
+                    "properties": {
+                        "name": "Acme",
+                        "domain": "acme.com",
+                        "industry_group": "Energy",
+                        "industry": "Oil",
+                        "description": "desc",
+                    }
+                }
+            ]
+        }
+        return DummyResp(data)
+
+    monkeypatch.setattr(hubspot_api.requests, "post", fake_post)
+    monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "tok")
+    res = hubspot_api.find_similar_companies("Energy", "Oil", None)
+    assert res[0]["company_name"] == "Acme"
+    assert captured["json"]["filterGroups"][0]["filters"][0]["propertyName"] == "industry_group"
+
+
+def test_find_similar_companies_error(monkeypatch):
+    def fake_post(*a, **k):
+        return DummyResp({}, status=400)
+
+    monkeypatch.setattr(hubspot_api.requests, "post", fake_post)
+    monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "tok")
+    with pytest.raises(RuntimeError):
+        hubspot_api.find_similar_companies("Energy", "Oil", None)
+
+
 def _run_base(monkeypatch, tmp_path, check_result, reply=None):
     monkeypatch.setattr(feature_flags, "ATTACH_PDF_TO_HUBSPOT", True)
     monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "tok")
