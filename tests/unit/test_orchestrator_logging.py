@@ -53,6 +53,8 @@ def test_gather_triggers_logs_contacts_fetch_failed(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(orchestrator, "fetch_events", lambda: [])
 
+    monkeypatch.setenv("LIVE_MODE", "0")
+
     def raise_env_error():
         raise RuntimeError("Missing Google OAuth env")
 
@@ -64,6 +66,25 @@ def test_gather_triggers_logs_contacts_fetch_failed(tmp_path, monkeypatch):
 
     triggers = orchestrator.gather_triggers()
     assert triggers == []
+    assert any(r.get("status") == "contacts_fetch_failed" for r in records)
+
+
+def test_gather_triggers_raises_contacts_fetch_failed_live_mode(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(orchestrator, "fetch_events", lambda: [])
+
+    def raise_env_error():
+        raise RuntimeError("Missing Google OAuth env")
+
+    monkeypatch.setattr(orchestrator, "fetch_contacts", raise_env_error)
+    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: None)
+    monkeypatch.setattr(orchestrator, "_contacts_fetch_logged", lambda wf_id: None)
+    monkeypatch.setenv("LIVE_MODE", "1")
+    records: list[dict[str, str]] = []
+    monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
+
+    with pytest.raises(RuntimeError):
+        orchestrator.gather_triggers()
     assert any(r.get("status") == "contacts_fetch_failed" for r in records)
 
 
