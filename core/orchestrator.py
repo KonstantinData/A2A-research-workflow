@@ -78,11 +78,14 @@ def _assert_live_ready() -> None:
         "GOOGLE_CLIENT_SECRET_V2",
         "SMTP_HOST",
         "SMTP_PORT",
-        "MAIL_FROM",
+        "SMTP_USER",
+        "SMTP_PASS",
     ]
     if os.getenv("REQUIRE_HUBSPOT", "1") == "1":
         required.append("HUBSPOT_ACCESS_TOKEN")
     missing = [k for k in required if not os.getenv(k)]
+    if not os.getenv("SMTP_FROM") and not os.getenv("MAIL_FROM"):
+        missing.append("SMTP_FROM")
     if missing:
         raise RuntimeError("LIVE readiness failed; missing: " + ", ".join(missing))
     log_event({"status": "live_assertions_passed"})
