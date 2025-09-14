@@ -2,32 +2,48 @@
 """Data retrieval for internal company research (LIVE via HubSpot)."""
 from __future__ import annotations
 
+import json
 import os
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Tuple, Optional, List
 
 from integrations import hubspot_api  # erwartet: echte Implementierung
+from core.feature_flags import ALLOW_STATIC_COMPANY_DATA
 
-# Import the static company dataset.  The internal company search
-# should not rely on HubSpot’s search API.  Instead we look up
-# companies directly in our own dataset.  The hubspot_api module
-# exposes ``lookup_company`` and ``all_company_names`` when the
-# agents package is available.  If the import fails the variables
-# below will be ``None`` which simply results in no static match.
 try:
-    # pylint: disable=unused-import
-    from agents.company_data import lookup_company as _lookup_company  # type: ignore
-    from agents.company_data import all_company_names as _all_company_names  # type: ignore
-except Exception:
+    import redis  # type: ignore
+except Exception:  # pragma: no cover - optional dependency
+    redis = None  # type: ignore
+
+
+def _empty_names() -> List[str]:
+    return []
+
+# Optional static dataset for tests only
+if ALLOW_STATIC_COMPANY_DATA:
+    try:
+        from agents.company_data import lookup_company as _lookup_company  # type: ignore
+        from agents.company_data import all_company_names as _all_company_names  # type: ignore
+    except Exception:  # pragma: no cover - dataset not available
+        _lookup_company = None  # type: ignore
+        _all_company_names = _empty_names  # type: ignore
+else:
     _lookup_company = None  # type: ignore
-    _all_company_names = lambda: []  # type: ignore
+    _all_company_names = _empty_names  # type: ignore
 
 Normalized = Dict[str, Any]
 Raw = Dict[str, Any]
 
 # Simple in-memory cache keyed by company_domain (fallback: company_name)
 _CACHE: Dict[str, Tuple[float, Raw]] = {}
+_CACHE_CLIENT = None
+REDIS_URL = os.getenv("INTERNAL_FETCH_REDIS_URL")
+if REDIS_URL and redis is not None:
+    try:
+        _CACHE_CLIENT = redis.Redis.from_url(REDIS_URL)
+    except Exception:  # pragma: no cover - Redis connection failed
+        _CACHE_CLIENT = None
 CACHE_TTL_SECONDS = int(os.getenv("INTERNAL_FETCH_CACHE_TTL", "3600"))
 
 
@@ -51,50 +67,37 @@ def _pick_company_key(payload: Dict[str, Any]) -> Tuple[str, str]:
 
 
 def _find_company(name: str, domain: str) -> Dict[str, Any]:
-    """
-    Search for a company in the static in‑memory dataset.
+    """Locate a company via HubSpot or optional static dataset."""
 
-    According to the project requirements, the internal company lookup must
-    not query HubSpot for companies.  Instead this helper inspects the
-    static dataset defined in :mod:`agents.company_data`.  The lookup
-    first tries to match the domain against the ``company_domain`` field
-    of each known company.  If no domain match is found it falls back
-    to a case‑insensitive name match.  If a company is located the
-    returned dictionary mimics a minimal HubSpot company object with
-    ``id`` and ``properties`` keys.  When no match is available an
-    empty dictionary is returned.
+    try:
+        if domain:
+            match = hubspot_api.find_company_by_domain(domain)
+            if match:
+                return match
+        if name:
+            matches = hubspot_api.find_company_by_name(name) or []
+            if matches:
+                return matches[0]
+    except Exception:
+        if not ALLOW_STATIC_COMPANY_DATA:
+            raise
 
-    Parameters
-    ----------
-    name: str
-        The company name to search for.
-    domain: str
-        The company domain (lowercase) to search for.
-
-    Returns
-    -------
-    Dict[str, Any]
-        A minimal record representing the company if found, otherwise
-        an empty dictionary.
-    """
-    # Prefer domain match when provided
-    if domain and _lookup_company and _all_company_names:
-        for comp_name in _all_company_names():
-            ci = _lookup_company(comp_name)
-            if ci and ci.company_domain.lower() == domain.strip().lower():
+    if ALLOW_STATIC_COMPANY_DATA and _lookup_company and _all_company_names:
+        if domain:
+            for comp_name in _all_company_names():
+                ci = _lookup_company(comp_name)
+                if ci and ci.company_domain.lower() == domain.strip().lower():
+                    return {
+                        "id": f"static-{ci.company_domain}",
+                        "properties": {"name": ci.company_name, "domain": ci.company_domain},
+                    }
+        if name:
+            ci = _lookup_company(name)
+            if ci:
                 return {
                     "id": f"static-{ci.company_domain}",
                     "properties": {"name": ci.company_name, "domain": ci.company_domain},
                 }
-    # Fall back to name match
-    if name and _lookup_company:
-        ci = _lookup_company(name)
-        if ci:
-            return {
-                "id": f"static-{ci.company_domain}",
-                "properties": {"name": ci.company_name, "domain": ci.company_domain},
-            }
-    # Nothing found
     return {}
 
 
@@ -206,6 +209,21 @@ def fetch(trigger: Normalized, force_refresh: bool = False) -> Raw:
     name, domain = _pick_company_key(payload)
     cache_key = domain or name
     now = time.time()
+
+    if _CACHE_CLIENT:
+        if not force_refresh:
+            cached_bytes = _CACHE_CLIENT.get(cache_key)
+            if cached_bytes:
+                try:
+                    return json.loads(cached_bytes)
+                except Exception:
+                    pass
+        raw = _retrieve_from_crm(payload)
+        try:
+            _CACHE_CLIENT.set(cache_key, json.dumps(raw), ex=CACHE_TTL_SECONDS)
+        except Exception:
+            pass
+        return raw
 
     cached = _CACHE.get(cache_key)
     if not force_refresh and cached and cached[0] > now:
