@@ -8,6 +8,7 @@ ENABLE_PRO_SOURCES: bool = os.getenv("ENABLE_PRO_SOURCES", "0") == "1"
 ATTACH_PDF_TO_HUBSPOT: bool = os.getenv("ATTACH_PDF_TO_HUBSPOT", "1") == "1"
 ENABLE_SUMMARY: bool = os.getenv("ENABLE_SUMMARY", "0") == "1"
 ENABLE_GRAPH_STORAGE: bool = os.getenv("ENABLE_GRAPH_STORAGE", "0") == "1"
+ALLOW_STATIC_COMPANY_DATA: bool = os.getenv("ALLOW_STATIC_COMPANY_DATA", "0") == "1"
 
 __all__ = [
     "USE_PUSH_TRIGGERS",
@@ -15,4 +16,5 @@ __all__ = [
     "ATTACH_PDF_TO_HUBSPOT",
     "ENABLE_SUMMARY",
     "ENABLE_GRAPH_STORAGE",
+    "ALLOW_STATIC_COMPANY_DATA",
 ]

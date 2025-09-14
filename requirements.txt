@@ -15,6 +15,7 @@ requests
 # YAML parsing and testing
 pyyaml
 pytest
+redis
 
 jinja2>=3.1
 
