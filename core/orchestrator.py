@@ -407,6 +407,8 @@ def gather_triggers(
                         "error": str(e),
                     }
                 )
+                if os.getenv("LIVE_MODE", "1") == "1":
+                    raise
                 contacts = []
             con_code = _contacts_fetch_logged(wf_id)
             if con_code:
@@ -478,6 +480,8 @@ def run(
                         "error": str(e),
                     }
                 )
+                if os.getenv("LIVE_MODE", "1") == "1":
+                    raise
                 contacts = []
             for c in contacts:
                 cid = c.get("contact_id") or c.get("id") or c.get("resourceName")
