@@ -39,13 +39,29 @@ class _Settings:
     require_hubspot: int = field(
         default_factory=lambda: int(os.getenv("REQUIRE_HUBSPOT", "0"))
     )
-    # Erlaubt statische Unternehmensdaten (nur für DEV; im LIVE=0)
-    allow_static_company_data: int = field(
-        default_factory=lambda: int(os.getenv("ALLOW_STATIC_COMPANY_DATA", "0"))
-    )
     # Optional: E-Mail-Allowlist-Domain zum Schutz vor Fehlversand
     smtp_allowlist_domain: str = field(
         default_factory=lambda: os.getenv("ALLOWLIST_EMAIL_DOMAIN", "")
+    )
+
+    # --- Feature Flags ---
+    use_push_triggers: bool = field(
+        default_factory=lambda: os.getenv("USE_PUSH_TRIGGERS", "0") == "1"
+    )
+    enable_pro_sources: bool = field(
+        default_factory=lambda: os.getenv("ENABLE_PRO_SOURCES", "0") == "1"
+    )
+    attach_pdf_to_hubspot: bool = field(
+        default_factory=lambda: os.getenv("ATTACH_PDF_TO_HUBSPOT", "1") == "1"
+    )
+    enable_summary: bool = field(
+        default_factory=lambda: os.getenv("ENABLE_SUMMARY", "0") == "1"
+    )
+    enable_graph_storage: bool = field(
+        default_factory=lambda: os.getenv("ENABLE_GRAPH_STORAGE", "0") == "1"
+    )
+    allow_static_company_data: bool = field(
+        default_factory=lambda: os.getenv("ALLOW_STATIC_COMPANY_DATA", "0") == "1"
     )
 
 

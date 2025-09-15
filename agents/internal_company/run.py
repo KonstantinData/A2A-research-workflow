@@ -6,7 +6,7 @@ from dataclasses import asdict
 from typing import Any, Dict, Iterable
 
 from core.tasks import create_task
-from core.feature_flags import ENABLE_GRAPH_STORAGE
+from config.settings import SETTINGS
 from integrations import graph_storage  # email_client NICHT hier verwenden
 
 from .plugins import INTERNAL_SOURCES
@@ -52,12 +52,12 @@ def run(trigger: Normalized) -> Normalized:
                 "neighbors": [],
             },
         }
-        if ENABLE_GRAPH_STORAGE:
+        if SETTINGS.enable_graph_storage:
             graph_storage.store_result(final_result)
         return final_result
 
     final_result = asdict(validated)
-    if ENABLE_GRAPH_STORAGE:
+    if SETTINGS.enable_graph_storage:
         graph_storage.store_result(final_result)
     return final_result
 

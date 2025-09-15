@@ -32,7 +32,7 @@ SCOPES = [
 ]
 
 from core.trigger_words import load_trigger_words, contains_trigger, suggest_similar
-from core import feature_flags, summarize, parser
+from core import summarize, parser
 from core.utils import (
     required_fields,
     optional_fields,
@@ -258,7 +258,7 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
             "notes_blob": notes,
             "notes_extracted": {"company": company, "domain": domain, "phone": phone},
         }
-        if feature_flags.ENABLE_SUMMARY:
+        if SETTINGS.enable_summary:
             payload["summary"] = summarize.summarize_notes(notes)
 
         missing_req = [f for f in required_fields("contacts") if not payload.get(f)]

@@ -6,7 +6,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from core import orchestrator, feature_flags
+from core import orchestrator
+from config.settings import SETTINGS
 from integrations import hubspot_api
 
 
@@ -143,7 +144,7 @@ def test_find_similar_companies_error(monkeypatch):
 
 
 def _run_base(monkeypatch, tmp_path, check_result, reply=None):
-    monkeypatch.setattr(feature_flags, "ATTACH_PDF_TO_HUBSPOT", True)
+    monkeypatch.setattr(SETTINGS, "attach_pdf_to_hubspot", True)
     monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "tok")
     monkeypatch.setenv("HUBSPOT_PORTAL_ID", "portal")
     monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
@@ -203,7 +204,7 @@ def test_run_propagates_check_error(monkeypatch, tmp_path):
     def raise_err(cid):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(feature_flags, "ATTACH_PDF_TO_HUBSPOT", True)
+    monkeypatch.setattr(SETTINGS, "attach_pdf_to_hubspot", True)
     monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "tok")
     monkeypatch.setenv("HUBSPOT_PORTAL_ID", "portal")
     monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
@@ -231,7 +232,7 @@ def test_run_propagates_check_error(monkeypatch, tmp_path):
 
 
 def _run_no_upload(monkeypatch, tmp_path, upsert_return, pdf_write):
-    monkeypatch.setattr(feature_flags, "ATTACH_PDF_TO_HUBSPOT", True)
+    monkeypatch.setattr(SETTINGS, "attach_pdf_to_hubspot", True)
     monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "tok")
     monkeypatch.setenv("HUBSPOT_PORTAL_ID", "portal")
     monkeypatch.setenv("OUTPUT_DIR", str(tmp_path))
