@@ -18,11 +18,14 @@ from core.utils import (
     get_workflow_id,
 )  # noqa: F401  # required_fields/optional_fields imported for completeness
 from core.logging import log_event
+from core import exports as export_utils
+from core import hubspot_ops
+from core import run_loop
+from core import triggers as trigger_utils
 from config.settings import SETTINGS
 from integrations.google_calendar import fetch_events, extract_company, extract_domain
 from integrations.google_contacts import fetch_contacts
 from integrations.google_oauth import build_user_credentials
-from core.trigger_words import contains_trigger
 
 # Common status definitions
 from core import statuses
@@ -32,17 +35,7 @@ from integrations import email_sender as email_sender  # noqa: F401
 from integrations import email_reader as email_reader  # noqa: F401
 
 # Research agents
-from agents import (
-    agent_internal_search,
-    agent_internal_level2_company_search,
-    agent_company_detail_research,
-    agent_external_level1_company_search,
-    agent_external_level2_companies_search,
-    reminder_service,
-    email_listener,
-    field_completion_agent,
-    recovery_agent,
-)
+from agents import reminder_service, email_listener, field_completion_agent, recovery_agent
 
 CAL_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
@@ -179,214 +172,66 @@ def _missing_required(source: str, payload: Dict[str, Any]) -> List[str]:
     return [f for f in req if not (payload or {}).get(f)]
 
 
-def _calendar_fetch_logged(wf_id: str) -> Optional[str]:
-    """Return ``None`` if a successful calendar fetch was logged, else a code."""
-
-    path = Path("logs") / "workflows" / "calendar.jsonl"
-    if not path.exists():
-        return "missing"
-    required = {"fetch_ok"}
-    statuses: set[str] = set()
-    try:
-        with path.open("r", encoding="utf-8") as fh:
-            for line in fh:
-                try:
-                    rec = json.loads(line)
-                except Exception:
-                    continue
-                if rec.get("workflow_id") == wf_id:
-                    statuses.add(rec.get("status"))
-    except Exception:
-        return "missing"
-    if required.issubset(statuses):
-        return None
-    if "google_api_client_missing" in statuses:
-        return "missing_client"
-    if "missing_google_oauth_env" in statuses or "fetch_error" in statuses:
-        return "oauth_error"
-    return "missing"
+_calendar_fetch_logged = trigger_utils._calendar_fetch_logged
+_contacts_fetch_logged = trigger_utils._contacts_fetch_logged
+_calendar_last_error = trigger_utils._calendar_last_error
 
 
-def _contacts_fetch_logged(wf_id: str) -> Optional[str]:
-    """Return ``None`` if contacts fetch logs exist, else a failure code."""
+def _as_trigger_from_event(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    from core.trigger_words import contains_trigger as _contains_trigger
 
-    path = Path("logs") / "workflows" / "contacts.jsonl"
-    if not path.exists():
-        return "missing"
-    statuses: set[str] = set()
-    try:
-        with path.open("r", encoding="utf-8") as fh:
-            for line in fh:
-                try:
-                    rec = json.loads(line)
-                except Exception:
-                    continue
-                if rec.get("workflow_id") == wf_id:
-                    statuses.add(rec.get("status"))
-    except Exception:
-        return "missing"
-    if "fetch_call" in statuses:
-        return None
-    if "google_api_client_missing" in statuses:
-        return "missing_client"
-    if "missing_google_oauth_env" in statuses or "fetch_error" in statuses:
-        return "oauth_error"
-    return "missing"
+    return trigger_utils._as_trigger_from_event(
+        event,
+        contains_trigger=_contains_trigger,
+    )
 
 
-def _calendar_last_error(wf_id: str) -> Optional[Dict[str, Any]]:
-    """Return the last error record from the calendar log for this workflow."""
-    path = Path("logs") / "workflows" / "calendar.jsonl"
-    if not path.exists():
-        return None
-    last: Optional[Dict[str, Any]] = None
-    try:
-        with path.open("r", encoding="utf-8") as fh:
-            for line in fh:
-                try:
-                    rec = json.loads(line)
-                except Exception:
-                    continue
-                if rec.get("workflow_id") == wf_id and rec.get("severity") == "error":
-                    last = rec
-    except Exception:
-        return None
-    return last
+def _as_trigger_from_contact(contact: Dict[str, Any]) -> Dict[str, Any]:
+    return trigger_utils._as_trigger_from_contact(contact)
 
 
-# --------- Trigger-Gathering für Kalender + Kontakte ----------
-def _as_trigger_from_event(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    # prüft summary, description, location, attendees[].email usw.
-    payload = ev.get("payload") or ev
-    if not contains_trigger(payload):
-        return None
-
-    return {
-        "source": "calendar",
-        "creator": (payload.get("creator") or {}).get("email")
-        or payload.get("creatorEmail"),
-        "recipient": (payload.get("organizer") or {}).get("email"),
-        "payload": payload,
-    }
+def gather_calendar_triggers(
+    events: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+    return trigger_utils.gather_calendar_triggers(
+        events,
+        fetch_events=fetch_events,
+        calendar_fetch_logged=_calendar_fetch_logged,
+        calendar_last_error=_calendar_last_error,
+        get_workflow_id=get_workflow_id,
+        log_event=log_event,
+        log_step=log_step,
+    )
 
 
-def _as_trigger_from_contact(c: Dict[str, Any]) -> Dict[str, Any]:
-    # google_contacts.scheduled_poll liefert schon Normalform,
-    # aber hier unterstützen wir die einfache Rohform aus fetch_contacts() Tests.
-    email = ""
-    for item in c.get("emailAddresses", []) or []:
-        val = (item or {}).get("value")
-        if val:
-            email = val
-            break
-    return {
-        "source": "contacts",
-        "creator": email,
-        "recipient": email,
-        "payload": c,
-    }
+def gather_contact_triggers(
+    contacts: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+    return trigger_utils.gather_contact_triggers(
+        contacts,
+        fetch_contacts=fetch_contacts,
+        contacts_fetch_logged=_contacts_fetch_logged,
+        get_workflow_id=get_workflow_id,
+        log_event=log_event,
+    )
 
 
 def gather_triggers(
     events: Optional[List[Dict[str, Any]]] = None,
     contacts: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
-    """Standardisiere Trigger in gemeinsames Format {source, creator, recipient, payload}."""
-
-    triggers: List[Dict[str, Any]] = []
-    try:
-        wf_id = get_workflow_id()
-        if events is None:
-            events = fetch_events()
-            if events == []:
-                err = _calendar_last_error(wf_id)
-                if err:
-                    details = {
-                        k: v
-                        for k, v in err.items()
-                        if k
-                        not in {
-                            "workflow_id",
-                            "trigger_source",
-                            "status",
-                            "severity",
-                            "variant",
-                        }
-                    }
-                    log_event(
-                        {
-                            "status": err.get("status"),
-                            "severity": err.get("severity", "error"),
-                            **details,
-                        }
-                    )
-
-        cal_code = _calendar_fetch_logged(wf_id)
-        if cal_code:
-            log_event(
-                {
-                    "status": f"calendar_fetch_{cal_code}",
-                    "severity": "warning",
-                    "message": "Proceeding without calendar logs",
-                }
-            )
-
-        if not events or not any(e.get("event_id") for e in events):
-            log_event({"status": "no_calendar_events", "severity": "warning"})
-            events = []
-
-        log_step("calendar", "fetch_return", {"count": len(events)})
-
-        for ev in events or []:
-            trig = _as_trigger_from_event(ev)
-            if trig is None:
-                payload = ev.get("payload") or ev
-                eid = payload.get("event_id") or payload.get("id")
-                log_step(
-                    "calendar",
-                    "event_discarded",
-                    {
-                        "reason": "no_trigger_match",
-                        "event": {"id": eid, "summary": payload.get("summary", "")},
-                    },
-                )
-                if eid:
-                    log_event({"event_id": eid, "status": statuses.NOT_RELEVANT})
-                continue
-            triggers.append(trig)
-        if contacts is None:
-            try:
-                contacts = fetch_contacts() or []
-            except Exception as e:
-                log_event(
-                    {
-                        "status": "contacts_fetch_failed",
-                        "severity": "warning",
-                        "error": str(e),
-                    }
-                )
-                if os.getenv("LIVE_MODE", "1") == "1":
-                    raise
-                contacts = []
-            con_code = _contacts_fetch_logged(wf_id)
-            if con_code:
-                log_event(
-                    {
-                        "status": f"contacts_fetch_{con_code}",
-                        "severity": "warning",
-                        "message": "Proceeding without contacts logs",
-                    }
-                )
-        if not contacts:
-            log_event({"status": "no_contacts", "severity": "warning"})
-        for c in contacts or []:
-            t = _as_trigger_from_contact(c)
-            if t:
-                triggers.append(t)
-    except Exception as e:
-        log_event({"severity": "critical", "where": "gather_triggers", "error": str(e)})
-        raise
-    return triggers
+    return trigger_utils.gather_triggers(
+        events,
+        contacts,
+        fetch_events=fetch_events,
+        fetch_contacts=fetch_contacts,
+        calendar_fetch_logged=_calendar_fetch_logged,
+        contacts_fetch_logged=_contacts_fetch_logged,
+        calendar_last_error=_calendar_last_error,
+        get_workflow_id=get_workflow_id,
+        log_event=log_event,
+        log_step=log_step,
+    )
 
 
 def run(
@@ -408,18 +253,17 @@ def run(
     restart_event_id: str | None = None,
 ) -> Dict[str, Any]:
     """Orchestrate the research workflow for provided triggers."""
-
-    # Determine triggers when not pushed externally
-    # Enforce real exporters in LIVE unless explicitly in test mode
-    from output import pdf_render as _pdf, csv_export as _csv
-
     TEST_MODE = os.getenv("A2A_TEST_MODE", "0") == "1"
-    if not TEST_MODE:
-        pdf_renderer = _pdf.render_pdf
-        csv_exporter = _csv.export_csv
-    else:
-        pdf_renderer = pdf_renderer or _pdf.render_pdf
-        csv_exporter = csv_exporter or _csv.export_csv
+    (
+        pdf_renderer,
+        csv_exporter,
+        fallback_pdf,
+        fallback_csv,
+    ) = export_utils.resolve_exporters(
+        pdf_renderer,
+        csv_exporter,
+        test_mode=TEST_MODE,
+    )
 
     log_event({"status": "workflow_started"})
 
@@ -428,76 +272,44 @@ def run(
             triggers = []
         else:
             events = fetch_events() or []
-            for ev in events:
-                eid = ev.get("event_id") or ev.get("id")
-                if eid:
-                    log_event({"event_id": eid, "status": "fetched"})
+            for event in events:
+                event_id = event.get("event_id") or event.get("id")
+                if event_id:
+                    log_event({"event_id": event_id, "status": "fetched"})
             try:
                 contacts = fetch_contacts() or []
-            except Exception as e:
+            except Exception as exc:
                 log_event(
                     {
                         "status": "contacts_fetch_failed",
                         "severity": "warning",
-                        "error": str(e),
+                        "error": str(exc),
                     }
                 )
                 if os.getenv("LIVE_MODE", "1") == "1":
                     raise
                 contacts = []
-            for c in contacts:
-                cid = c.get("contact_id") or c.get("id") or c.get("resourceName")
-                if cid:
-                    log_event({"event_id": cid, "status": "fetched"})
+            for contact in contacts:
+                contact_id = (
+                    contact.get("contact_id")
+                    or contact.get("id")
+                    or contact.get("resourceName")
+                )
+                if contact_id:
+                    log_event({"event_id": contact_id, "status": "fetched"})
             triggers = gather_triggers(events, contacts)
 
-    # Allow e-mail replies to fill missing fields and update task store
-    replies: List[Dict[str, Any]] = []
-    if email_listener.has_pending_events():
-        try:
-            replies = email_reader.fetch_replies()
-        except Exception:
-            replies = []
-    for trig in triggers or []:
-        tid = (
-            trig.get("payload", {}).get("task_id")
-            or trig.get("payload", {}).get("id")
-            or trig.get("payload", {}).get("event_id")
-        )
-        for rep in list(replies):
-            try:
-                email_listener.run(json.dumps(rep))
-            except Exception:
-                pass
-            if rep.get("task_id") == tid:
-                trig.setdefault("payload", {}).update(rep.get("fields", {}))
-                ev_id = trig.get("payload", {}).get("event_id") or rep.get("event_id")
-                log_event(
-                    {
-                        "status": "email_reply_received",
-                        "event_id": ev_id,
-                        "creator": rep.get("creator"),
-                    }
-                )
-                log_event({"status": "pending_email_reply_resolved", "event_id": ev_id})
-                log_event(
-                    {
-                        "status": "resumed",
-                        "event_id": ev_id,
-                        "creator": rep.get("creator"),
-                    }
-                )
-                replies.remove(rep)
-
-    # Remove duplicates based on event_id
-    filtered: List[Dict[str, Any]] = []
-    for trig in triggers or []:
-        eid = trig.get("payload", {}).get("event_id")
-        if eid and is_event_active(str(eid)):
-            log_event({"event_id": eid, "status": "duplicate_event"})
-        else:
-            filtered.append(trig)
-    triggers = filtered
+    triggers = run_loop.incorporate_email_replies(
+        triggers,
+        email_listener=email_listener,
+        email_reader=email_reader,
+        log_event=log_event,
+    )
+    triggers = run_loop.filter_duplicate_triggers(
+        triggers,
+        is_event_active=is_event_active,
+        log_event=log_event,
+    )
 
     if not triggers:
         details = {
@@ -519,243 +331,84 @@ def run(
                 "message": "No calendar or contact events matched trigger words",
             }
         )
-        # --- Idle/Heartbeat Artefakte erzeugen ---
-        from output import pdf_render, csv_export
-
-        outdir = Path(os.getenv("OUTPUT_DIR", "output")) / "exports"
-        outdir.mkdir(parents=True, exist_ok=True)
-        pdf_path = outdir / "report.pdf"
-        csv_path = outdir / "data.csv"
-        empty_report = {
-            "fields": ["info"],
-            "rows": [{"info": "No valid triggers in current window"}],
-            "meta": {"reason": "no_triggers"},
-        }
-        try:
-            pdf_render.render_pdf(empty_report, pdf_path)
-            log_event({"status": "artifact_pdf", "path": str(pdf_path)})
-        except Exception as e:
-            log_event(
-                {"status": "artifact_pdf_error", "error": str(e), "severity": "warning"}
-            )
-        try:
-            csv_export.export_csv([], csv_path)
-            log_event({"status": "artifact_csv", "path": str(csv_path)})
-        except Exception as e:
-            log_event(
-                {"status": "artifact_csv_error", "error": str(e), "severity": "warning"}
-            )
-        # Zusammenfassung/Logs bündeln und normal zurückkehren
+        export_utils.create_idle_artifacts(log_event=log_event)
         finalize_run()
         return {"status": "idle"}
 
-    if researchers is None:
-        researchers = [
-            agent_internal_search.run,
-            agent_external_level1_company_search.run,
-            agent_external_level2_companies_search.run,
-            agent_internal_level2_company_search.run,
-            agent_company_detail_research.run,
-        ]
+    resolved_researchers = run_loop.resolve_researchers(researchers)
+    results = run_loop.run_researchers(
+        triggers,
+        resolved_researchers,
+        field_completion_agent=field_completion_agent,
+        email_sender=email_sender,
+        log_event=log_event,
+        missing_required=_missing_required,
+        extract_company=extract_company,
+        extract_domain=extract_domain,
+        feature_flags=feature_flags,
+    )
 
-    results: List[Dict[str, Any]] = []
-    for trig in triggers:
-        payload = trig.setdefault("payload", {})
-        event_id = payload.get("event_id")
-        enriched: Dict[str, Any] | None = None
-        if not payload.get("company_name"):
-            extracted_company = extract_company(
-                payload.get("summary")
-            ) or extract_company(payload.get("description"))
-            if extracted_company:
-                payload["company_name"] = extracted_company
-        if not payload.get("domain"):
-            extracted_domain = extract_domain(payload.get("summary")) or extract_domain(
-                payload.get("description")
-            )
-            if extracted_domain:
-                payload["domain"] = extracted_domain
-        if event_id:
-            enriched = field_completion_agent.run(trig) or {}
-            added_fields = {k: v for k, v in enriched.items() if not payload.get(k)}
-            if enriched:
-                payload.update(enriched)
-            missing = _missing_required(trig.get("source", ""), payload)
-            if missing:
-                log_event(
-                    {
-                        "event_id": event_id,
-                        "status": statuses.PENDING,
-                        "missing": missing,
-                    }
-                )
-                try:
-                    email_sender.send_email(
-                        to=trig.get("creator"),
-                        subject="Missing information for research",
-                        body="Please reply with: " + ", ".join(missing),
-                        task_id=payload.get("task_id") or event_id,
-                    )
-                except Exception:
-                    pass
-                continue
-            elif added_fields:
-                log_event(
-                    {
-                        "event_id": event_id,
-                        "status": "enriched_by_ai",
-                        "fields": list(added_fields.keys()),
-                    }
-                )
-        if researchers:
-            log_event(
-                {
-                    "event_id": event_id,
-                    "status": statuses.PENDING,
-                    "creator": trig.get("creator"),
-                }
-            )
-        trig_results: List[Dict[str, Any]] = []
-        for researcher in researchers or []:
-            if (
-                getattr(researcher, "pro", False)
-                and not feature_flags.ENABLE_PRO_SOURCES
-            ):
-                continue
-            res = researcher(trig)
-            if res:
-                payload.update(res.get("payload", {}))
-                trig_results.append(res)
-        if any(r.get("status") == "missing_fields" for r in trig_results):
-            # skip further processing for this trigger but continue others
-            continue
-        results.extend(trig_results)
-
-    # Send reminders for triggers still missing info
-    try:
-        reminder_service.check_and_notify(triggers)
-    except Exception:
-        pass
+    run_loop.notify_reminders(triggers, reminder_service=reminder_service)
 
     consolidated = consolidate_fn(results) if consolidate_fn else {}
     log_event({"status": "consolidated", "count": len(results)})
 
-    first_id = (triggers or [{}])[0].get("payload", {}).get("event_id")
-    existing = hubspot_check_existing(company_id) if hubspot_check_existing else None
-    if existing:
-        creator = (triggers or [{}])[0].get("creator")
-        try:
-            email_sender.send_email(
-                to=creator,
-                subject="Existing report found",
-                body="A report already exists for this company. Reply with Ja to continue or Nein to skip.",
-                task_id=first_id,
-            )
-        except Exception:
-            pass
-        log_event({"event_id": first_id, "status": "report_exists_query"})
-        decision = "yes"
-        try:
-            replies = email_reader.fetch_replies()
-        except Exception:
-            replies = []
-        for rep in replies:
-            if rep.get("creator") == creator:
-                text = str(rep.get("text") or "").strip().lower()
-                if text in {"nein", "no"}:
-                    decision = "no"
-                elif text in {"ja", "yes"}:
-                    decision = "yes"
-                break
-        if decision != "yes":
-            log_event({"event_id": first_id, "status": "report_skipped"})
-            finalize_run()
-            return consolidated
+    first_event_id = run_loop.first_event_id(triggers)
+
+    existing, should_continue = hubspot_ops.check_existing_and_prompt(
+        triggers=triggers,
+        company_id=company_id,
+        hubspot_check_existing=hubspot_check_existing,
+        email_sender=email_sender,
+        email_reader=email_reader,
+        log_event=log_event,
+    )
+    if not should_continue:
+        finalize_run()
+        return consolidated
 
     if duplicate_checker and duplicate_checker(consolidated, existing):
         finalize_run()
         return consolidated
 
-    out_dir = Path(os.getenv("OUTPUT_DIR", "output")) / "exports"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    pdf_path = out_dir / "report.pdf"
-    csv_path = out_dir / "data.csv"
     try:
-        pdf_renderer(consolidated, pdf_path)
-        csv_exporter(consolidated.get("rows", []), csv_path)
-        # Artefakt-Integrität absichern (kein 3-Byte-Stub etc.)
-        try:
-            if pdf_path.exists() and pdf_path.stat().st_size < 1000:
-                _pdf.render_pdf(
-                    {
-                        "fields": ["info"],
-                        "rows": [{"info": "invalid_artifact_detected"}],
-                        "meta": {},
-                    },
-                    pdf_path,
-                )
-            if csv_path.exists() and csv_path.stat().st_size < 5:
-                _csv.export_csv([], csv_path)
-        except Exception:
-            pass
-        log_event(
-            {"event_id": first_id, "status": "artifact_pdf", "path": str(pdf_path)}
+        pdf_path, csv_path = export_utils.export_report(
+            consolidated,
+            first_event_id,
+            pdf_renderer,
+            csv_exporter,
+            fallback_pdf,
+            fallback_csv,
+            log_event=log_event,
+            log_step=log_step,
         )
-        log_event(
-            {"event_id": first_id, "status": "artifact_csv", "path": str(csv_path)}
-        )
-        log_step(
-            "orchestrator",
-            "report_generated",
-            {"event_id": first_id, "path": str(pdf_path)},
-        )
-    except Exception as e:
-        recovery_agent.handle_failure(first_id, e)
+    except Exception as exc:
+        recovery_agent.handle_failure(first_event_id, exc)
         log_step(
             "orchestrator",
             "report_error",
-            {"event_id": first_id, "error": str(e)},
+            {"event_id": first_event_id, "error": str(exc)},
             severity="critical",
         )
         finalize_run(severity="warning")
         return consolidated
 
     try:
-        if company_id is None and hubspot_upsert:
-            company_id = hubspot_upsert(consolidated)
-
-        if (
-            feature_flags.ATTACH_PDF_TO_HUBSPOT
-            and company_id
-            and pdf_path.exists()
-            and hubspot_attach
-        ):
-            try:
-                hubspot_attach(pdf_path, company_id)
-                log_event({"event_id": first_id, "status": "report_uploaded"})
-            except Exception as e:
-                recovery_agent.handle_failure(first_id, e)
-                log_event(
-                    {
-                        "event_id": first_id,
-                        "status": "report_upload_failed",
-                        "severity": "critical",
-                    }
-                )
-                log_step(
-                    "orchestrator",
-                    "report_error",
-                    {"event_id": first_id, "error": str(e)},
-                    severity="critical",
-                )
-                log_step(
-                    "orchestrator",
-                    "report_upload_failed",
-                    {"event_id": first_id},
-                    severity="warning",
-                )
-                finalize_run()
-                return consolidated
+        company_id, upload_ok = hubspot_ops.upsert_and_attach(
+            consolidated=consolidated,
+            company_id=company_id,
+            pdf_path=pdf_path,
+            hubspot_upsert=hubspot_upsert,
+            hubspot_attach=hubspot_attach,
+            feature_flags=feature_flags,
+            log_event=log_event,
+            log_step=log_step,
+            recovery_agent=recovery_agent,
+            first_event_id=first_event_id,
+        )
+        if not upload_ok:
+            finalize_run()
+            return consolidated
 
         recipient = (triggers or [{}])[0].get("recipient")
         if recipient and pdf_path.exists():
@@ -766,12 +419,12 @@ def run(
                     body="Please find the attached report.",
                     attachments=[str(pdf_path)],
                 )
-                log_event({"event_id": first_id, "status": statuses.REPORT_SENT})
-            except Exception as e:
-                recovery_agent.handle_failure(first_id, e)
+                log_event({"event_id": first_event_id, "status": statuses.REPORT_SENT})
+            except Exception as exc:
+                recovery_agent.handle_failure(first_event_id, exc)
                 log_event(
                     {
-                        "event_id": first_id,
+                        "event_id": first_event_id,
                         "status": statuses.REPORT_NOT_SENT,
                         "severity": "critical",
                     }
@@ -779,7 +432,7 @@ def run(
                 log_step(
                     "orchestrator",
                     "report_not_sent",
-                    {"event_id": first_id, "error": str(e)},
+                    {"event_id": first_event_id, "error": str(exc)},
                     severity="critical",
                 )
                 finalize_run()
@@ -787,7 +440,7 @@ def run(
         else:
             log_event(
                 {
-                    "event_id": first_id,
+                    "event_id": first_event_id,
                     "status": statuses.REPORT_NOT_SENT,
                     "severity": "warning",
                 }
@@ -795,11 +448,11 @@ def run(
             log_step(
                 "orchestrator",
                 "report_not_sent",
-                {"event_id": first_id},
+                {"event_id": first_event_id},
                 severity="warning",
             )
-    except Exception as e:
-        recovery_agent.handle_failure(first_id, e)
+    except Exception as exc:
+        recovery_agent.handle_failure(first_event_id, exc)
         finalize_run()
         return consolidated
 
