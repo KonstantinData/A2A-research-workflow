@@ -21,8 +21,8 @@ See repository README for common variables.
 - `SMTP_USER`
 - `SMTP_PASS`
 - `SMTP_SECURE`
-- `SMTP_FROM` (optional)
-- `MAIL_FROM` (preferred; falls back to `SMTP_FROM`)
+- `MAIL_FROM` (sender address)
+- `SMTP_FROM` (deprecated; automatically mapped to `MAIL_FROM` with a warning)
 - `ALLOWLIST_EMAIL_DOMAIN` (optional)
 
 ## IMAP (optional)

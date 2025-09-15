@@ -57,7 +57,7 @@ def test_escalate_tasks_emails_admin(monkeypatch):
             "task_id": task_id,
         })
 
-    monkeypatch.setenv("SMTP_FROM", "bot@example.com")
+    monkeypatch.setenv("MAIL_FROM", "bot@example.com")
     monkeypatch.setattr(email_sender, "send_email", fake_send)
 
     task = tasks.create_task("trigger", ["field"], "user@example.com")

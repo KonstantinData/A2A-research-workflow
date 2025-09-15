@@ -14,6 +14,7 @@ import os
 import time
 from pathlib import Path
 
+from config.env import ensure_mail_from
 from .mailer import send_email as _send_email  # tatsächlicher SMTP/Provider-Client
 from core.utils import log_step
 
@@ -26,7 +27,8 @@ def _deliver(
     port = int(os.environ.get("SMTP_PORT", 587))
     user = os.environ.get("SMTP_USER")
     password = os.environ.get("SMTP_PASS")
-    mail_from = os.environ.get("SMTP_FROM") or os.environ.get("MAIL_FROM", user)
+    ensure_mail_from()
+    mail_from = os.environ.get("MAIL_FROM") or user
     secure = os.environ.get("SMTP_SECURE", "ssl").lower()
     if not host or not user or not password:
         if os.getenv("LIVE_MODE", "1") == "1":

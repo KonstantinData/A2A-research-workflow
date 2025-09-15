@@ -5,6 +5,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List
 
+from .env import ensure_mail_from
+
+
+ensure_mail_from()
+
 
 def _default_root() -> Path:
     project_root = os.getenv("PROJECT_ROOT")
