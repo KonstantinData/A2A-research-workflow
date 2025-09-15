@@ -69,13 +69,15 @@ and environments.
    - `GOOGLE_CLIENT_SECRET_V2`
    - `GOOGLE_REFRESH_TOKEN`
    - `HUBSPOT_ACCESS_TOKEN`
-   - `HUBSPOT_PORTAL_ID`
    - `SMTP_HOST`
    - `SMTP_PORT`
    - `SMTP_USER`
    - `SMTP_PASS`
    - `SMTP_SECURE`
    - `MAIL_FROM` (sender address; replaces deprecated `SMTP_FROM`)
+
+HubSpot requests automatically retry on HTTP 429/5xx responses with exponential backoff and jitter to smooth over transient
+errors. The legacy `HUBSPOT_PORTAL_ID` secret is no longer required because the workflow only needs the private app token.
 
 PDF generation relies on WeasyPrint system libraries, installed by the Dockerfile and the CI workflow.
 

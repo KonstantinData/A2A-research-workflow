@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import random
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -10,6 +12,28 @@ import requests
 
 DEFAULT_TIMEOUT = 30
 HS_BASE = "https://api.hubapi.com"
+
+
+def _request_with_retry(method: str, url: str, **kwargs: Any) -> requests.Response:
+    """Perform a HubSpot API request with retry/backoff for transient failures."""
+
+    max_retries = 3
+    attempt = 0
+    while True:
+        try:
+            response = requests.request(method, url, **kwargs)
+        except requests.RequestException:
+            if attempt >= max_retries:
+                raise
+        else:
+            if response.status_code != 429 and not 500 <= response.status_code < 600:
+                return response
+            if attempt >= max_retries:
+                return response
+
+        sleep_for = 0.5 * (2**attempt) + random.uniform(0, 0.1)
+        time.sleep(sleep_for)
+        attempt += 1
 
 # The static company data is used as a lightweight substitute for a real
 # CRM or HubSpot look‑up.  In the live system these helpers would
@@ -47,7 +71,8 @@ def upsert_company(data: Dict[str, Any]) -> Optional[str]:
 
     # 1) Try lookup by domain
     if domain:
-        resp = requests.post(
+        resp = _request_with_retry(
+            "post",
             f"{HS_BASE}/crm/v3/objects/companies/search",
             headers=headers,
             json={"filterGroups":[{"filters":[{"propertyName":"domain","operator":"EQ","value":domain}]}]},
@@ -81,14 +106,26 @@ def _map_core_to_properties(core: Dict[str, Any]) -> Dict[str, Any]:
 
 def _create_company(core: Dict[str, Any], headers: Dict[str, str]) -> Optional[str]:
     payload = {"properties": _map_core_to_properties(core)}
-    resp = requests.post(f"{HS_BASE}/crm/v3/objects/companies", headers=headers, json=payload, timeout=DEFAULT_TIMEOUT)
+    resp = _request_with_retry(
+        "post",
+        f"{HS_BASE}/crm/v3/objects/companies",
+        headers=headers,
+        json=payload,
+        timeout=DEFAULT_TIMEOUT,
+    )
     resp.raise_for_status()
     return (resp.json() or {}).get("id")
 
 
 def _update_company(company_id: str, core: Dict[str, Any], headers: Dict[str, str]) -> None:
     payload = {"properties": _map_core_to_properties(core)}
-    resp = requests.patch(f"{HS_BASE}/crm/v3/objects/companies/{company_id}", headers=headers, json=payload, timeout=DEFAULT_TIMEOUT)
+    resp = _request_with_retry(
+        "patch",
+        f"{HS_BASE}/crm/v3/objects/companies/{company_id}",
+        headers=headers,
+        json=payload,
+        timeout=DEFAULT_TIMEOUT,
+    )
     resp.raise_for_status()
 
 
@@ -110,7 +147,13 @@ def check_existing_report(company_id: str) -> Optional[Dict[str, Any]]:
         "limit": 1,
         "sorts": ["-createdAt"],
     }
-    resp = requests.post(url, headers=headers, json=payload, timeout=DEFAULT_TIMEOUT)
+    resp = _request_with_retry(
+        "post",
+        url,
+        headers=headers,
+        json=payload,
+        timeout=DEFAULT_TIMEOUT,
+    )
     resp.raise_for_status()
     results = resp.json().get("results", [])
     return results[0] if results else None
@@ -125,13 +168,21 @@ def attach_pdf(pdf_path: Path, company_id: str) -> Optional[Dict[str, Any]]:
     headers = {"Authorization": f"Bearer {token}"}
     files = {"file": (pdf_path.name, pdf_path.read_bytes(), "application/pdf")}
     data = {"folderPath": "A2A Reports"}
-    up = requests.post(f"{HS_BASE}/files/v3/files", headers=headers, files=files, data=data, timeout=DEFAULT_TIMEOUT)
+    up = _request_with_retry(
+        "post",
+        f"{HS_BASE}/files/v3/files",
+        headers=headers,
+        files=files,
+        data=data,
+        timeout=DEFAULT_TIMEOUT,
+    )
     up.raise_for_status()
     file_id = (up.json() or {}).get("id")
     if not file_id:
         return None
     # Associate with company
-    assoc = requests.put(
+    assoc = _request_with_retry(
+        "put",
         f"{HS_BASE}/crm/v3/associations/companies/files/batch/create",
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
         json={"inputs":[{"from":{"id": company_id}, "to":{"id": file_id}, "type":"company_to_file"}]},
@@ -269,7 +320,12 @@ def list_company_reports(company_id: str) -> List[Dict[str, Any]]:
     url = f"{HS_BASE}/crm/v3/objects/companies/{company_id}/associations/files"
     headers = {"Authorization": f"Bearer {token}"}
     try:
-        resp = requests.get(url, headers=headers, timeout=DEFAULT_TIMEOUT)
+        resp = _request_with_retry(
+            "get",
+            url,
+            headers=headers,
+            timeout=DEFAULT_TIMEOUT,
+        )
         resp.raise_for_status()
     except requests.RequestException as exc:  # pragma: no cover - network errors
         raise RuntimeError("Failed to list company reports") from exc
@@ -319,7 +375,8 @@ def find_similar_companies(
     payload = {"filterGroups": [{"filters": filters}], "properties": ["name", "domain", "industry_group", "industry", "description"]}
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     try:
-        resp = requests.post(
+        resp = _request_with_retry(
+            "post",
             f"{HS_BASE}/crm/v3/objects/companies/search",
             headers=headers,
             json=payload,

@@ -98,7 +98,6 @@ jobs:
           CAL_LOOKAHEAD_DAYS:   30
           CAL_LOOKBACK_DAYS:    2
           HUBSPOT_ACCESS_TOKEN: ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
-          HUBSPOT_PORTAL_ID:    ${{ secrets.HUBSPOT_PORTAL_ID }}
           SMTP_HOST:            ${{ secrets.SMTP_HOST }}
           SMTP_PORT:            ${{ secrets.SMTP_PORT }}
           SMTP_USER:            ${{ secrets.SMTP_USER }}
