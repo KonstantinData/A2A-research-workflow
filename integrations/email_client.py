@@ -9,18 +9,18 @@ from __future__ import annotations
 from typing import Iterable, Optional
 import os
 
+from config.env import ensure_mail_from
+
 from . import email_sender
 
 
 def _mail_from() -> str:
-    """Require SMTP_FROM via environment (set by Actions secrets/variables)."""
+    """Require MAIL_FROM via environment (set by Actions secrets/variables)."""
+    ensure_mail_from()
     try:
-        return os.environ["SMTP_FROM"]
-    except KeyError:
-        try:
-            return os.environ["MAIL_FROM"]
-        except KeyError as e:  # pragma: no cover - legacy fallback
-            raise RuntimeError("SMTP_FROM not configured") from e
+        return os.environ["MAIL_FROM"]
+    except KeyError as e:
+        raise RuntimeError("MAIL_FROM not configured") from e
 
 
 def send_email(

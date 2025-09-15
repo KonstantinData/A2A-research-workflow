@@ -21,6 +21,7 @@ from core import exports as export_utils
 from core import hubspot_ops
 from core import run_loop
 from core import triggers as trigger_utils
+from config.env import ensure_mail_from
 from config.settings import SETTINGS
 from integrations.google_calendar import fetch_events, extract_company, extract_domain
 from integrations.google_contacts import fetch_contacts
@@ -46,6 +47,7 @@ _finalized_lock = threading.Lock()
 def _assert_live_ready() -> None:
     if os.getenv("LIVE_MODE", "1") != "1":
         return
+    ensure_mail_from()
     # v2-only
     legacy = [
         "GOOGLE_" + "CLIENT_ID",
@@ -70,8 +72,8 @@ def _assert_live_ready() -> None:
     if os.getenv("REQUIRE_HUBSPOT", "1") == "1":
         required.append("HUBSPOT_ACCESS_TOKEN")
     missing = [k for k in required if not os.getenv(k)]
-    if not os.getenv("SMTP_FROM") and not os.getenv("MAIL_FROM"):
-        missing.append("SMTP_FROM")
+    if not os.getenv("MAIL_FROM"):
+        missing.append("MAIL_FROM")
     if missing:
         raise RuntimeError("LIVE readiness failed; missing: " + ", ".join(missing))
     log_event({"status": "live_assertions_passed"})

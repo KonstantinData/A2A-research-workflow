@@ -75,7 +75,7 @@ and environments.
    - `SMTP_USER`
    - `SMTP_PASS`
    - `SMTP_SECURE`
-   - `SMTP_FROM`
+   - `MAIL_FROM` (sender address; replaces deprecated `SMTP_FROM`)
 
 PDF generation relies on WeasyPrint system libraries, installed by the Dockerfile and the CI workflow.
 
@@ -203,7 +203,7 @@ CRM.
 | `SMTP_PORT` | SMTP server port | `587` |
 | `SMTP_USER` | SMTP username | – |
 | `SMTP_PASS` | SMTP password | – |
-| `SMTP_FROM` | Sender e‑mail address (`MAIL_FROM` accepted for compatibility) | `SMTP_USER` |
+| `MAIL_FROM` | Sender e‑mail address (`SMTP_FROM` is deprecated; auto-aliases to `MAIL_FROM`) | `SMTP_USER` |
 | `SMTP_SECURE` | SMTP security mode (`ssl`/`starttls`) | `ssl` |
 | `ALLOWLIST_EMAIL_DOMAIN` | Allow reminder emails only to addresses in this domain | – |
 | `MAIL_TO` | Recipient e‑mail for reports | – |
