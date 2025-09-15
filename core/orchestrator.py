@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Callable, Optional
 import shutil
+import threading
 
 from core import feature_flags
 from core.utils import (
@@ -45,16 +46,22 @@ from agents import (
 
 import importlib.util as _ilu
 
-_JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
-_spec = _ilu.spec_from_file_location("jsonl_sink", _JSONL_PATH)
-_mod = _ilu.module_from_spec(_spec)
-assert _spec and _spec.loader
-_spec.loader.exec_module(_mod)
-append_jsonl = _mod.append
+# Fehlerbehandlung beim Import von jsonl_sink.py
+try:
+    _JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
+    _spec = _ilu.spec_from_file_location("jsonl_sink", _JSONL_PATH)
+    _mod = _ilu.module_from_spec(_spec)
+    assert _spec and _spec.loader
+    _spec.loader.exec_module(_mod)
+    append_jsonl = _mod.append
+except Exception as e:
+    raise ImportError(f"Could not import jsonl_sink.py: {e}")
 
 CAL_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 _finalized = False
+_finalized_lock = threading.Lock()
+
 
 # --------- LIVE readiness assertions ---------
 def _assert_live_ready() -> None:
@@ -117,7 +124,14 @@ def log_event(record: Dict[str, Any]) -> None:
 
     # Collect any extra keys into the ``details`` field.
     for k, v in record.items():
-        if k not in {"event_id", "status", "timestamp", "severity", "workflow_id", "details"}:
+        if k not in {
+            "event_id",
+            "status",
+            "timestamp",
+            "severity",
+            "workflow_id",
+            "details",
+        }:
             base.setdefault("details", {})[k] = v
         elif k == "details" and isinstance(v, dict):
             base["details"].update(v)
@@ -149,9 +163,10 @@ def bundle_logs_into_exports() -> None:  # pragma: no cover - backward compat
 
 def finalize_run(**event: Any) -> None:
     global _finalized
-    if _finalized:
-        return
-    _finalized = True
+    with _finalized_lock:
+        if _finalized:
+            return
+        _finalized = True
     try:
         finalize_summary()
         _copy_run_logs_to_export(get_workflow_id())
@@ -170,9 +185,7 @@ def _preflight_google() -> bool:
             }
         )
         return False
-    log_event(
-        {"status": "preflight_oauth_ok", "provider": "google", "mode": "v2-only"}
-    )
+    log_event({"status": "preflight_oauth_ok", "provider": "google", "mode": "v2-only"})
     return True
 
 
@@ -184,7 +197,7 @@ def _latest_status(event_id: str) -> Optional[str]:
     if not base.exists():
         return None
     latest: Optional[str] = None
-    for path in sorted(base.glob("wf-*.jsonl")):
+    for path in sorted(base.glob("*.jsonl")):  # Fix: Suche alle .jsonl Dateien
         try:
             with path.open("r", encoding="utf-8") as fh:
                 for line in fh:
@@ -295,7 +308,6 @@ def _calendar_last_error(wf_id: str) -> Optional[Dict[str, Any]]:
     return last
 
 
-
 # --------- Trigger-Gathering für Kalender + Kontakte ----------
 def _as_trigger_from_event(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     # prüft summary, description, location, attendees[].email usw.
@@ -305,7 +317,8 @@ def _as_trigger_from_event(ev: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
     return {
         "source": "calendar",
-        "creator": (payload.get("creator") or {}).get("email") or payload.get("creatorEmail"),
+        "creator": (payload.get("creator") or {}).get("email")
+        or payload.get("creatorEmail"),
         "recipient": (payload.get("organizer") or {}).get("email"),
         "payload": payload,
     }
@@ -326,7 +339,6 @@ def _as_trigger_from_contact(c: Dict[str, Any]) -> Dict[str, Any]:
         "recipient": email,
         "payload": c,
     }
-
 
 
 def gather_triggers(
@@ -431,18 +443,21 @@ def gather_triggers(
     return triggers
 
 
-
 def run(
     *,
     triggers: List[Dict[str, Any]] | None = None,
     researchers: List[Callable[[Dict[str, Any]], Dict[str, Any]]] | None = None,
-    consolidate_fn: Callable[[List[Dict[str, Any]]], Dict[str, Any]] | None = lambda r: {},
+    consolidate_fn: (
+        Callable[[List[Dict[str, Any]]], Dict[str, Any]] | None
+    ) = lambda r: {},
     pdf_renderer: Callable[[Dict[str, Any], Path], None] | None = None,
     csv_exporter: Callable[[List[Dict[str, Any]], Path], None] | None = None,
     hubspot_upsert: Callable[[Dict[str, Any]], Any] | None = lambda d: None,
     hubspot_attach: Callable[[Path, Any], None] | None = lambda p, c: None,
     hubspot_check_existing: Callable[[Any], Any] | None = lambda cid: None,
-    duplicate_checker: Callable[[Dict[str, Any], Any], bool] | None = lambda rec, existing: False,
+    duplicate_checker: (
+        Callable[[Dict[str, Any], Any], bool] | None
+    ) = lambda rec, existing: False,
     company_id: Any | None = None,
     restart_event_id: str | None = None,
 ) -> Dict[str, Any]:
@@ -451,6 +466,7 @@ def run(
     # Determine triggers when not pushed externally
     # Enforce real exporters in LIVE unless explicitly in test mode
     from output import pdf_render as _pdf, csv_export as _csv
+
     TEST_MODE = os.getenv("A2A_TEST_MODE", "0") == "1"
     if not TEST_MODE:
         pdf_renderer = _pdf.render_pdf
@@ -510,9 +526,21 @@ def run(
             if rep.get("task_id") == tid:
                 trig.setdefault("payload", {}).update(rep.get("fields", {}))
                 ev_id = trig.get("payload", {}).get("event_id") or rep.get("event_id")
-                log_event({"status": "email_reply_received", "event_id": ev_id, "creator": rep.get("creator")})
+                log_event(
+                    {
+                        "status": "email_reply_received",
+                        "event_id": ev_id,
+                        "creator": rep.get("creator"),
+                    }
+                )
                 log_event({"status": "pending_email_reply_resolved", "event_id": ev_id})
-                log_event({"status": "resumed", "event_id": ev_id, "creator": rep.get("creator")})
+                log_event(
+                    {
+                        "status": "resumed",
+                        "event_id": ev_id,
+                        "creator": rep.get("creator"),
+                    }
+                )
                 replies.remove(rep)
 
     # Remove duplicates based on event_id
@@ -532,17 +560,22 @@ def run(
             "calendar_ids": SETTINGS.google_calendar_ids or ["primary"],
         }
         log_step("orchestrator", "no_triggers_diagnostics", details, severity="info")
-        log_event({
-            "status": "no_triggers_diagnostics",
-            "details": details,
-            "severity": "info",
-        })
-        log_event({
-            "status": "no_triggers",
-            "message": "No calendar or contact events matched trigger words"
-        })
+        log_event(
+            {
+                "status": "no_triggers_diagnostics",
+                "details": details,
+                "severity": "info",
+            }
+        )
+        log_event(
+            {
+                "status": "no_triggers",
+                "message": "No calendar or contact events matched trigger words",
+            }
+        )
         # --- Idle/Heartbeat Artefakte erzeugen ---
         from output import pdf_render, csv_export
+
         outdir = Path(os.getenv("OUTPUT_DIR", "output")) / "exports"
         outdir.mkdir(parents=True, exist_ok=True)
         pdf_path = outdir / "report.pdf"
@@ -550,18 +583,22 @@ def run(
         empty_report = {
             "fields": ["info"],
             "rows": [{"info": "No valid triggers in current window"}],
-            "meta": {"reason": "no_triggers"}
+            "meta": {"reason": "no_triggers"},
         }
         try:
             pdf_render.render_pdf(empty_report, pdf_path)
             log_event({"status": "artifact_pdf", "path": str(pdf_path)})
         except Exception as e:
-            log_event({"status": "artifact_pdf_error", "error": str(e), "severity": "warning"})
+            log_event(
+                {"status": "artifact_pdf_error", "error": str(e), "severity": "warning"}
+            )
         try:
             csv_export.export_csv([], csv_path)
             log_event({"status": "artifact_csv", "path": str(csv_path)})
         except Exception as e:
-            log_event({"status": "artifact_csv_error", "error": str(e), "severity": "warning"})
+            log_event(
+                {"status": "artifact_csv_error", "error": str(e), "severity": "warning"}
+            )
         # Zusammenfassung/Logs bündeln und normal zurückkehren
         finalize_run()
         return {"status": "idle"}
@@ -581,11 +618,15 @@ def run(
         event_id = payload.get("event_id")
         enriched: Dict[str, Any] | None = None
         if not payload.get("company_name"):
-            extracted_company = extract_company(payload.get("summary")) or extract_company(payload.get("description"))
+            extracted_company = extract_company(
+                payload.get("summary")
+            ) or extract_company(payload.get("description"))
             if extracted_company:
                 payload["company_name"] = extracted_company
         if not payload.get("domain"):
-            extracted_domain = extract_domain(payload.get("summary")) or extract_domain(payload.get("description"))
+            extracted_domain = extract_domain(payload.get("summary")) or extract_domain(
+                payload.get("description")
+            )
             if extracted_domain:
                 payload["domain"] = extracted_domain
         if event_id:
@@ -595,7 +636,13 @@ def run(
                 payload.update(enriched)
             missing = _missing_required(trig.get("source", ""), payload)
             if missing:
-                log_event({"event_id": event_id, "status": statuses.PENDING, "missing": missing})
+                log_event(
+                    {
+                        "event_id": event_id,
+                        "status": statuses.PENDING,
+                        "missing": missing,
+                    }
+                )
                 try:
                     email_sender.send_email(
                         to=trig.get("creator"),
@@ -615,10 +662,19 @@ def run(
                     }
                 )
         if researchers:
-            log_event({"event_id": event_id, "status": statuses.PENDING, "creator": trig.get("creator")})
+            log_event(
+                {
+                    "event_id": event_id,
+                    "status": statuses.PENDING,
+                    "creator": trig.get("creator"),
+                }
+            )
         trig_results: List[Dict[str, Any]] = []
         for researcher in researchers or []:
-            if getattr(researcher, "pro", False) and not feature_flags.ENABLE_PRO_SOURCES:
+            if (
+                getattr(researcher, "pro", False)
+                and not feature_flags.ENABLE_PRO_SOURCES
+            ):
                 continue
             res = researcher(trig)
             if res:
@@ -684,14 +740,29 @@ def run(
         # Artefakt-Integrität absichern (kein 3-Byte-Stub etc.)
         try:
             if pdf_path.exists() and pdf_path.stat().st_size < 1000:
-                _pdf.render_pdf({"fields":["info"],"rows":[{"info":"invalid_artifact_detected"}],"meta":{}}, pdf_path)
+                _pdf.render_pdf(
+                    {
+                        "fields": ["info"],
+                        "rows": [{"info": "invalid_artifact_detected"}],
+                        "meta": {},
+                    },
+                    pdf_path,
+                )
             if csv_path.exists() and csv_path.stat().st_size < 5:
                 _csv.export_csv([], csv_path)
         except Exception:
             pass
-        log_event({"event_id": first_id, "status": "artifact_pdf", "path": str(pdf_path)})
-        log_event({"event_id": first_id, "status": "artifact_csv", "path": str(csv_path)})
-        log_step("orchestrator","report_generated",{"event_id": first_id, "path": str(pdf_path)})
+        log_event(
+            {"event_id": first_id, "status": "artifact_pdf", "path": str(pdf_path)}
+        )
+        log_event(
+            {"event_id": first_id, "status": "artifact_csv", "path": str(csv_path)}
+        )
+        log_step(
+            "orchestrator",
+            "report_generated",
+            {"event_id": first_id, "path": str(pdf_path)},
+        )
     except Exception as e:
         recovery_agent.handle_failure(first_id, e)
         log_step(
@@ -768,7 +839,13 @@ def run(
                 finalize_run()
                 return consolidated
         else:
-            log_event({"event_id": first_id, "status": statuses.REPORT_NOT_SENT, "severity": "warning"})
+            log_event(
+                {
+                    "event_id": first_id,
+                    "status": statuses.REPORT_NOT_SENT,
+                    "severity": "warning",
+                }
+            )
             log_step(
                 "orchestrator",
                 "report_not_sent",
