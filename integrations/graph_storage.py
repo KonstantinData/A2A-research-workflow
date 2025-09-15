@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
+from config.settings import SETTINGS
+
 
 def store_result(result: Dict[str, Any], path: str | None = None) -> None:
     """Store a normalized run result into a simple graph structure.
@@ -19,7 +21,7 @@ def store_result(result: Dict[str, Any], path: str | None = None) -> None:
         ``output/graph.json``.
     """
     graph = _result_to_graph(result)
-    output = Path(path) if path else Path("output/graph.json")
+    output = Path(path) if path else SETTINGS.output_dir / "graph.json"
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", encoding="utf-8") as fh:
         json.dump(graph, fh, ensure_ascii=False, indent=2)

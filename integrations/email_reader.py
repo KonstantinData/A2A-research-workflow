@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import email
+import email
 import imaplib
 import os
 import re
@@ -13,6 +14,7 @@ from typing import Any, Dict, List
 import importlib.util as _ilu
 
 from core import parser
+from config.settings import SETTINGS
 
 _JSONL_PATH = Path(__file__).resolve().parents[1] / "a2a_logging" / "jsonl_sink.py"
 _spec = _ilu.spec_from_file_location("jsonl_sink", _JSONL_PATH)
@@ -21,9 +23,17 @@ assert _spec and _spec.loader
 _spec.loader.exec_module(_mod)
 append_jsonl = _mod.append
 
-_REPLY_LOG = Path("logs") / "workflows" / "replies.jsonl"
-
 logger = logging.getLogger(__name__)
+
+
+def _reply_log_path() -> Path:
+    return SETTINGS.workflows_dir / "replies.jsonl"
+
+
+def _append_reply_log(record: Dict[str, Any]) -> None:
+    path = _reply_log_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    append_jsonl(path, record)
 
 
 def _decode(value: str) -> str:
@@ -46,8 +56,7 @@ def fetch_replies() -> List[Dict[str, Any]]:
     folder = os.getenv("IMAP_FOLDER", "INBOX")
     if not all([host, user, pwd]):
         logger.info("IMAP credentials not configured; skipping fetch")
-        append_jsonl(
-            _REPLY_LOG,
+        _append_reply_log(
             {"status": "imap_not_configured", "severity": "info"},
         )
         return []
@@ -120,8 +129,7 @@ def fetch_replies() -> List[Dict[str, Any]]:
                     "fields": fields,
                 }
             )
-            append_jsonl(
-                _REPLY_LOG,
+            _append_reply_log(
                 {
                     "status": "reply_received",
                     "event_id": event_id,
@@ -142,8 +150,7 @@ def poll_replies(interval: int = 600) -> None:
         try:
             fetch_replies()
         except Exception as e:
-            append_jsonl(
-                _REPLY_LOG,
+            _append_reply_log(
                 {"status": "error", "error": str(e), "severity": "warning"},
             )
         time.sleep(interval)

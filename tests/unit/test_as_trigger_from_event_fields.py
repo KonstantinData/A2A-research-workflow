@@ -4,6 +4,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from core import orchestrator
+from config.settings import SETTINGS
 
 
 def test_trigger_from_location_or_attendee():
@@ -45,5 +46,5 @@ def test_no_enriched_log_when_fields_present(monkeypatch, tmp_path):
         hubspot_check_existing=lambda cid: None,
     )
 
-    logs = "".join(p.read_text() for p in Path("logs/workflows").glob("*.jsonl"))
+    logs = "".join(p.read_text() for p in SETTINGS.workflows_dir.glob("*.jsonl"))
     assert '"status": "enriched_by_ai"' not in logs

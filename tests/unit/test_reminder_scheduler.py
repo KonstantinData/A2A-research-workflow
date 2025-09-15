@@ -10,6 +10,7 @@ from agents.reminder_service import ReminderScheduler, check_and_notify
 from core import tasks, task_history, statuses
 from core.utils import get_workflow_id
 from integrations import email_client, email_sender
+from config.settings import SETTINGS
 import json
 
 
@@ -121,7 +122,7 @@ def test_check_and_notify_logs(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
 
     wf_id = get_workflow_id()
-    log_dir = Path("logs") / "workflows"
+    log_dir = SETTINGS.workflows_dir
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"{wf_id}.jsonl"
     entries = [
@@ -164,7 +165,7 @@ def test_check_and_notify_logs(monkeypatch, tmp_path):
     check_and_notify(triggers)
 
     assert {c["to"] for c in calls} == {"a@example.com", "c@example.com"}
-    reminder_log = log_dir / "reminders.jsonl"
+    reminder_log = SETTINGS.workflows_dir / "reminders.jsonl"
     lines = reminder_log.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 2
     for line in lines:

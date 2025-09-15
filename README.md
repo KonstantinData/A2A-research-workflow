@@ -35,6 +35,28 @@ flowchart LR
 3. Set required environment variables as needed. SMTP/IMAP/HubSpot/Google variables are listed in [`.env.example`](.env.example) and documented in [`ops/CONFIG.md`](ops/CONFIG.md).
 4. Adjust trigger words in `config/trigger_words.txt` or point `TRIGGER_WORDS_FILE` to a custom list.
 
+### Centralised paths
+
+All log, export and artefact locations are resolved through
+`config.settings.SETTINGS`.  The default layout stores workflow logs in
+`logs/workflows/`, generated artefacts in `artifacts/` and report
+exports in `output/exports/` relative to the project root.  To customise
+the locations set the following environment variables before the
+application starts:
+
+| Environment variable | Description |
+| --- | --- |
+| `PROJECT_ROOT` | Base directory used when resolving relative paths. |
+| `LOGS_DIR` / `WORKFLOWS_SUBDIR` | Override the log directory or the workflow sub-directory. |
+| `OUTPUT_DIR` / `EXPORTS_SUBDIR` | Override the output directory or exports sub-directory. |
+| `EXPORTS_DIR` | Absolute path for exports (takes precedence over `OUTPUT_DIR`). |
+| `ARTIFACTS_DIR` | Directory used for intermediate artefacts. |
+
+`SETTINGS` is a dataclass and can be patched in tests for temporary
+directories (see `tests/conftest.py`).  All modules reference it instead
+of hard-coded strings, ensuring consistent behaviour across containers
+and environments.
+
 ## LIVE Setup
 
 1. Copy [`.env.example`](.env.example) to `.env` and fill in the credentials (SMTP/IMAP/HubSpot/Google variables see [`ops/CONFIG.md`](ops/CONFIG.md)).

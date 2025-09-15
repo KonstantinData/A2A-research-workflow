@@ -6,17 +6,18 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from core import orchestrator  # type: ignore
+from config.settings import SETTINGS
 
 
 def test_log_event_severity_defaults(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     orchestrator.log_event({"status": "ok"})
-    files = list(Path("logs/workflows").glob("*.jsonl"))
+    files = list(SETTINGS.workflows_dir.glob("*.jsonl"))
     content = files[0].read_text()
     assert '"severity": "info"' in content
 
     orchestrator.log_event({"status": "fail", "severity": "critical"})
-    files = sorted(Path("logs/workflows").glob("*.jsonl"))
+    files = sorted(SETTINGS.workflows_dir.glob("*.jsonl"))
     content = files[-1].read_text()
     assert '"severity": "critical"' in content
 
@@ -53,6 +54,6 @@ def test_upload_failure_logged_critical(monkeypatch, tmp_path):
         hubspot_attach=fail_attach,
     )
 
-    content = "".join(p.read_text() for p in Path("logs/workflows").glob("*.jsonl"))
+    content = "".join(p.read_text() for p in SETTINGS.workflows_dir.glob("*.jsonl"))
     assert '"status": "report_upload_failed"' in content
     assert '"severity": "critical"' in content

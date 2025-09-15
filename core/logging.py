@@ -7,6 +7,7 @@ from typing import Any, Dict
 
 from core.utils import get_workflow_id
 import importlib.util as _ilu
+from config.settings import SETTINGS
 
 try:
     _JSONL_PATH = Path(__file__).resolve().parents[1] / "a2a_logging" / "jsonl_sink.py"
@@ -23,7 +24,7 @@ def _log_event_impl(record: Dict[str, Any]) -> None:
     """Append ``record`` to a JSONL workflow log file using a common template."""
 
     wf = get_workflow_id()
-    path = Path("logs") / "workflows" / f"{wf}.jsonl"
+    path = SETTINGS.workflows_dir / f"{wf}.jsonl"
 
     base: Dict[str, Any] = {
         "event_id": record.get("event_id"),
@@ -50,6 +51,7 @@ def _log_event_impl(record: Dict[str, Any]) -> None:
         elif k == "details" and isinstance(v, dict):
             base["details"].update(v)
 
+    SETTINGS.workflows_dir.mkdir(parents=True, exist_ok=True)
     append_jsonl(path, base)
 
 

@@ -19,6 +19,8 @@ from . import company_data
 import importlib.util as _ilu
 from datetime import datetime, timezone
 
+from config.settings import SETTINGS
+
 _JSONL_PATH = Path(__file__).resolve().parent.parent / "a2a_logging" / "jsonl_sink.py"
 _spec = _ilu.spec_from_file_location("jsonl_sink", _JSONL_PATH)
 _mod = _ilu.module_from_spec(_spec)
@@ -31,7 +33,7 @@ Normalized = Dict[str, Any]
 
 def _write_artifact(filename: str, data: Any) -> None:
     try:
-        out_dir = Path("artifacts")
+        out_dir = SETTINGS.artifacts_dir
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / filename).write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     except Exception:
@@ -40,11 +42,12 @@ def _write_artifact(filename: str, data: Any) -> None:
 
 def _log_workflow(record: Dict[str, Any]) -> None:
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
-    path = Path("logs") / "workflows" / f"{ts}_workflow.jsonl"
+    path = SETTINGS.workflows_dir / f"{ts}_workflow.jsonl"
     data = dict(record)
     data.setdefault(
         "timestamp", datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     )
+    SETTINGS.workflows_dir.mkdir(parents=True, exist_ok=True)
     append_jsonl(path, data)
 
 

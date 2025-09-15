@@ -60,7 +60,7 @@ def test_orchestrator_generates_outputs_and_calls_hubspot(tmp_path, monkeypatch,
         hubspot_check_existing=lambda cid: None,
     )
 
-    out_dir = Path("output/exports")
+    out_dir = SETTINGS.exports_dir
     assert (out_dir / "report.pdf").exists()
     assert (out_dir / "data.csv").exists()
     assert calls["upsert"] == 1

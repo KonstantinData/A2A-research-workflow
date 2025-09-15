@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from core import orchestrator, tasks, task_history, statuses
 from agents import field_completion_agent, reminder_service
 from integrations import email_sender, email_client
+from config.settings import SETTINGS
 
 
 @pytest.fixture(autouse=True)
@@ -26,7 +27,7 @@ def _stub_csv(data, path):
 
 
 def _collect_logs() -> str:
-    return "".join(p.read_text() for p in sorted(Path("logs/workflows").glob("*.jsonl")))
+    return "".join(p.read_text() for p in sorted(SETTINGS.workflows_dir.glob("*.jsonl")))
 
 
 def _orchestrator_run(triggers, monkeypatch):

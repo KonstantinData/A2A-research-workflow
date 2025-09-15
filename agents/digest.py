@@ -1,9 +1,10 @@
-from pathlib import Path, PurePath
 import json
+
+from config.settings import SETTINGS
 
 
 def send_daily_admin_digest(to: str):
-    p = Path("logs/workflows/summary.json")
+    p = SETTINGS.workflows_dir / "summary.json"
     if not p.exists(): 
         return
     s = json.loads(p.read_text(encoding="utf-8"))

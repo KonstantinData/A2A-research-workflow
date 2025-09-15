@@ -8,6 +8,7 @@ import shutil
 from integrations import email_sender
 
 from core import statuses
+from config.settings import SETTINGS
 
 
 def handle_failure(event_id: str | None, error: Exception) -> None:
@@ -28,7 +29,7 @@ def handle_failure(event_id: str | None, error: Exception) -> None:
         }
     )
 
-    log_path = Path("logs") / "workflows" / f"{event_id}.jsonl"
+    log_path = SETTINGS.workflows_dir / f"{event_id}.jsonl"
     can_restart = log_path.exists()
 
     if can_restart:
@@ -68,7 +69,10 @@ def abort(event_id: str) -> None:
     """Abort processing for ``event_id`` and clean up temporary data."""
     orchestrator = importlib.import_module("core.orchestrator")
     log_event = orchestrator.log_event
-    tmp_paths = [Path("artifacts") / event_id, Path("output") / "exports" / event_id]
+    tmp_paths = [
+        SETTINGS.artifacts_dir / event_id,
+        SETTINGS.exports_dir / event_id,
+    ]
     for path in tmp_paths:
         if path.exists():
             if path.is_dir():

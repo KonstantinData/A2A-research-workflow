@@ -21,6 +21,8 @@ assert _spec and _spec.loader
 _spec.loader.exec_module(_mod)
 append_jsonl = _mod.append
 
+from config.settings import SETTINGS
+
 Normalized = Dict[str, Any]
 
 
@@ -28,7 +30,7 @@ def _log_agent(action: str, domain: str, user_email: str, artifacts: str | None 
     """Write a log line for this agent."""
     date = datetime.now(timezone.utc)
     path = (
-        Path("logs")
+        SETTINGS.logs_dir
         / "agent_internal_search"
         / f"{date:%Y}"
         / f"{date:%m}"
@@ -43,16 +45,18 @@ def _log_agent(action: str, domain: str, user_email: str, artifacts: str | None 
     }
     if artifacts:
         record["artifacts"] = artifacts
+    path.parent.mkdir(parents=True, exist_ok=True)
     append_jsonl(path, record)
 
 
 def _log_workflow(record: Dict[str, Any]) -> None:
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
-    path = Path("logs") / "workflows" / f"{ts}_workflow.jsonl"
+    path = SETTINGS.workflows_dir / f"{ts}_workflow.jsonl"
     data = dict(record)
     data.setdefault(
         "timestamp", datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     )
+    SETTINGS.workflows_dir.mkdir(parents=True, exist_ok=True)
     append_jsonl(path, data)
 
 
@@ -173,8 +177,9 @@ def run(trigger: Normalized) -> Normalized:
             }
         )
     if samples:
-        Path("artifacts").mkdir(exist_ok=True)
-        with open("artifacts/internal_level1_samples.json", "w", encoding="utf-8") as fh:
+        SETTINGS.artifacts_dir.mkdir(parents=True, exist_ok=True)
+        sample_path = SETTINGS.artifacts_dir / "internal_level1_samples.json"
+        with sample_path.open("w", encoding="utf-8") as fh:
             json.dump(samples, fh)
         _log_workflow(
             {
@@ -217,9 +222,9 @@ def run(trigger: Normalized) -> Normalized:
 
     artifacts_path: str | None = None
     if any(payload.get(k) for k in ("industry_group", "industry", "description")):
-        artifacts_path = "artifacts/matching_crm_companies.json"
-        Path("artifacts").mkdir(exist_ok=True)
-        with open(artifacts_path, "w", encoding="utf-8") as fh:
+        SETTINGS.artifacts_dir.mkdir(parents=True, exist_ok=True)
+        artifacts_file = SETTINGS.artifacts_dir / "matching_crm_companies.json"
+        with artifacts_file.open("w", encoding="utf-8") as fh:
             json.dump(
                 [
                     {
@@ -231,6 +236,7 @@ def run(trigger: Normalized) -> Normalized:
                 ],
                 fh,
             )
+        artifacts_path = str(artifacts_file)
 
     _log_agent(action, company_domain, creator_email, artifacts_path)
 

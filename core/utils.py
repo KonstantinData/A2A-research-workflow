@@ -23,6 +23,8 @@ import importlib.util as _ilu
 import glob
 import shutil
 
+from config.settings import SETTINGS
+
 VARIANT = "v2"
 
 _JSONL_PATH = Path(__file__).resolve().parents[1] / "a2a_logging" / "jsonl_sink.py"
@@ -82,7 +84,8 @@ def log_step(source: str, stage: str, data: Dict[str, Any], *, severity: str = "
     }
     payload.update(data)
     try:
-        append_jsonl(Path("logs") / "workflows" / f"{source}.jsonl", payload)
+        SETTINGS.workflows_dir.mkdir(parents=True, exist_ok=True)
+        append_jsonl(SETTINGS.workflows_dir / f"{source}.jsonl", payload)
     except Exception as e:  # pragma: no cover - logging shouldn't break tests
         getLogger(__name__).warning("Logging failed: %s", e)
     else:
@@ -90,7 +93,7 @@ def log_step(source: str, stage: str, data: Dict[str, Any], *, severity: str = "
 
 
 def _aggregate_severities(workflow_id: str) -> dict:
-    p = Path("logs/workflows") / f"{workflow_id}.jsonl"
+    p = SETTINGS.workflows_dir / f"{workflow_id}.jsonl"
     errors = warnings = 0
     if p.exists():
         with p.open("r", encoding="utf-8") as fh:
@@ -109,13 +112,13 @@ def _aggregate_severities(workflow_id: str) -> dict:
 def finalize_summary() -> None:
     """Write a digest summary for the current workflow run."""
     wf_id = get_workflow_id()
-    path = Path("logs") / "workflows" / "summary.json"
+    path = SETTINGS.workflows_dir / "summary.json"
     payload = {"workflow_id": wf_id, **SUMMARY}
 
     sev = _aggregate_severities(wf_id)
     payload.update(sev)
 
-    cal_path = Path("logs") / "workflows" / "calendar.jsonl"
+    cal_path = SETTINGS.workflows_dir / "calendar.jsonl"
     calendar_logs: List[Dict[str, Any]] = []
     if cal_path.exists():
         try:
@@ -145,8 +148,8 @@ def finalize_summary() -> None:
         with path.open("r", encoding="utf-8", newline="") as fh:
             return sum(1 for _ in csv.reader(fh)) - 1  # minus header if present
 
-    pdf_path = Path("output/exports/report.pdf")
-    csv_path = Path("output/exports/data.csv")
+    pdf_path = SETTINGS.exports_dir / "report.pdf"
+    csv_path = SETTINGS.exports_dir / "data.csv"
     pdf_ok = pdf_path.exists()
     csv_ok = csv_path.exists()
 
@@ -254,8 +257,8 @@ def bundle_logs_into_exports() -> None:
     environments.
     """
 
-    src = Path("logs/workflows")
-    dst = Path("output/exports/run_logs")
+    src = SETTINGS.workflows_dir
+    dst = SETTINGS.exports_dir / "run_logs"
     dst.mkdir(parents=True, exist_ok=True)
     if not src.exists():
         return

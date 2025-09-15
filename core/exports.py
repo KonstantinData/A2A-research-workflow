@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
+
+from config.settings import SETTINGS
 
 
 def resolve_exporters(
@@ -40,7 +41,7 @@ def create_idle_artifacts(
     from output import csv_export
     from output import pdf_render
 
-    outdir = Path(os.getenv("OUTPUT_DIR", "output")) / "exports"
+    outdir = SETTINGS.exports_dir
     outdir.mkdir(parents=True, exist_ok=True)
 
     pdf_path = outdir / "report.pdf"
@@ -90,7 +91,7 @@ def export_report(
     log_event: Callable[[Dict[str, Any]], None],
     log_step: Callable[[str, str, Dict[str, Any]], None],
 ) -> Tuple[Path, Path]:
-    outdir = Path(os.getenv("OUTPUT_DIR", "output")) / "exports"
+    outdir = SETTINGS.exports_dir
     outdir.mkdir(parents=True, exist_ok=True)
 
     pdf_path = outdir / "report.pdf"

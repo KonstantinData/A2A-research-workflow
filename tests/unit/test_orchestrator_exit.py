@@ -3,6 +3,7 @@ from pathlib import Path
 
 from core import orchestrator, statuses
 from agents import recovery_agent
+from config.settings import SETTINGS
 
 
 def test_main_handles_string_exit(monkeypatch):
@@ -20,7 +21,7 @@ def test_abort_cleans_temp_and_logs(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     records = []
     monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
-    tmp = Path("artifacts") / "42"
+    tmp = SETTINGS.artifacts_dir / "42"
     tmp.mkdir(parents=True, exist_ok=True)
     (tmp / "data.json").write_text("x", encoding="utf-8")
 

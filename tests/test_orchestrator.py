@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from core import orchestrator
 from agents import field_completion_agent, reminder_service
+from config.settings import SETTINGS
 
 
 def _dummy_trigger():
@@ -27,12 +28,12 @@ def test_run_exits_when_no_triggers(monkeypatch, tmp_path):
     res = orchestrator.run()
     assert res == {"status": "idle"}
 
-    log_dir = Path("logs/workflows")
+    log_dir = SETTINGS.workflows_dir
     files = sorted(log_dir.glob("wf-*.jsonl"))
     assert files, "log file not written"
     content = files[0].read_text()
     assert '"status": "no_triggers"' in content
-    out_dir = Path("output/exports")
+    out_dir = SETTINGS.exports_dir
     assert (out_dir / "report.pdf").exists()
     assert (out_dir / "data.csv").exists()
 
@@ -63,7 +64,7 @@ def test_run_processes_with_triggers(monkeypatch, tmp_path):
         hubspot_check_existing=lambda cid: None,
     )
 
-    out_dir = Path("output/exports")
+    out_dir = SETTINGS.exports_dir
     assert (out_dir / "report.pdf").exists()
     assert (out_dir / "data.csv").exists()
     assert called == {"pdf": 1, "csv": 1}
@@ -95,7 +96,7 @@ def test_run_processes_event_missing_fields(monkeypatch, tmp_path):
         hubspot_check_existing=lambda cid: None,
     )
 
-    logs = "".join(p.read_text() for p in Path("logs/workflows").glob("*.jsonl"))
+    logs = "".join(p.read_text() for p in SETTINGS.workflows_dir.glob("*.jsonl"))
     assert '"status": "enriched_by_ai"' in logs
 
 
