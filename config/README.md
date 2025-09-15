@@ -4,6 +4,7 @@
 Configuration files for the workflow.
 
 ## Files
+- `settings.py`: centralised runtime configuration and feature flags loaded from environment variables.
 - `trigger_words.txt`: newline-separated trigger words or phrases (case-insensitive).
 
 ## Dependencies

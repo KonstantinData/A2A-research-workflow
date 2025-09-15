@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Tuple, Optional, List
 
 from integrations import hubspot_api  # erwartet: echte Implementierung
-from core.feature_flags import ALLOW_STATIC_COMPANY_DATA
+from config.settings import SETTINGS
 
 try:
     import redis  # type: ignore
@@ -21,7 +21,7 @@ def _empty_names() -> List[str]:
     return []
 
 # Optional static dataset for tests only
-if ALLOW_STATIC_COMPANY_DATA:
+if SETTINGS.allow_static_company_data:
     try:
         from agents.company_data import lookup_company as _lookup_company  # type: ignore
         from agents.company_data import all_company_names as _all_company_names  # type: ignore
@@ -79,10 +79,10 @@ def _find_company(name: str, domain: str) -> Dict[str, Any]:
             if matches:
                 return matches[0]
     except Exception:
-        if not ALLOW_STATIC_COMPANY_DATA:
+        if not SETTINGS.allow_static_company_data:
             raise
 
-    if ALLOW_STATIC_COMPANY_DATA and _lookup_company and _all_company_names:
+    if SETTINGS.allow_static_company_data and _lookup_company and _all_company_names:
         if domain:
             for comp_name in _all_company_names():
                 ci = _lookup_company(comp_name)

@@ -9,7 +9,7 @@ Clients for external services such as HubSpot and Google APIs.
 - `google_contacts.py`: scheduled polling of contacts with trigger-word filtering and normalized payloads.
 - `email_sender.py`: SMTP e-mail helper.
 - `web_scraper.py`
-- `sources_registry.py`
+- Source registry now lives in `core/sources_registry.py`.
 - `templates/`: reusable e-mail templates.
 
 ## Dependencies

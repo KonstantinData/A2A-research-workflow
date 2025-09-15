@@ -50,7 +50,7 @@ def test_contacts_scheduled_poll_summarizes_notes(monkeypatch):
     }
 
     monkeypatch.setattr(google_contacts, "fetch_contacts", lambda: [contact])
-    monkeypatch.setattr(google_contacts.feature_flags, "ENABLE_SUMMARY", True)
+    monkeypatch.setattr(google_contacts.SETTINGS, "enable_summary", True)
     monkeypatch.setattr(google_contacts.email_sender, "send", lambda *a, **k: None)
 
     result = google_contacts.scheduled_poll()

@@ -5,7 +5,8 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from core import orchestrator, feature_flags
+from core import orchestrator
+from config.settings import SETTINGS
 from output import pdf_render, csv_export
 
 
@@ -15,8 +16,8 @@ def test_orchestrator_generates_outputs_and_calls_hubspot(tmp_path, monkeypatch,
     monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "token")
     monkeypatch.setenv("HUBSPOT_PORTAL_ID", "portal")
     monkeypatch.setenv("LIVE_MODE", "0")
-    # reload feature flags to pick up env change
-    monkeypatch.setattr(feature_flags, "USE_PUSH_TRIGGERS", True)
+    # reload settings to pick up env change
+    monkeypatch.setattr(SETTINGS, "use_push_triggers", True)
 
     calls = {"upsert": 0, "attach": 0}
 

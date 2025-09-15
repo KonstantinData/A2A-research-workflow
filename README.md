@@ -207,7 +207,7 @@ CRM.
 Key directories:
 
 - `agents/` – individual research agents.
-- `core/` – orchestration, classification, consolidation, and feature flags.
+- `core/` – orchestration, classification, consolidation, and workflow helpers.
 - `integrations/` – external service clients (HubSpot, Google, email) and templates.
 - `output/` – PDF and CSV rendering utilities.
 - `schemas/` – JSON schema definitions.
@@ -215,7 +215,7 @@ Key directories:
 - `a2a_logging/` – logging utilities and error definitions.
 - `tests/` – unit, integration, and end-to-end tests.
 - `ops/` – operational files such as Dockerfile and CI/CD configs.
-- `config/` – configuration files such as trigger word list.
+- `config/` – centralised runtime settings (see `config/settings.py`) and trigger word lists.
 ## License
 
 MIT

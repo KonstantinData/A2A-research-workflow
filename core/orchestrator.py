@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Callable, Optional
 import shutil
 import threading
 
-from core import feature_flags
 from core.utils import (
     required_fields,
     optional_fields,
@@ -268,7 +267,7 @@ def run(
     log_event({"status": "workflow_started"})
 
     if triggers is None:
-        if feature_flags.USE_PUSH_TRIGGERS:
+        if SETTINGS.use_push_triggers:
             triggers = []
         else:
             events = fetch_events() or []
@@ -345,7 +344,7 @@ def run(
         missing_required=_missing_required,
         extract_company=extract_company,
         extract_domain=extract_domain,
-        feature_flags=feature_flags,
+        settings=SETTINGS,
     )
 
     run_loop.notify_reminders(triggers, reminder_service=reminder_service)
@@ -400,7 +399,7 @@ def run(
             pdf_path=pdf_path,
             hubspot_upsert=hubspot_upsert,
             hubspot_attach=hubspot_attach,
-            feature_flags=feature_flags,
+            settings=SETTINGS,
             log_event=log_event,
             log_step=log_step,
             recovery_agent=recovery_agent,

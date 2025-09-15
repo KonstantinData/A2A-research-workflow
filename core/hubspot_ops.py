@@ -67,7 +67,7 @@ def upsert_and_attach(
     pdf_path: Path,
     hubspot_upsert: Callable[[Dict[str, Any]], Any] | None,
     hubspot_attach: Callable[[Path, Any], None] | None,
-    feature_flags: Any,
+    settings: Any,
     log_event: Callable[[Dict[str, Any]], None],
     log_step: Callable[[str, str, Dict[str, Any]], None],
     recovery_agent: Any,
@@ -78,7 +78,7 @@ def upsert_and_attach(
         new_company_id = hubspot_upsert(consolidated)
 
     if (
-        feature_flags.ATTACH_PDF_TO_HUBSPOT
+        getattr(settings, "attach_pdf_to_hubspot", False)
         and new_company_id
         and pdf_path.exists()
         and hubspot_attach

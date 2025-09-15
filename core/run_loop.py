@@ -4,6 +4,7 @@ import json
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence
 
 from core import statuses
+from core.sources_registry import SOURCES
 
 
 def incorporate_email_replies(
@@ -79,21 +80,7 @@ def resolve_researchers(
     if researchers is not None:
         return list(researchers)
 
-    from agents import (
-        agent_company_detail_research,
-        agent_external_level1_company_search,
-        agent_external_level2_companies_search,
-        agent_internal_level2_company_search,
-        agent_internal_search,
-    )
-
-    return [
-        agent_internal_search.run,
-        agent_external_level1_company_search.run,
-        agent_external_level2_companies_search.run,
-        agent_internal_level2_company_search.run,
-        agent_company_detail_research.run,
-    ]
+    return list(SOURCES)
 
 
 def run_researchers(
@@ -106,7 +93,7 @@ def run_researchers(
     missing_required: Callable[[str, Dict[str, Any]], List[str]],
     extract_company: Callable[[Optional[str]], Optional[str]],
     extract_domain: Callable[[Optional[str]], Optional[str]],
-    feature_flags: Any,
+    settings: Any,
 ) -> List[Dict[str, Any]]:
     results: List[Dict[str, Any]] = []
 
@@ -171,7 +158,9 @@ def run_researchers(
 
         trigger_results: List[Dict[str, Any]] = []
         for researcher in researchers:
-            if getattr(researcher, "pro", False) and not feature_flags.ENABLE_PRO_SOURCES:
+            if getattr(researcher, "pro", False) and not getattr(
+                settings, "enable_pro_sources", False
+            ):
                 continue
             result = researcher(trigger)
             if result:
