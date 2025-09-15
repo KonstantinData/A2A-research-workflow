@@ -14,7 +14,7 @@ from core.utils import log_step, optional_fields, required_fields
 
 import importlib.util as _ilu
 
-_JSONL_PATH = Path(__file__).resolve().parent.parent / "logging" / "jsonl_sink.py"
+_JSONL_PATH = Path(__file__).resolve().parent.parent / "a2a_logging" / "jsonl_sink.py"
 _spec = _ilu.spec_from_file_location("jsonl_sink", _JSONL_PATH)
 _mod = _ilu.module_from_spec(_spec)
 assert _spec and _spec.loader

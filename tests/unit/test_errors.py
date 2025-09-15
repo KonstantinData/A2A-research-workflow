@@ -5,7 +5,7 @@ import pathlib
 
 
 spec = importlib.util.spec_from_file_location(
-    "a2a_errors", pathlib.Path("logging/errors.py")
+    "a2a_errors", pathlib.Path("a2a_logging/errors.py")
 )
 errors = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(errors)
