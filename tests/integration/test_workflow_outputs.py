@@ -14,7 +14,6 @@ def test_orchestrator_generates_outputs_and_calls_hubspot(tmp_path, monkeypatch,
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("USE_PUSH_TRIGGERS", "1")
     monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "token")
-    monkeypatch.setenv("HUBSPOT_PORTAL_ID", "portal")
     monkeypatch.setenv("LIVE_MODE", "0")
     # reload settings to pick up env change
     monkeypatch.setattr(SETTINGS, "use_push_triggers", True)
