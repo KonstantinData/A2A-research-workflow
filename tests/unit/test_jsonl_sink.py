@@ -4,7 +4,7 @@ import json
 import importlib.util
 
 _spec = importlib.util.spec_from_file_location(
-    "jsonl_sink", Path(__file__).resolve().parents[2] / "logging" / "jsonl_sink.py"
+    "jsonl_sink", Path(__file__).resolve().parents[2] / "a2a_logging" / "jsonl_sink.py"
 )
 _mod = importlib.util.module_from_spec(_spec)
 assert _spec and _spec.loader

@@ -7,7 +7,7 @@ import logging
 
 
 spec = importlib.util.spec_from_file_location(
-    "a2a_logger", pathlib.Path("logging/logger.py")
+    "a2a_logger", pathlib.Path("a2a_logging/logger.py")
 )
 logger_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(logger_module)

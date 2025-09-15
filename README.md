@@ -212,7 +212,7 @@ Key directories:
 - `output/` – PDF and CSV rendering utilities.
 - `schemas/` – JSON schema definitions.
 - `compliance/` – GDPR helpers.
-- `logging/` – logging utilities and error definitions.
+- `a2a_logging/` – logging utilities and error definitions.
 - `tests/` – unit, integration, and end-to-end tests.
 - `ops/` – operational files such as Dockerfile and CI/CD configs.
 - `config/` – configuration files such as trigger word list.

@@ -17,7 +17,7 @@ from integrations import email_client, email_sender
 from agents.templates import build_reminder_email
 
 # JSONL logging for reminder notifications
-_JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
+_JSONL_PATH = Path(__file__).resolve().parents[1] / "a2a_logging" / "jsonl_sink.py"
 _spec = _ilu.spec_from_file_location("jsonl_sink", _JSONL_PATH)
 _mod = _ilu.module_from_spec(_spec)
 assert _spec and _spec.loader
