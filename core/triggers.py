@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from core import statuses
+from config.settings import SETTINGS
 
 
 def _as_trigger_from_event(
@@ -246,7 +246,7 @@ def gather_triggers(
 
 
 def _calendar_last_error(workflow_id: str) -> Optional[Dict[str, Any]]:
-    path = Path("logs") / "workflows" / "calendar.jsonl"
+    path = SETTINGS.workflows_dir / "calendar.jsonl"
     if not path.exists():
         return None
     last: Optional[Dict[str, Any]] = None
@@ -265,7 +265,7 @@ def _calendar_last_error(workflow_id: str) -> Optional[Dict[str, Any]]:
 
 
 def _calendar_fetch_logged(workflow_id: str) -> Optional[str]:
-    path = Path("logs") / "workflows" / "calendar.jsonl"
+    path = SETTINGS.workflows_dir / "calendar.jsonl"
     if not path.exists():
         return "missing"
     required = {"fetch_ok"}
@@ -291,7 +291,7 @@ def _calendar_fetch_logged(workflow_id: str) -> Optional[str]:
 
 
 def _contacts_fetch_logged(workflow_id: str) -> Optional[str]:
-    path = Path("logs") / "workflows" / "contacts.jsonl"
+    path = SETTINGS.workflows_dir / "contacts.jsonl"
     if not path.exists():
         return "missing"
     statuses_seen: set[str] = set()

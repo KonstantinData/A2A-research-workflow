@@ -5,10 +5,12 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from core.utils import _aggregate_severities
+from config.settings import SETTINGS
 
 def test_aggregate_counts(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    p = Path("logs/workflows"); p.mkdir(parents=True)
+    p = SETTINGS.workflows_dir
+    p.mkdir(parents=True)
     wf = p / "wf-xyz.jsonl"
     wf.write_text("\n".join([
         json.dumps({"severity": "info"}),

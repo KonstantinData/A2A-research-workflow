@@ -23,6 +23,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List
 
+from config.settings import SETTINGS
+
 try:
     from weasyprint import HTML  # type: ignore
 except Exception:  # pragma: no cover - optional dependency
@@ -152,7 +154,7 @@ def render_pdf(
     rows: List[Dict[str, Any]] = list(data_or_rows or [])
     fields: List[str] = list(out_path_or_fields or [])  # retained for future use
 
-    out_dir = Path("output/exports")
+    out_dir = SETTINGS.exports_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "report.pdf"
 

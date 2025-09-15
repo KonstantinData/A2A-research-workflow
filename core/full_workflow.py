@@ -42,7 +42,7 @@ from core.sources_registry import SOURCES
 
 
 def _ensure_output_dir() -> Path:
-    out_dir = Path(os.getenv("OUTPUT_DIR", "output")) / "exports"
+    out_dir = SETTINGS.exports_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     return out_dir
 

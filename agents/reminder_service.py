@@ -15,6 +15,7 @@ from core import tasks, task_history, statuses as status_defs
 from core.utils import get_workflow_id
 from integrations import email_client, email_sender
 from agents.templates import build_reminder_email
+from config.settings import SETTINGS
 
 # JSONL logging for reminder notifications
 _JSONL_PATH = Path(__file__).resolve().parents[1] / "a2a_logging" / "jsonl_sink.py"
@@ -23,7 +24,10 @@ _mod = _ilu.module_from_spec(_spec)
 assert _spec and _spec.loader
 _spec.loader.exec_module(_mod)  # type: ignore[attr-defined]
 append_jsonl = _mod.append
-_REMINDER_LOG = Path("logs") / "workflows" / "reminders.jsonl"
+
+
+def _reminder_log_path() -> Path:
+    return SETTINGS.workflows_dir / "reminders.jsonl"
 
 
 logger = logging.getLogger(__name__)
@@ -32,7 +36,7 @@ logger = logging.getLogger(__name__)
 def log_event(record: dict) -> None:
     """Write ``record`` to a workflow JSONL log with a common schema."""
     ts = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-    path = Path("logs") / "workflows" / f"{ts}_workflow.jsonl"
+    path = SETTINGS.workflows_dir / f"{ts}_workflow.jsonl"
     payload = {
         "event_id": record.get("event_id"),
         "status": record.get("status"),
@@ -46,6 +50,7 @@ def log_event(record: dict) -> None:
             payload["details"][k] = v
         elif k == "details" and isinstance(v, dict):
             payload["details"].update(v)
+    SETTINGS.workflows_dir.mkdir(parents=True, exist_ok=True)
     append_jsonl(path, payload)
 
 
@@ -170,7 +175,7 @@ class ReminderScheduler:
 def check_and_notify(triggers: list[dict]) -> None:
     """Send reminder e-mails for triggers with pending/pending_admin status."""
     wf_id = get_workflow_id()
-    log_path = Path("logs") / "workflows" / f"{wf_id}.jsonl"
+    log_path = SETTINGS.workflows_dir / f"{wf_id}.jsonl"
     statuses: dict[str, str] = {}
     if log_path.exists():
         try:
@@ -203,8 +208,10 @@ def check_and_notify(triggers: list[dict]) -> None:
             subject=email["subject"],
             body=email["body"],
         )
+        reminder_log = _reminder_log_path()
+        reminder_log.parent.mkdir(parents=True, exist_ok=True)
         append_jsonl(
-            _REMINDER_LOG,
+            reminder_log,
             {
                 "timestamp": datetime.utcnow().isoformat() + "Z",
                 "status": "reminder_sent",

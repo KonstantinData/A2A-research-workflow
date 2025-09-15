@@ -14,11 +14,13 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
+from config.settings import SETTINGS
+
 Normalized = Dict[str, Any]
 
 
 def _read_artifact(filename: str) -> List[str]:
-    path = Path("artifacts") / filename
+    path = SETTINGS.artifacts_dir / filename
     try:
         text = path.read_text(encoding="utf-8")
         data = json.loads(text)

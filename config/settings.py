@@ -2,12 +2,27 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import List
+
+
+def _default_root() -> Path:
+    project_root = os.getenv("PROJECT_ROOT")
+    if project_root:
+        return Path(project_root).expanduser()
+    return Path(__file__).resolve().parent.parent
 
 
 @dataclass
 class _Settings:
     """Centralised runtime configuration loaded from environment variables."""
+
+    root_dir: Path = field(default_factory=_default_root)
+    logs_dir: Path = field(init=False)
+    workflows_dir: Path = field(init=False)
+    output_dir: Path = field(init=False)
+    exports_dir: Path = field(init=False)
+    artifacts_dir: Path = field(init=False)
 
     # --- Calendar / Contacts ---
     cal_lookback_days: int = field(
@@ -63,6 +78,45 @@ class _Settings:
     allow_static_company_data: bool = field(
         default_factory=lambda: os.getenv("ALLOW_STATIC_COMPANY_DATA", "0") == "1"
     )
+
+    def __post_init__(self) -> None:
+        self.root_dir = Path(self.root_dir).expanduser()
+        if not self.root_dir.is_absolute():
+            base = Path(__file__).resolve().parent.parent
+            self.root_dir = (base / self.root_dir).resolve()
+        else:
+            self.root_dir = self.root_dir.resolve()
+
+        self.logs_dir = self._resolve_path(os.getenv("LOGS_DIR", "logs"))
+        self.output_dir = self._resolve_path(os.getenv("OUTPUT_DIR", "output"))
+        self.artifacts_dir = self._resolve_path(os.getenv("ARTIFACTS_DIR", "artifacts"))
+
+        workflows_override = os.getenv("WORKFLOWS_DIR")
+        if workflows_override:
+            self.workflows_dir = self._resolve_path(workflows_override)
+        else:
+            workflows_subdir = os.getenv("WORKFLOWS_SUBDIR", "workflows")
+            self.workflows_dir = self._resolve_subpath(self.logs_dir, workflows_subdir)
+
+        exports_override = os.getenv("EXPORTS_DIR")
+        if exports_override:
+            self.exports_dir = self._resolve_path(exports_override)
+        else:
+            exports_subdir = os.getenv("EXPORTS_SUBDIR", "exports")
+            self.exports_dir = self._resolve_subpath(self.output_dir, exports_subdir)
+
+    def _resolve_path(self, value: str | Path) -> Path:
+        path = Path(value).expanduser()
+        if not path.is_absolute():
+            path = self.root_dir / path
+        return path
+
+    @staticmethod
+    def _resolve_subpath(base: Path, value: str | Path) -> Path:
+        sub_path = Path(value).expanduser()
+        if sub_path.is_absolute():
+            return sub_path
+        return base / sub_path
 
 
 SETTINGS = _Settings()

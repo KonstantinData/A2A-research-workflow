@@ -6,6 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from agents import digest
 import integrations.email_sender as email_sender
+from config.settings import SETTINGS
 
 
 def test_send_daily_admin_digest_builds_body(monkeypatch, tmp_path):
@@ -24,7 +25,7 @@ def test_send_daily_admin_digest_builds_body(monkeypatch, tmp_path):
             "empty_run": False,
         },
     }
-    summary_path = Path("logs/workflows")
+    summary_path = SETTINGS.workflows_dir
     summary_path.mkdir(parents=True)
     (summary_path / "summary.json").write_text(json.dumps(summary))
 

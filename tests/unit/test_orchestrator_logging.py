@@ -7,6 +7,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from core import orchestrator, statuses
+from config.settings import SETTINGS
 
 
 def test_gather_triggers_logs_discard_reasons(tmp_path, monkeypatch):
@@ -24,13 +25,13 @@ def test_gather_triggers_logs_discard_reasons(tmp_path, monkeypatch):
     assert len(triggers) == 1
     assert triggers[0]["payload"]["event_id"] == "2"
 
-    log_file = Path("logs") / "workflows" / "calendar.jsonl"
+    log_file = SETTINGS.workflows_dir / "calendar.jsonl"
     records = [json.loads(line) for line in log_file.read_text().splitlines()]
     reasons = [r.get("reason") for r in records if r.get("status") == "event_discarded"]
     assert "no_trigger_match" in reasons
     assert "missing_fields" not in reasons
 
-    wf_log = next((Path("logs") / "workflows").glob("wf-*.jsonl"))
+    wf_log = next(SETTINGS.workflows_dir.glob("wf-*.jsonl"))
     wf_records = [json.loads(line) for line in wf_log.read_text().splitlines()]
     assert any(r.get("status") == statuses.NOT_RELEVANT and r.get("event_id") == "1" for r in wf_records)
 

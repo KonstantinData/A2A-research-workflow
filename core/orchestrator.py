@@ -78,8 +78,8 @@ def _assert_live_ready() -> None:
 
 
 def _copy_run_logs_to_export(workflow_id: str) -> None:
-    src = Path("logs/workflows")
-    dst = Path("output/exports/run_logs")
+    src = SETTINGS.workflows_dir
+    dst = SETTINGS.exports_dir / "run_logs"
     # Replace any previous run logs so this directory mirrors the current run
     shutil.rmtree(dst, ignore_errors=True)
     dst.mkdir(parents=True, exist_ok=True)
@@ -131,7 +131,7 @@ def _latest_status(event_id: str) -> Optional[str]:
     """Return the last non-``fetched`` status for ``event_id`` from workflow logs."""
     if not event_id:
         return None
-    base = Path("logs") / "workflows"
+    base = SETTINGS.workflows_dir
     if not base.exists():
         return None
     latest: Optional[str] = None
