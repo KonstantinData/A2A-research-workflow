@@ -7,6 +7,13 @@ from core import orchestrator
 from config.settings import SETTINGS
 
 
+def _write_stub_pdf(out_path: Path | str | None) -> Path:
+    target = Path(out_path) if out_path else SETTINGS.exports_dir / "report.pdf"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("pdf")
+    return target
+
+
 def test_trigger_from_location_or_attendee():
     ev = {"summary": "Weekly sync", "description": "", "location": "Meeting Vorbereitung"}
     assert orchestrator._as_trigger_from_event(ev) is not None
@@ -39,7 +46,7 @@ def test_no_enriched_log_when_fields_present(monkeypatch, tmp_path):
         triggers=[trig],
         researchers=[],
         consolidate_fn=lambda r: {},
-        pdf_renderer=lambda data, path: path.write_text("pdf"),
+        pdf_renderer=lambda rows, fields, meta=None, out_path=None: _write_stub_pdf(out_path),
         csv_exporter=lambda data, path: path.write_text("csv"),
         hubspot_upsert=lambda d: None,
         hubspot_attach=lambda p, c: None,

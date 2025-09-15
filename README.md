@@ -231,7 +231,9 @@ Key directories:
 - `agents/` – individual research agents.
 - `core/` – orchestration, classification, consolidation, and workflow helpers.
 - `integrations/` – external service clients (HubSpot, Google, email) and templates.
-- `output/` – PDF and CSV rendering utilities.
+- `output/` – PDF and CSV rendering utilities. The `pdf_render.render_pdf`
+  helper now accepts `(rows, fields, meta=None, out_path=None)` and returns the
+  written path; the legacy `(mapping, path)` signature is deprecated.
 - `schemas/` – JSON schema definitions.
 - `compliance/` – GDPR helpers.
 - `a2a_logging/` – logging utilities and error definitions.

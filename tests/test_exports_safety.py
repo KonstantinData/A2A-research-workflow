@@ -37,3 +37,13 @@ def test_pdf_raises_in_live_mode(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError):
         pdf_render.render_pdf(rows, ["company_name"], {"reason": "no_triggers"})
 
+
+def test_legacy_wrapper_emits_warning(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("LIVE_MODE", "0")
+    payload = {"rows": [], "fields": [], "meta": {"reason": "legacy"}}
+    out_path = SETTINGS.exports_dir / "legacy.pdf"
+    with pytest.deprecated_call():
+        pdf_render.render_pdf_from_mapping(payload, out_path)
+    assert out_path.exists()
+

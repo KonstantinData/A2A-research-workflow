@@ -10,6 +10,13 @@ from core import orchestrator, statuses
 from config.settings import SETTINGS
 
 
+def _write_stub_pdf(out_path: Path | str | None) -> Path:
+    target = Path(out_path) if out_path else SETTINGS.exports_dir / "report.pdf"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("pdf")
+    return target
+
+
 def test_gather_triggers_logs_discard_reasons(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     events = [
@@ -111,7 +118,7 @@ def test_run_invokes_recovery_on_failure(tmp_path, monkeypatch):
     orchestrator.run(
         triggers=trig,
         researchers=[],
-        pdf_renderer=lambda d, p: None,
+        pdf_renderer=lambda rows, fields, meta=None, out_path=None: _write_stub_pdf(out_path),
         csv_exporter=lambda d, p: None,
         hubspot_upsert=fail_hubspot,
         hubspot_attach=lambda p, c: None,

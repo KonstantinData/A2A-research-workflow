@@ -242,7 +242,10 @@ def run(
     consolidate_fn: (
         Callable[[List[Dict[str, Any]]], Dict[str, Any]] | None
     ) = lambda r: {},
-    pdf_renderer: Callable[[Dict[str, Any], Path], None] | None = None,
+    pdf_renderer: (
+        Callable[[List[Dict[str, Any]], List[str], Dict[str, Any] | None, Path | None], Path]
+        | None
+    ) = None,
     csv_exporter: Callable[[List[Dict[str, Any]], Path], None] | None = None,
     hubspot_upsert: Callable[[Dict[str, Any]], Any] | None = lambda d: None,
     hubspot_attach: Callable[[Path, Any], None] | None = lambda p, c: None,
