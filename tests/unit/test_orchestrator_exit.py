@@ -6,6 +6,13 @@ from agents import recovery_agent
 from config.settings import SETTINGS
 
 
+def _write_stub_pdf(out_path: Path | str | None) -> Path:
+    target = Path(out_path) if out_path else SETTINGS.exports_dir / "report.pdf"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("pdf")
+    return target
+
+
 def test_main_handles_string_exit(monkeypatch):
     def fake_run():
         raise SystemExit("No real calendar events detected – aborting run")
@@ -51,7 +58,7 @@ def test_run_logs_resumed_on_restart(tmp_path, monkeypatch):
     orchestrator.run(
         triggers=trig,
         researchers=[],
-        pdf_renderer=lambda d, p: None,
+        pdf_renderer=lambda rows, fields, meta=None, out_path=None: _write_stub_pdf(out_path),
         csv_exporter=lambda d, p: None,
         hubspot_upsert=lambda d: None,
         hubspot_attach=lambda p, c: None,

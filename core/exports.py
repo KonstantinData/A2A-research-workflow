@@ -6,17 +6,16 @@ from typing import Any, Callable, Dict, List, Tuple
 from config.settings import SETTINGS
 
 
+PdfRenderer = Callable[[List[Dict[str, Any]], List[str], Dict[str, Any] | None, Path | None], Path]
+CsvExporter = Callable[[List[Dict[str, Any]], Path], None]
+
+
 def resolve_exporters(
-    pdf_renderer: Callable[[Dict[str, Any], Path], None] | None,
-    csv_exporter: Callable[[List[Dict[str, Any]], Path], None] | None,
+    pdf_renderer: PdfRenderer | None,
+    csv_exporter: CsvExporter | None,
     *,
     test_mode: bool,
-) -> Tuple[
-    Callable[[Dict[str, Any], Path], None],
-    Callable[[List[Dict[str, Any]], Path], None],
-    Callable[[Dict[str, Any], Path], None],
-    Callable[[List[Dict[str, Any]], Path], None],
-]:
+) -> Tuple[PdfRenderer, CsvExporter, PdfRenderer, CsvExporter]:
     from output import csv_export as csv_module
     from output import pdf_render as pdf_module
 
@@ -47,14 +46,13 @@ def create_idle_artifacts(
     pdf_path = outdir / "report.pdf"
     csv_path = outdir / "data.csv"
 
-    empty_report = {
-        "fields": ["info"],
-        "rows": [{"info": "No valid triggers in current window"}],
-        "meta": {"reason": "no_triggers"},
-    }
-
     try:
-        pdf_render.render_pdf(empty_report, pdf_path)
+        pdf_render.render_pdf(
+            [{"info": "No valid triggers in current window"}],
+            ["info"],
+            {"reason": "no_triggers"},
+            pdf_path,
+        )
         log_event({"status": "artifact_pdf", "path": str(pdf_path)})
     except Exception as exc:
         log_event(
@@ -83,10 +81,10 @@ def create_idle_artifacts(
 def export_report(
     consolidated: Dict[str, Any],
     first_event_id: Any,
-    pdf_renderer: Callable[[Dict[str, Any], Path], None],
-    csv_exporter: Callable[[List[Dict[str, Any]], Path], None],
-    fallback_pdf: Callable[[Dict[str, Any], Path], None],
-    fallback_csv: Callable[[List[Dict[str, Any]], Path], None],
+    pdf_renderer: PdfRenderer,
+    csv_exporter: CsvExporter,
+    fallback_pdf: PdfRenderer,
+    fallback_csv: CsvExporter,
     *,
     log_event: Callable[[Dict[str, Any]], None],
     log_step: Callable[[str, str, Dict[str, Any]], None],
@@ -97,17 +95,20 @@ def export_report(
     pdf_path = outdir / "report.pdf"
     csv_path = outdir / "data.csv"
 
-    pdf_renderer(consolidated, pdf_path)
-    csv_exporter(consolidated.get("rows", []), csv_path)
+    rows = list(consolidated.get("rows") or [])
+    fields = list(consolidated.get("fields") or [])
+    meta = consolidated.get("meta")
+    meta_dict = dict(meta) if isinstance(meta, dict) else None
+
+    pdf_path = pdf_renderer(rows, fields, meta_dict, pdf_path)
+    csv_exporter(rows, csv_path)
 
     try:
         if pdf_path.exists() and pdf_path.stat().st_size < 1000:
             fallback_pdf(
-                {
-                    "fields": ["info"],
-                    "rows": [{"info": "invalid_artifact_detected"}],
-                    "meta": {},
-                },
+                [{"info": "invalid_artifact_detected"}],
+                ["info"],
+                {"reason": "invalid_artifact_detected"},
                 pdf_path,
             )
         if csv_path.exists() and csv_path.stat().st_size < 5:

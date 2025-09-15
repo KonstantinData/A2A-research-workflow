@@ -174,7 +174,14 @@ def run_full_workflow(
         csv_path = out_dir / "data.csv"
         # Write reports
         try:
-            pdf_render.render_pdf(consolidated, pdf_path)
+            meta = consolidated.get("meta")
+            meta_dict = dict(meta) if isinstance(meta, dict) else None
+            pdf_render.render_pdf(
+                list(consolidated.get("rows") or []),
+                list(consolidated.get("fields") or []),
+                meta_dict,
+                pdf_path,
+            )
         except Exception:
             pass
         try:

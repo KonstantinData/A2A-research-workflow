@@ -1,27 +1,21 @@
 # output/pdf_render.py
 """PDF rendering helpers.
 
-This module provides a small wrapper around WeasyPrint (when available) and a
-fallback implementation for environments without the dependency.  To remain
-compatible with legacy tests the exposed :func:`render_pdf` function accepts two
-different calling conventions:
-
-``render_pdf(mapping, path)``
-    Serialises ``mapping`` to HTML and writes the result to ``path``.  This is
-    the behaviour that existed before this change and is still used by several
-    integration tests.
-
-``render_pdf(rows, fields, meta=None)``
-    New behaviour used by export safety tests.  The report is written to
-    ``output/exports/report.pdf`` and if ``rows`` is empty an empty PDF is
-    generated explaining why no data is available.
+The public :func:`render_pdf` helper renders tabular PDF reports from an
+iterable of row dictionaries.  It writes the PDF to ``out_path`` (or the
+default exports directory) and returns the resulting :class:`~pathlib.Path`.
+For legacy call sites that still provide a mapping and output path a
+compatibility wrapper :func:`render_pdf_from_mapping` is available.  The
+wrapper emits a :class:`DeprecationWarning` to encourage migration to the
+unified API.
 """
 
 from __future__ import annotations
 
 import os
+import warnings
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Mapping
 
 from config.settings import SETTINGS
 
@@ -116,83 +110,76 @@ def _write_html_pdf(html: str, out_path: Path) -> None:
 
 
 def render_pdf(
-    data_or_rows: Any,
-    out_path_or_fields: Any,
-    meta: Dict[str, Any] | None = None,
-) -> None:
-    """Render a PDF report.
-
-    Parameters
-    ----------
-    data_or_rows:
-        Mapping of data (legacy mode) or iterable of row dictionaries.
-    out_path_or_fields:
-        Target path (legacy) or iterable of field names (new mode).
-    meta:
-        Optional metadata used in new mode to provide a reason for empty
-        exports.
-    """
+    rows: list[dict[str, Any]],
+    fields: list[str],
+    meta: dict[str, Any] | None = None,
+    out_path: Path | None = None,
+) -> Path:
+    """Render ``rows`` into a PDF table and return the written path."""
 
     live_mode = os.getenv("LIVE_MODE", "1") == "1"
 
     if live_mode:
         _ensure_weasyprint()
 
-    # --- Legacy behaviour: render_pdf(data, out_path) -------------------
-    if isinstance(out_path_or_fields, (str, Path)):
-        out_path = Path(out_path_or_fields)
-        html = _html_from_data(data_or_rows)
-        try:
-            _write_html_pdf(html, out_path)
-        except Exception:
-            if live_mode:
-                raise
-            out_path.write_text(html, encoding="utf-8")
-        return
+    normalized_rows: List[Dict[str, Any]] = list(rows or [])
+    normalized_fields: List[str] = list(fields or [])
+    normalized_meta: Dict[str, Any] = dict(meta or {})
 
-    # --- New behaviour: render_pdf(rows, fields, meta) -------------------
-    rows: List[Dict[str, Any]] = list(data_or_rows or [])
-    fields: List[str] = list(out_path_or_fields or [])  # retained for future use
+    destination = Path(out_path) if out_path else SETTINGS.exports_dir / "report.pdf"
+    destination.parent.mkdir(parents=True, exist_ok=True)
 
-    out_dir = SETTINGS.exports_dir
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / "report.pdf"
-
-    if not rows:
-        # Render ein Minimal-HTML mit WeasyPrint (wenn vorhanden); nur wenn weder
-        # WeasyPrint noch ReportLab verfügbar sind, auf Text ausweichen.
-        reason = (meta or {}).get("reason") if meta else None
-        empty = {
+    if not normalized_rows:
+        reason = normalized_meta.get("reason")
+        empty_payload = {
             "fields": ["info"],
             "rows": [
                 {
                     "info": f"No data to report. Reason: {reason or 'No valid triggers'}",
                 }
             ],
-            "meta": meta or {},
+            "meta": normalized_meta,
         }
-        html = _html_from_data(empty)
+        html = _html_from_data(empty_payload)
         try:
-            _write_html_pdf(html, out_path)
-            return
+            _write_html_pdf(html, destination)
         except Exception:
             if live_mode:
                 raise
             try:
-                _write_empty_pdf(out_path, reason)
-                return
+                _write_empty_pdf(destination, reason)
             except Exception:
-                out_path.write_text(html, encoding="utf-8")
-                return
+                destination.write_text(html, encoding="utf-8")
+        return destination
 
-    data = {"rows": rows, "fields": fields, "meta": meta or {}}
+    data = {"rows": normalized_rows, "fields": normalized_fields, "meta": normalized_meta}
     html = _html_from_data(data)
     try:
-        _write_html_pdf(html, out_path)
+        _write_html_pdf(html, destination)
     except Exception:
         if live_mode:
             raise
-        out_path.write_text(html, encoding="utf-8")
+        destination.write_text(html, encoding="utf-8")
+    return destination
+
+
+def render_pdf_from_mapping(data: Mapping[str, Any], out_path: Path | str) -> Path:
+    """Compatibility wrapper for the deprecated ``render_pdf(mapping, path)`` API."""
+
+    warnings.warn(
+        "render_pdf(mapping, path) is deprecated; call render_pdf(rows, fields, meta, out_path) instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    rows = list(data.get("rows") or [])  # type: ignore[arg-type]
+    fields = list(data.get("fields") or [])  # type: ignore[arg-type]
+    meta = data.get("meta")
+    normalized_meta: Dict[str, Any] | None
+    if isinstance(meta, Mapping):
+        normalized_meta = dict(meta)
+    else:
+        normalized_meta = None
+    return render_pdf(rows, fields, normalized_meta, Path(out_path))
 
 
 __all__ = ["render_pdf"]

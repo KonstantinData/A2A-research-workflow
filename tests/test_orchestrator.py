@@ -21,6 +21,13 @@ def _dummy_trigger():
     }
 
 
+def _write_stub_pdf(out_path: Path | str | None, content: str = "pdf") -> Path:
+    target = Path(out_path) if out_path else SETTINGS.exports_dir / "report.pdf"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(content)
+    return target
+
+
 def test_run_exits_when_no_triggers(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(orchestrator, "gather_triggers", lambda *a, **k: [])
@@ -45,9 +52,9 @@ def test_run_processes_with_triggers(monkeypatch, tmp_path):
 
     called = {"pdf": 0, "csv": 0}
 
-    def fake_pdf(data, path):
+    def fake_pdf(rows, fields, meta=None, out_path=None):
         called["pdf"] += 1
-        path.write_text("pdf")
+        return _write_stub_pdf(out_path)
 
     def fake_csv(data, path):
         called["csv"] += 1
@@ -89,7 +96,7 @@ def test_run_processes_event_missing_fields(monkeypatch, tmp_path):
         triggers=triggers,
         researchers=[],
         consolidate_fn=lambda r: {},
-        pdf_renderer=lambda data, path: path.write_text("pdf"),
+        pdf_renderer=lambda rows, fields, meta=None, out_path=None: _write_stub_pdf(out_path),
         csv_exporter=lambda data, path: path.write_text("csv"),
         hubspot_upsert=lambda d: None,
         hubspot_attach=lambda p, c: None,
@@ -112,7 +119,11 @@ def test_run_raises_contacts_fetch_failed_live_mode(monkeypatch, tmp_path):
     records = []
     monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
     from output import pdf_render, csv_export
-    monkeypatch.setattr(pdf_render, "render_pdf", lambda data, path: None)
+    monkeypatch.setattr(
+        pdf_render,
+        "render_pdf",
+        lambda rows, fields, meta=None, out_path=None: _write_stub_pdf(out_path),
+    )
     monkeypatch.setattr(csv_export, "export_csv", lambda data, path: None)
 
     with pytest.raises(RuntimeError):
@@ -133,7 +144,11 @@ def test_run_handles_contacts_fetch_failed_test_mode(monkeypatch, tmp_path):
     records = []
     monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
     from output import pdf_render, csv_export
-    monkeypatch.setattr(pdf_render, "render_pdf", lambda data, path: None)
+    monkeypatch.setattr(
+        pdf_render,
+        "render_pdf",
+        lambda rows, fields, meta=None, out_path=None: _write_stub_pdf(out_path),
+    )
     monkeypatch.setattr(csv_export, "export_csv", lambda data, path: None)
 
     res = orchestrator.run()
