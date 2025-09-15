@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -18,6 +17,7 @@ from core.utils import (
     finalize_summary,
     get_workflow_id,
 )  # noqa: F401  # required_fields/optional_fields imported for completeness
+from core.logging import log_event
 from config.settings import SETTINGS
 from integrations.google_calendar import fetch_events, extract_company, extract_domain
 from integrations.google_contacts import fetch_contacts
@@ -43,19 +43,6 @@ from agents import (
     field_completion_agent,
     recovery_agent,
 )
-
-import importlib.util as _ilu
-
-# Fehlerbehandlung beim Import von jsonl_sink.py
-try:
-    _JSONL_PATH = Path(__file__).resolve().parents[1] / "logging" / "jsonl_sink.py"
-    _spec = _ilu.spec_from_file_location("jsonl_sink", _JSONL_PATH)
-    _mod = _ilu.module_from_spec(_spec)
-    assert _spec and _spec.loader
-    _spec.loader.exec_module(_mod)
-    append_jsonl = _mod.append
-except Exception as e:
-    raise ImportError(f"Could not import jsonl_sink.py: {e}")
 
 CAL_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
@@ -96,47 +83,6 @@ def _assert_live_ready() -> None:
     if missing:
         raise RuntimeError("LIVE readiness failed; missing: " + ", ".join(missing))
     log_event({"status": "live_assertions_passed"})
-
-
-# --------- kleine Logging-Helfer, von Tests gepatcht ---------
-def log_event(record: Dict[str, Any]) -> None:
-    """Append ``record`` to a JSONL workflow log file using a common template.
-
-    The workflow expects every entry to provide at least ``event_id`` and
-    ``status``.  Additional context is nested under ``details`` so that the log
-    structure remains consistent across services.
-    """
-
-    wf = get_workflow_id()
-    path = Path("logs") / "workflows" / f"{wf}.jsonl"
-
-    base: Dict[str, Any] = {
-        "event_id": record.get("event_id"),
-        "status": record.get("status"),
-        "timestamp": datetime.now(timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z"),
-        "severity": record.get("severity", "info"),
-        "workflow_id": get_workflow_id(),
-        "details": {},
-    }
-
-    # Collect any extra keys into the ``details`` field.
-    for k, v in record.items():
-        if k not in {
-            "event_id",
-            "status",
-            "timestamp",
-            "severity",
-            "workflow_id",
-            "details",
-        }:
-            base.setdefault("details", {})[k] = v
-        elif k == "details" and isinstance(v, dict):
-            base["details"].update(v)
-
-    append_jsonl(path, base)
 
 
 def _copy_run_logs_to_export(workflow_id: str) -> None:

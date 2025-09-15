@@ -90,7 +90,7 @@ def extract_domain(text: str) -> str | None:
 
 
 def fetch_events() -> List[Normalized]:
-    from core.orchestrator import log_event
+    from core.logging import log_event
 
     results: List[Normalized] = []
     if not build or not Credentials:

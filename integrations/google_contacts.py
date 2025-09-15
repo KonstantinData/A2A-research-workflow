@@ -77,7 +77,7 @@ def fetch_contacts(
         page_limit = SETTINGS.contacts_page_limit
     if build is None or Request is None:  # pragma: no cover
         log_step("contacts", "google_api_client_missing", {}, severity="error")
-        from core.orchestrator import log_event
+        from core.logging import log_event
         log_event({"status": "google_api_client_missing", "severity": "error"})
         if os.getenv("LIVE_MODE", "1") == "1":
             raise RuntimeError("google_api_client_missing")
@@ -92,7 +92,7 @@ def fetch_contacts(
                 {"mode": "v2-only"},
                 severity="error",
             )
-            from core.orchestrator import log_event
+            from core.logging import log_event
             log_event(
                 {
                     "status": "missing_google_oauth_env",
@@ -109,7 +109,7 @@ def fetch_contacts(
             try:
                 creds.token = refresh_access_token()
             except OAuthError:
-                from core.orchestrator import log_event
+                from core.logging import log_event
 
                 log_event({"status": "google_invalid_grant", "severity": "error"})
                 return []
@@ -124,7 +124,7 @@ def fetch_contacts(
         out: List[Dict[str, Any]] = []
         page_token: Optional[str] = None
         pages = 0
-        from core.orchestrator import log_event
+        from core.logging import log_event
         while True:  # pragma: no cover (in CI meist gemonkeypatched)
             resp = (
                 service.people()
@@ -158,7 +158,7 @@ def fetch_contacts(
             {"error": str(e), "code": code, "hint": hint, "client_id_tail": cid_tail},
             severity="error",
         )
-        from core.orchestrator import log_event
+        from core.logging import log_event
         log_event(
             {
                 "status": "contacts_fetch_error",
