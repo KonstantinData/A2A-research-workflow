@@ -2,15 +2,16 @@
 from __future__ import annotations
 
 import email
-import email
 import imaplib
+import json
 import os
 import re
 import time
-import logging
+import logging as _py_logging
 from email.header import decode_header
+from email.message import Message
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 import importlib.util as _ilu
 
 from core import parser
@@ -23,7 +24,7 @@ assert _spec and _spec.loader
 _spec.loader.exec_module(_mod)
 append_jsonl = _mod.append
 
-logger = logging.getLogger(__name__)
+logger = _py_logging.getLogger(__name__)
 
 
 def _reply_log_path() -> Path:
@@ -36,6 +37,105 @@ def _append_reply_log(record: Dict[str, Any]) -> None:
     append_jsonl(path, record)
 
 
+def _state_path() -> Path:
+    return SETTINGS.workflows_dir / "email_reader_state.json"
+
+
+def _normalize_message_id(value: str | None) -> str:
+    if not value:
+        return ""
+    cleaned = value.strip()
+    if cleaned.startswith("<"):
+        cleaned = cleaned[1:]
+    if cleaned.endswith(">"):
+        cleaned = cleaned[:-1]
+    return cleaned.strip().lower()
+
+
+def _load_state() -> Dict[str, Any]:
+    default = {"processed_message_ids": [], "correlation_index": {}}
+    path = _state_path()
+    if not path.exists():
+        return default.copy()
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except Exception:
+        return default.copy()
+
+    processed = data.get("processed_message_ids")
+    if not isinstance(processed, list):
+        processed = []
+
+    raw_index = data.get("correlation_index")
+    index: Dict[str, Dict[str, str]] = {}
+    if isinstance(raw_index, dict):
+        for key, value in raw_index.items():
+            if not isinstance(key, str) or not isinstance(value, dict):
+                continue
+            normalized_key = _normalize_message_id(key)
+            if not normalized_key:
+                continue
+            entry = {}
+            task_val = value.get("task_id")
+            event_val = value.get("event_id")
+            if isinstance(task_val, str) and task_val:
+                entry["task_id"] = task_val
+            if isinstance(event_val, str) and event_val:
+                entry["event_id"] = event_val
+            if entry:
+                index[normalized_key] = entry
+
+    return {"processed_message_ids": processed, "correlation_index": index}
+
+
+def _save_state(state: Dict[str, Any]) -> None:
+    path = _state_path()
+    payload = {
+        "processed_message_ids": sorted(
+            {
+                _normalize_message_id(mid)
+                for mid in state.get("processed_message_ids", [])
+                if _normalize_message_id(mid)
+            }
+        ),
+        "correlation_index": state.get("correlation_index", {}),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+
+def record_outbound_message(
+    message_id: str,
+    *,
+    task_id: str | None = None,
+    event_id: str | None = None,
+) -> None:
+    """Persist correlation metadata for an outbound message.
+
+    The IMAP reply processor records outbound message identifiers so that
+    incoming replies can be matched purely via headers.  The mapping is stored
+    alongside the processed message tracking state to ensure restarts do not
+    lose correlation information.
+    """
+
+    normalized = _normalize_message_id(message_id)
+    if not normalized:
+        return
+
+    state = _load_state()
+    index = state.setdefault("correlation_index", {})
+    entry = index.get(normalized, {}).copy()
+    if task_id:
+        entry["task_id"] = task_id
+    if event_id:
+        entry["event_id"] = event_id
+    if entry:
+        index[normalized] = entry
+        state["correlation_index"] = index
+        _save_state(state)
+
+
 def _decode(value: str) -> str:
     parts = decode_header(value)
     decoded = ""
@@ -45,6 +145,73 @@ def _decode(value: str) -> str:
         else:
             decoded += part
     return decoded
+
+
+_MESSAGE_ID_PATTERN = re.compile(r"<[^>]+>")
+_TASK_ID_PATTERN = re.compile(r"Task ([A-Fa-f0-9-]{36})")
+_EVENT_ID_PATTERN = re.compile(r"Event (\d{4}-\d{2}-\d{2})_(\d{4})")
+
+
+def _header_message_ids(msg: Message) -> List[str]:
+    message_ids: List[str] = []
+    for header in ("In-Reply-To", "References"):
+        for value in msg.get_all(header, []):
+            if not value:
+                continue
+            matches = _MESSAGE_ID_PATTERN.findall(value)
+            if matches:
+                message_ids.extend(_normalize_message_id(m) for m in matches)
+            else:
+                message_ids.append(_normalize_message_id(value))
+    return [mid for mid in message_ids if mid]
+
+
+def _correlate_from_headers(msg: Message, index: Dict[str, Dict[str, str]]) -> Tuple[str, str]:
+    for message_id in _header_message_ids(msg):
+        entry = index.get(message_id)
+        if not entry:
+            continue
+        task_id = entry.get("task_id", "")
+        event_id = entry.get("event_id", "")
+        if task_id or event_id:
+            return task_id, event_id
+    return "", ""
+
+
+def _extract_ids_from_subject(subject: str) -> Tuple[str, str]:
+    task_id = ""
+    event_id = ""
+    task_match = _TASK_ID_PATTERN.search(subject)
+    if task_match:
+        task_id = task_match.group(1)
+    event_match = _EVENT_ID_PATTERN.search(subject)
+    if event_match:
+        event_id = f"{event_match.group(1)}_{event_match.group(2)}"
+    return task_id, event_id
+
+
+def _update_correlation_index(
+    index: Dict[str, Dict[str, str]],
+    message_ids: List[str],
+    task_id: str,
+    event_id: str,
+) -> bool:
+    changed = False
+    if not message_ids or not (task_id or event_id):
+        return False
+    for mid in message_ids:
+        if not mid:
+            continue
+        entry = index.get(mid, {}).copy()
+        before = entry.copy()
+        if task_id:
+            entry["task_id"] = task_id
+        if event_id:
+            entry["event_id"] = event_id
+        if entry != before:
+            index[mid] = entry
+            changed = True
+    return changed
 
 
 def fetch_replies() -> List[Dict[str, Any]]:
@@ -61,6 +228,17 @@ def fetch_replies() -> List[Dict[str, Any]]:
         )
         return []
 
+    state = _load_state()
+    processed_ids = {
+        mid
+        for mid in (
+            _normalize_message_id(m) for m in state.get("processed_message_ids", [])
+        )
+        if mid
+    }
+    correlation_index: Dict[str, Dict[str, str]] = state.get("correlation_index", {}).copy()
+    state_changed = False
+
     results: List[Dict[str, Any]] = []
     imap = imaplib.IMAP4_SSL(host, port)
     imap.login(user, pwd)
@@ -69,22 +247,49 @@ def fetch_replies() -> List[Dict[str, Any]]:
     ids = data[0].split() if typ == "OK" else []
     for msg_id in ids:
         typ, msg_data = imap.fetch(msg_id, "(RFC822)")
-        if typ != "OK":
+        if typ != "OK" or not msg_data:
             continue
         msg = email.message_from_bytes(msg_data[0][1])
+        message_id_header = msg.get("Message-ID") or msg.get("Message-Id")
+        message_id = _normalize_message_id(message_id_header)
+        if not message_id:
+            try:
+                uid = msg_id.decode() if isinstance(msg_id, bytes) else str(msg_id)
+            except Exception:
+                uid = str(msg_id)
+            message_id = f"imap-{uid}"
+
+        if message_id in processed_ids:
+            _append_reply_log(
+                {
+                    "status": "reply_duplicate_skipped",
+                    "message_id": message_id,
+                    "severity": "info",
+                }
+            )
+            imap.store(msg_id, "+FLAGS", "(\\Seen)")
+            continue
+
         subject = _decode(msg.get("Subject", ""))
         if "[Research Agent] Missing Information" not in subject:
             continue
-        # Extract a task identifier when present (e.g. "Task 123e4567-e89b-12d3-a456-426655440000")
-        task_match = re.search(r"Task ([A-Fa-f0-9-]{36})", subject)
-        # Fallback: extract event ID pattern from older subjects
-        event_match = re.search(r"Event (\d{4}-\d{2}-\d{2})_(\d{4})", subject)
-        task_id = ""
-        event_id = ""
-        if task_match:
-            task_id = task_match.group(1)
-        if event_match:
-            event_id = f"{event_match.group(1)}_{event_match.group(2)}"
+
+        header_task_id, header_event_id = _correlate_from_headers(msg, correlation_index)
+        task_id = header_task_id
+        event_id = header_event_id
+
+        subject_task_id, subject_event_id = _extract_ids_from_subject(subject)
+        if not task_id and subject_task_id:
+            task_id = subject_task_id
+        if not event_id and subject_event_id:
+            event_id = subject_event_id
+
+        referenced_ids = _header_message_ids(msg)
+        if _update_correlation_index(
+            correlation_index, referenced_ids, task_id, event_id
+        ):
+            state_changed = True
+
         from_addr = email.utils.parseaddr(msg.get("From"))[1]
 
         body = ""
@@ -120,6 +325,13 @@ def fetch_replies() -> List[Dict[str, Any]]:
         if mail_match:
             fields["email"] = mail_match.group(0)
 
+        processed_ids.add(message_id)
+        if _update_correlation_index(
+            correlation_index, [message_id], task_id, event_id
+        ):
+            state_changed = True
+        state_changed = True
+
         if fields:
             results.append(
                 {
@@ -136,9 +348,38 @@ def fetch_replies() -> List[Dict[str, Any]]:
                     "task_id": task_id or event_id,
                     "fields_completed": list(fields.keys()),
                     "source": "email",
-                },
+                    "message_id": message_id,
+                }
             )
+        else:
+            _append_reply_log(
+                {
+                    "status": "reply_no_fields",
+                    "task_id": task_id or event_id,
+                    "event_id": event_id,
+                    "message_id": message_id,
+                    "severity": "info",
+                }
+            )
+
+        if not (task_id or event_id):
+            _append_reply_log(
+                {
+                    "status": "reply_unmatched",
+                    "message_id": message_id,
+                    "severity": "warning",
+                }
+            )
+
         imap.store(msg_id, "+FLAGS", "(\\Seen)")
+
+    if state_changed:
+        _save_state(
+            {
+                "processed_message_ids": list(processed_ids),
+                "correlation_index": correlation_index,
+            }
+        )
 
     imap.logout()
     return results
@@ -156,5 +397,5 @@ def poll_replies(interval: int = 600) -> None:
         time.sleep(interval)
 
 
-__all__ = ["fetch_replies", "poll_replies"]
+__all__ = ["fetch_replies", "poll_replies", "record_outbound_message"]
 

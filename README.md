@@ -100,6 +100,16 @@ The refresh token is bound to the exact client (ID/secret); mixing clients cause
 5. Consolidate data and generate PDF/CSV outputs.
 6. Optionally enrich HubSpot with core fields and attach the PDF.
 
+### Email Reply Processing
+
+Reminder e-mails include deterministic ``Message-ID`` headers derived from the
+task or event identifier.  `integrations.email_reader.fetch_replies()` stores
+the identifiers of processed messages and uses the ``In-Reply-To`` and
+``References`` headers to correlate replies back to their tasks.  Duplicate
+messages are skipped idempotently while activity is logged to
+``logs/workflows/replies.jsonl``.  The detailed flow is documented in
+[`docs/email_reply_processing.md`](docs/email_reply_processing.md).
+
 ## Data Model
 
 ### Two‑Layer Company Model

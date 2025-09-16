@@ -10,7 +10,16 @@ from integrations import email_sender
 def test_send_reminder_formats_subject_and_body(monkeypatch):
     captured = {}
 
-    def fake_send(*, to, subject, body, sender=None, attachments=None, task_id=None):
+    def fake_send(
+        *,
+        to,
+        subject,
+        body,
+        sender=None,
+        attachments=None,
+        task_id=None,
+        event_id=None,
+    ):
         captured['subject'] = subject
         captured['body'] = body
 

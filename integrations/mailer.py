@@ -24,6 +24,7 @@ def send_email(
     secure: str = "ssl",
     attachments: list[str] | None = None,
     allowed_domain: str | None = None,
+    message_id: str | None = None,
 ) -> None:
     """Send an e-mail via SMTP using the selected security mode.
 
@@ -53,6 +54,8 @@ def send_email(
     msg["From"] = mail_from
     msg["To"] = recipient
     msg["Subject"] = subject
+    if message_id:
+        msg["Message-ID"] = message_id
 
     for path in attachments or []:
         p = Path(path)
