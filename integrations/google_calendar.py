@@ -125,7 +125,7 @@ def fetch_events() -> List[Normalized]:
             service.calendarList().get(calendarId=CAL_IDS[0]).execute()
         except Exception as e:
             code, hint = classify_oauth_error(e)
-            cid_tail = (os.getenv("GOOGLE_CLIENT_ID_V2") or "")[-8:]
+            cid_tail = (os.getenv("GOOGLE_CLIENT_ID") or "")[-8:]
             log_step(
                 "calendar",
                 "fetch_error",
@@ -173,7 +173,7 @@ def fetch_events() -> List[Normalized]:
         log_step("calendar", "fetch_ok", {"calendars": CAL_IDS, "count": len(results)})
     except Exception as e:  # pragma: no cover
         code, hint = classify_oauth_error(e)
-        cid_tail = (os.getenv("GOOGLE_CLIENT_ID_V2") or "")[-8:]
+        cid_tail = (os.getenv("GOOGLE_CLIENT_ID") or "")[-8:]
         log_step(
             "calendar",
             "fetch_error",

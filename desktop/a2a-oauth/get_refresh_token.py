@@ -3,7 +3,7 @@
 The legacy "out of band" (OOB) redirect has been deprecated by Google. This
 script now follows the recommended loopback redirect approach:
 
-1. Ensure ``GOOGLE_CLIENT_ID_V2`` and ``GOOGLE_CLIENT_SECRET_V2`` are defined
+1. Ensure ``GOOGLE_CLIENT_ID`` and ``GOOGLE_CLIENT_SECRET`` are defined
    in your environment (``.env``).
 2. Run the script. It spins up a temporary HTTP server on ``localhost:8888``
    and prints the consent URL.
@@ -128,11 +128,11 @@ def exchange_code_for_tokens(client_id: str, client_secret: str, code: str) -> d
 def main() -> None:
     load_dotenv()
 
-    client_id = os.getenv("GOOGLE_CLIENT_ID_V2")
-    client_secret = os.getenv("GOOGLE_CLIENT_SECRET_V2")
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
     if not client_id or not client_secret:
         raise SystemExit(
-            "GOOGLE_CLIENT_ID_V2 and GOOGLE_CLIENT_SECRET_V2 must be set in the environment/.env file."
+            "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set in the environment/.env file."
         )
 
     server_thread = start_callback_server()

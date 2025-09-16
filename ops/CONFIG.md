@@ -7,8 +7,8 @@ See repository README for common variables.
 
 ## Secrets
 - `HUBSPOT_ACCESS_TOKEN`
-- `GOOGLE_CLIENT_ID_V2`
-- `GOOGLE_CLIENT_SECRET_V2`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_REFRESH_TOKEN`
 - Optional: `GOOGLE_TOKEN_URI` (Default: https://oauth2.googleapis.com/token)
 - `SMTP_HOST` (optional)
