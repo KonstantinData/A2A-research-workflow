@@ -14,7 +14,16 @@ import config.env as env_module
 def test_email_client_delegates_to_email_sender(monkeypatch):
     calls = {}
 
-    def fake_send(*, to, subject, body, sender=None, attachments=None, task_id=None):
+    def fake_send(
+        *,
+        to,
+        subject,
+        body,
+        sender=None,
+        attachments=None,
+        task_id=None,
+        event_id=None,
+    ):
         calls['sender'] = sender
         calls['recipient'] = to
         calls['subject'] = subject

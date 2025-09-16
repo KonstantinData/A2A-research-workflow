@@ -9,14 +9,20 @@ the tests can assert against it.
 from __future__ import annotations
 
 from datetime import datetime
+from email.utils import make_msgid
 from typing import Optional, Sequence
+import logging as _py_logging
 import os
 import time
 from pathlib import Path
+import re
 
 from config.env import ensure_mail_from
 from .mailer import send_email as _send_email  # tatsächlicher SMTP/Provider-Client
 from core.utils import log_step
+from integrations import email_reader
+
+logger = _py_logging.getLogger(__name__)
 
 
 def _validate_recipient(to: str) -> str | None:
@@ -64,8 +70,36 @@ def _validate_recipient(to: str) -> str | None:
     return cleaned_to
 
 
+def _generate_message_id(identifier: Optional[str]) -> str | None:
+    if not identifier:
+        return None
+    token = re.sub(r"[^A-Za-z0-9.-]", "", identifier)
+    if not token:
+        return None
+    return make_msgid(idstring=f"task-{token}")
+
+
+def _record_outbound_correlation(
+    message_id: Optional[str], *, task_id: Optional[str], event_id: Optional[str]
+) -> None:
+    if not message_id:
+        return
+    try:
+        email_reader.record_outbound_message(
+            message_id, task_id=task_id, event_id=event_id
+        )
+    except Exception:
+        # Correlation is best-effort and must not interfere with sending.
+        logger.debug("Failed to record outbound message correlation", exc_info=True)
+
+
 def _deliver(
-    to: str, subject: str, body: str, attachments: Optional[Sequence[str]] = None
+    to: str,
+    subject: str,
+    body: str,
+    attachments: Optional[Sequence[str]] = None,
+    *,
+    message_id: Optional[str] = None,
 ) -> None:
     """Send message using environment configured SMTP credentials."""
     host = os.environ.get("SMTP_HOST")
@@ -96,6 +130,7 @@ def _deliver(
         secure=secure,
         attachments=list(attachments or []),
         allowed_domain=allowed_domain,
+        message_id=message_id,
     )
 
 
@@ -107,6 +142,7 @@ def send(
     sender: Optional[str] = None,
     attachments: Optional[Sequence[str]] = None,
     task_id: Optional[str] = None,
+    event_id: Optional[str] = None,
 ) -> None:
     """
     Generische Send-Funktion, die Tests monkeypatchen.
@@ -115,10 +151,15 @@ def send(
     if not validated_to:
         return
 
+    message_id = _generate_message_id(task_id)
+
     try:
-        _deliver(validated_to, subject, body, attachments)
+        _deliver(validated_to, subject, body, attachments, message_id=message_id)
         log_step(
             "orchestrator", "mail_sent", {"to": validated_to, "subject": subject}
+        )
+        _record_outbound_correlation(
+            message_id, task_id=task_id, event_id=event_id
         )
     except Exception as e:  # pragma: no cover - network errors
         log_step(
@@ -143,12 +184,14 @@ def send_email(
     sender: Optional[str] = None,
     attachments: Optional[Sequence[str]] = None,
     task_id: Optional[str] = None,
+    event_id: Optional[str] = None,
 ) -> None:
     """Wrapper around the low level mailer with logging and retries.
 
-    ``task_id`` may be supplied for correlation so that replies can be matched
-    to pending workflow items.  When provided it is logged with the message
-    metadata."""
+    ``task_id`` or ``event_id`` may be supplied for correlation so that
+    replies can be matched to pending workflow items.  When provided a
+    deterministic ``Message-ID`` is generated and persisted for the IMAP reply
+    processor."""
 
     validated_to = _validate_recipient(to)
     if not validated_to:
@@ -174,13 +217,24 @@ def send_email(
 
     delays = [5, 15, 45]
     last_exc: Exception | None = None
+    message_id = _generate_message_id(task_id)
+
     for attempt in range(3):
         try:
-            _deliver(validated_to, subject, body, attach_paths)
+            _deliver(
+                validated_to,
+                subject,
+                body,
+                attach_paths,
+                message_id=message_id,
+            )
             log_step(
                 "orchestrator",
                 "mail_sent",
                 {"to": validated_to, "subject": subject},
+            )
+            _record_outbound_correlation(
+                message_id, task_id=task_id, event_id=event_id
             )
             return
         except Exception as e:  # pragma: no cover - network errors
@@ -228,7 +282,12 @@ def request_missing_fields(task: dict, missing_fields: list[str], recipient_emai
         )
     )
 
-    send_email(to=recipient_email, subject=subject, body=body)
+    send_email(
+        to=recipient_email,
+        subject=subject,
+        body=body,
+        task_id=task.get("id"),
+    )
 
 
 def send_missing_fields_reminder(
@@ -262,7 +321,12 @@ def send_missing_fields_reminder(
     if allow and not recipient_email.lower().endswith(f"@{allow.lower()}"):
         log_step("mailer", "reminder_skipped_invalid_domain", {"to": recipient_email}, severity="warning")
         return
-    send_email(to=recipient_email, subject=subject, body=body)
+    send_email(
+        to=recipient_email,
+        subject=subject,
+        body=body,
+        task_id=task.get("id"),
+    )
 
 
 def send_reminder(
@@ -337,6 +401,7 @@ Thanks a lot for your support!
         subject=subject,
         body=body,
         task_id=task_id or event_id,
+        event_id=event_id,
     )
 
 
