@@ -57,6 +57,18 @@ directories (see `tests/conftest.py`).  All modules reference it instead
 of hard-coded strings, ensuring consistent behaviour across containers
 and environments.
 
+## Structured logging
+
+All integrations emit diagnostics through `core.utils.log_step(source, stage, details, severity=...)`.
+The helper enriches every record with the active workflow identifier, severity
+and variant before writing to the JSONL telemetry stream.  Integration modules
+must not create their own loggers or print statements; instead they should
+describe the relevant event in `details` and set the severity to `"error"` or
+`"critical"` for failure paths.  This keeps calendar, contacts, HubSpot and
+email integrations aligned with the orchestrator’s structured logging model and
+ensures downstream tooling receives consistent telemetry across all data
+sources.
+
 ## LIVE Setup
 
 1. Copy [`.env.example`](.env.example) to `.env` and fill in the credentials (SMTP/IMAP/HubSpot/Google variables see [`ops/CONFIG.md`](ops/CONFIG.md)).
@@ -106,9 +118,10 @@ Reminder e-mails include deterministic ``Message-ID`` headers derived from the
 task or event identifier.  `integrations.email_reader.fetch_replies()` stores
 the identifiers of processed messages and uses the ``In-Reply-To`` and
 ``References`` headers to correlate replies back to their tasks.  Duplicate
-messages are skipped idempotently while activity is logged to
-``logs/workflows/replies.jsonl``.  The detailed flow is documented in
-[`docs/email_reply_processing.md`](docs/email_reply_processing.md).
+messages are skipped idempotently while activity is emitted via
+``core.utils.log_step`` under the ``email_reader`` source, ensuring the
+structured telemetry stream captures every reply-handling outcome.  The detailed
+flow is documented in [`docs/email_reply_processing.md`](docs/email_reply_processing.md).
 
 ## Data Model
 

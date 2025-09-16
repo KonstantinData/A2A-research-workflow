@@ -10,6 +10,7 @@ from typing import Iterable, Optional
 import os
 
 from config.env import ensure_mail_from
+from core.utils import log_step
 
 from . import email_sender
 
@@ -35,6 +36,16 @@ def send_email(
     # Normalize and sort for deterministic output
     fields_list = sorted({f.strip() for f in missing_fields if f and f.strip()})
     has_fields = len(fields_list) > 0
+
+    log_step(
+        "email_client",
+        "compose_missing_fields_email",
+        {
+            "recipient": employee_email,
+            "missing_fields": fields_list,
+            "has_fields": has_fields,
+        },
+    )
 
     subject = "Missing information for research"
     # Friendlier copy with bullets when available

@@ -84,7 +84,7 @@ def test_fetch_replies_uses_headers_and_deduplicates(tmp_path, monkeypatch):
     assert outbound_key in state["correlation_index"]
     assert state["correlation_index"][outbound_key]["task_id"] == task_id
 
-    log_path = tmp_path / "replies.jsonl"
+    log_path = tmp_path / "email_reader.jsonl"
     contents = log_path.read_text().splitlines()
     assert any('"status": "reply_received"' in line for line in contents)
     assert any('"status": "reply_duplicate_skipped"' in line for line in contents)

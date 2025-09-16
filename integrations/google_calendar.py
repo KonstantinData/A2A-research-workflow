@@ -90,12 +90,9 @@ def extract_domain(text: str) -> str | None:
 
 
 def fetch_events() -> List[Normalized]:
-    from core.logging import log_event
-
     results: List[Normalized] = []
     if not build or not Credentials:
         log_step("calendar", "google_api_client_missing", {}, severity="error")
-        log_event({"status": "google_api_client_missing", "severity": "error"})
         if os.getenv("LIVE_MODE", "1") == "1":
             raise RuntimeError("google_api_client_missing")
         return results
@@ -108,13 +105,6 @@ def fetch_events() -> List[Normalized]:
                 {"mode": "v2-only"},
                 severity="error",
             )
-            log_event(
-                {
-                    "status": "missing_google_oauth_env",
-                    "mode": "v2-only",
-                    "severity": "error",
-                }
-            )
             return []
         if all(
             getattr(SETTINGS, a, None)
@@ -123,7 +113,12 @@ def fetch_events() -> List[Normalized]:
             try:
                 creds.token = refresh_access_token()
             except OAuthError:
-                log_event({"status": "google_invalid_grant", "severity": "error"})
+                log_step(
+                    "calendar",
+                    "google_invalid_grant",
+                    {"message": "Refresh token rejected"},
+                    severity="error",
+                )
                 return []
         service = build("calendar", "v3", credentials=creds, cache_discovery=False)
         try:
@@ -163,7 +158,11 @@ def fetch_events() -> List[Normalized]:
                 )
                 for item in resp.get("items", []):
                     norm = _normalize(item, cal_id)
-                    log_event({"event_id": norm.get("event_id"), "status": "ingested"})
+                    log_step(
+                        "calendar",
+                        "event_ingested",
+                        {"event_id": norm.get("event_id"), "calendar_id": cal_id},
+                    )
                     ev = dict(norm)
                     ev["payload"] = dict(norm)
                     results.append(ev)

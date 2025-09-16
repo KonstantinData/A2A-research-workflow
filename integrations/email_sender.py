@@ -12,7 +12,6 @@ import inspect
 from datetime import datetime
 from email.utils import make_msgid
 from typing import Optional, Sequence
-import logging as _py_logging
 import os
 import time
 from pathlib import Path
@@ -22,8 +21,6 @@ from config.env import ensure_mail_from
 from .mailer import send_email as _send_email  # tatsächlicher SMTP/Provider-Client
 from core.utils import log_step
 from integrations import email_reader
-
-logger = _py_logging.getLogger(__name__)
 
 
 def _validate_recipient(to: str) -> str | None:
@@ -108,9 +105,19 @@ def _record_outbound_correlation(
         email_reader.record_outbound_message(
             message_id, task_id=task_id, event_id=event_id
         )
-    except Exception:
+    except Exception as exc:
         # Correlation is best-effort and must not interfere with sending.
-        logger.debug("Failed to record outbound message correlation", exc_info=True)
+        log_step(
+            "mailer",
+            "correlation_record_failed",
+            {
+                "message_id": message_id,
+                "task_id": task_id,
+                "event_id": event_id,
+                "error": str(exc),
+            },
+            severity="warning",
+        )
 
 
 def _deliver(
