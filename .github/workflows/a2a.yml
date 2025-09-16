@@ -89,8 +89,8 @@ jobs:
       - name: Run orchestrator (LIVE)
         env:
           # Google OAuth
-          GOOGLE_CLIENT_ID_V2:     ${{ secrets.GOOGLE_CLIENT_ID_V2 }}
-          GOOGLE_CLIENT_SECRET_V2: ${{ secrets.GOOGLE_CLIENT_SECRET_V2 }}
+          GOOGLE_CLIENT_ID:        ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET:    ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_REFRESH_TOKEN:    ${{ secrets.GOOGLE_REFRESH_TOKEN }}
           GOOGLE_TOKEN_URI:        ${{ secrets.GOOGLE_TOKEN_URI != '' && secrets.GOOGLE_TOKEN_URI || 'https://oauth2.googleapis.com/token' }}
           # Kalender

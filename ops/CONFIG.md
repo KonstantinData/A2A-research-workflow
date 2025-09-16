@@ -3,12 +3,12 @@
 Document environment variables and secrets required for the workflow.
 See repository README for common variables.
 
-> **Note:** <span style="color:red">v2-only</span> – legacy Google OAuth environment names (previous client ID/secret or JSON variants) will fail at startup.
+> **Note:** <span style="color:red">v2-only</span> – legacy Google OAuth environment names (e.g. deprecated `_V2` or JSON variants) will fail at startup.
 
 ## Secrets
 - `HUBSPOT_ACCESS_TOKEN`
-- `GOOGLE_CLIENT_ID_V2`
-- `GOOGLE_CLIENT_SECRET_V2`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_REFRESH_TOKEN`
 - Optional: `GOOGLE_TOKEN_URI` (Default: https://oauth2.googleapis.com/token)
 - `SMTP_HOST` (optional)

@@ -1,4 +1,4 @@
-"""Google OAuth (v2-only): requires GOOGLE_CLIENT_ID_V2 / GOOGLE_CLIENT_SECRET_V2 / GOOGLE_REFRESH_TOKEN."""
+"""Google OAuth: requires GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REFRESH_TOKEN."""
 from __future__ import annotations
 
 import os
@@ -24,23 +24,23 @@ class OAuthError(Exception):
 def build_user_credentials(scopes: List[str]) -> Optional["Credentials"]:
     if Credentials is None:
         return None
-    client_id = os.getenv("GOOGLE_CLIENT_ID_V2")
-    client_secret = os.getenv("GOOGLE_CLIENT_SECRET_V2")
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
     refresh_token = os.getenv("GOOGLE_REFRESH_TOKEN")
     token_uri = os.getenv("GOOGLE_TOKEN_URI", DEFAULT_TOKEN_URI)
     if not (client_id and client_secret and refresh_token):
         return None
     # Hard block if legacy vars are present to avoid accidental mixing.
     legacy = [
-        "GOOGLE_" + "CLIENT_ID",
-        "GOOGLE_" + "CLIENT_SECRET",
+        "GOOGLE_CLIENT_ID" + "_V2",
+        "GOOGLE_CLIENT_SECRET" + "_V2",
         "GOOGLE_" + "0",
         "GOOGLE_" + "OAUTH_JSON",
         "GOOGLE_" + "CREDENTIALS_JSON",
     ]
     if any(os.getenv(k) for k in legacy):
         raise RuntimeError(
-            "Legacy Google OAuth variables detected; v2-only is enforced. Remove legacy envs."
+            "Legacy Google OAuth variables detected; use GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET instead."
         )
     return Credentials(
         token=None,
@@ -55,11 +55,11 @@ def classify_oauth_error(err: Exception) -> Tuple[str, str]:
     msg = str(err).lower()
     if "invalid_grant" in msg:
         return ("invalid_grant",
-                "Refresh token expired/revoked or not issued for this v2 client. "
-                "Ensure Consent Screen is IN PRODUCTION and re-issue with the same v2 client "
+                "Refresh token expired/revoked or not issued for this client. "
+                "Ensure Consent Screen is IN PRODUCTION and re-issue with the same client "
                 "(access_type=offline, prompt=consent).")
     if "invalid_client" in msg:
-        return ("invalid_client", "Check GOOGLE_CLIENT_ID_V2 / GOOGLE_CLIENT_SECRET_V2 values.")
+        return ("invalid_client", "Check GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET values.")
     if "unauthorized_client" in msg:
         return ("unauthorized_client", "Client not allowed for scopes; verify Cloud Console settings.")
     if "invalid_scope" in msg:
