@@ -19,6 +19,51 @@ from .mailer import send_email as _send_email  # tatsächlicher SMTP/Provider-Cl
 from core.utils import log_step
 
 
+def _validate_recipient(to: str) -> str | None:
+    """Return a normalised, allowlisted recipient address or ``None``.
+
+    The higher level helpers historically enforced the optional
+    ``ALLOWLIST_EMAIL_DOMAIN`` guard before attempting delivery.  We keep that
+    behaviour here so that orchestration code continues to short-circuit early
+    (avoiding misleading "mail sent" log entries) while also providing the
+    validated address to the low level mailer for defence in depth.
+    """
+
+    cleaned_to = to.strip()
+    allow_env = os.getenv("ALLOWLIST_EMAIL_DOMAIN", "").strip()
+    allowed_domain = allow_env.lstrip("@").lower()
+
+    if not cleaned_to:
+        log_step(
+            "mailer",
+            "email_skipped_invalid_domain",
+            {"to": to, "allowed_domain": allowed_domain or allow_env or None},
+            severity="warning",
+        )
+        return None
+
+    if allowed_domain:
+        if "@" not in cleaned_to:
+            log_step(
+                "mailer",
+                "email_skipped_invalid_domain",
+                {"to": cleaned_to, "allowed_domain": allowed_domain},
+                severity="warning",
+            )
+            return None
+        recipient_domain = cleaned_to.rsplit("@", 1)[-1].lower()
+        if recipient_domain != allowed_domain:
+            log_step(
+                "mailer",
+                "email_skipped_invalid_domain",
+                {"to": cleaned_to, "allowed_domain": allowed_domain},
+                severity="warning",
+            )
+            return None
+
+    return cleaned_to
+
+
 def _deliver(
     to: str, subject: str, body: str, attachments: Optional[Sequence[str]] = None
 ) -> None:
@@ -34,17 +79,23 @@ def _deliver(
         if os.getenv("LIVE_MODE", "1") == "1":
             raise RuntimeError("SMTP not configured; cannot send emails in LIVE mode")
         return
+    allow_env = os.getenv("ALLOWLIST_EMAIL_DOMAIN", "").strip()
+    allowed_domain = allow_env.lstrip("@").lower() or None
+
+    validated_to = to.strip()
+
     _send_email(
         host,
         port,
         user,
         password,
         mail_from,
-        to,
+        validated_to,
         subject,
         body,
         secure=secure,
         attachments=list(attachments or []),
+        allowed_domain=allowed_domain,
     )
 
 
@@ -60,14 +111,25 @@ def send(
     """
     Generische Send-Funktion, die Tests monkeypatchen.
     """
+    validated_to = _validate_recipient(to)
+    if not validated_to:
+        return
+
     try:
-        _deliver(to, subject, body, attachments)
-        log_step("orchestrator", "mail_sent", {"to": to, "subject": subject})
+        _deliver(validated_to, subject, body, attachments)
+        log_step(
+            "orchestrator", "mail_sent", {"to": validated_to, "subject": subject}
+        )
     except Exception as e:  # pragma: no cover - network errors
         log_step(
             "orchestrator",
             "mail_error",
-            {"to": to, "subject": subject, "error": str(e), "event_id": task_id},
+            {
+                "to": validated_to,
+                "subject": subject,
+                "error": str(e),
+                "event_id": task_id,
+            },
             severity="critical",
         )
         raise
@@ -87,6 +149,10 @@ def send_email(
     ``task_id`` may be supplied for correlation so that replies can be matched
     to pending workflow items.  When provided it is logged with the message
     metadata."""
+
+    validated_to = _validate_recipient(to)
+    if not validated_to:
+        return
 
     attach_paths: list[str] = []
     body_extra = ""
@@ -110,8 +176,12 @@ def send_email(
     last_exc: Exception | None = None
     for attempt in range(3):
         try:
-            _deliver(to, subject, body, attach_paths)
-            log_step("orchestrator", "mail_sent", {"to": to, "subject": subject})
+            _deliver(validated_to, subject, body, attach_paths)
+            log_step(
+                "orchestrator",
+                "mail_sent",
+                {"to": validated_to, "subject": subject},
+            )
             return
         except Exception as e:  # pragma: no cover - network errors
             last_exc = e
@@ -121,7 +191,12 @@ def send_email(
                 log_step(
                     "orchestrator",
                     "report_not_sent",
-                    {"to": to, "subject": subject, "error": str(e), "event_id": task_id},
+                    {
+                        "to": validated_to,
+                        "subject": subject,
+                        "error": str(e),
+                        "event_id": task_id,
+                    },
                     severity="critical",
                 )
     if last_exc:

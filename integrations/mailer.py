@@ -23,6 +23,7 @@ def send_email(
     body: str,
     secure: str = "ssl",
     attachments: list[str] | None = None,
+    allowed_domain: str | None = None,
 ) -> None:
     """Send an e-mail via SMTP using the selected security mode.
 
@@ -32,12 +33,25 @@ def send_email(
     to, subject, body: Message details.
     secure: ``"ssl"`` or ``"tls"`` (STARTTLS).
     attachments: optional list of file paths to include.
+    allowed_domain: optional domain restriction (case-insensitive).
     """
+
+    recipient = to.strip()
+    if not recipient:
+        raise ValueError("Recipient address must not be empty")
+
+    domain_guard = (allowed_domain or "").strip().lstrip("@").lower()
+    if domain_guard:
+        if "@" not in recipient:
+            raise ValueError("Recipient address is missing a domain part")
+        recipient_domain = recipient.rsplit("@", 1)[-1].lower()
+        if recipient_domain != domain_guard:
+            raise ValueError("Recipient domain is not allowlisted")
 
     msg = MIMEMultipart()
     msg.attach(MIMEText(body, "plain", "utf-8"))
     msg["From"] = mail_from
-    msg["To"] = to
+    msg["To"] = recipient
     msg["Subject"] = subject
 
     for path in attachments or []:
@@ -58,12 +72,12 @@ def send_email(
             context = ssl.create_default_context()
             with smtplib.SMTP_SSL(host, port, context=context) as smtp:
                 smtp.login(user, password)
-                smtp.sendmail(mail_from, [to], msg.as_string())
+                smtp.sendmail(mail_from, [recipient], msg.as_string())
         elif secure == "tls":
             with smtplib.SMTP(host, port) as smtp:
                 smtp.starttls(context=ssl.create_default_context())
                 smtp.login(user, password)
-                smtp.sendmail(mail_from, [to], msg.as_string())
+                smtp.sendmail(mail_from, [recipient], msg.as_string())
         else:  # pragma: no cover - defensive programming
             raise ValueError(f"Unsupported secure mode: {secure}")
     except Exception as exc:  # pragma: no cover - network errors

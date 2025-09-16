@@ -207,7 +207,7 @@ CRM.
 | `SMTP_PASS` | SMTP password | – |
 | `MAIL_FROM` | Sender e‑mail address (`SMTP_FROM` is deprecated; auto-aliases to `MAIL_FROM`) | `SMTP_USER` |
 | `SMTP_SECURE` | SMTP security mode (`ssl`/`starttls`) | `ssl` |
-| `ALLOWLIST_EMAIL_DOMAIN` | Allow reminder emails only to addresses in this domain | – |
+| `ALLOWLIST_EMAIL_DOMAIN` | Allow outbound emails only to addresses in this domain | – |
 | `MAIL_TO` | Recipient e‑mail for reports | – |
 | `TRIGGER_WORDS_FILE` | Path to trigger words list | `config/trigger_words.txt` |
 | `GOOGLE_CLIENT_ID_V2` | Google OAuth client ID | – |
@@ -225,6 +225,13 @@ CRM.
 | `STAGE` | Logging stage label | – |
 | `GITHUB_REPOSITORY` | Repository for error issues | – |
 | `GITHUB_TOKEN` | Token for GitHub issue creation | – |
+
+When `ALLOWLIST_EMAIL_DOMAIN` is configured the recipient address is validated in
+`integrations.email_sender` before a send attempt is made.  The normalized
+address and allowlisted domain are also forwarded to the low level
+`integrations.mailer` helper, which rejects any recipients outside the allowed
+domain.  This defence-in-depth setup ensures that even direct uses of the mailer
+cannot bypass the allowlist.
 
 ## Repository Structure
 
