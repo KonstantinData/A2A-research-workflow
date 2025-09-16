@@ -6,9 +6,9 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
-  # Achtung: GitHub Actions läuft in UTC. Diese Cron deckt ca. 07–19 CET / 06–18 CEST ab (Mo–Fr, stündlich).
+  # Achtung: GitHub Actions läuft in UTC. Mo–Fr, stündlich 08–19 UTC.
   schedule:
-    - cron: "0 8-19 * * 1-5" #correspondst 09:00 am until 08:00 pm CET
+    - cron: "0 8-19 * * 1-5"
 
 permissions:
   contents: read
@@ -30,18 +30,17 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
+
       - name: Install OS packages for WeasyPrint
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             libcairo2 \
             libpango-1.0-0 \
-            libpangoft2-1.0-0 \
+            libpangocairo-1.0-0 \
             libgdk-pixbuf-2.0-0 \
             libffi-dev \
-            libxml2 \
-            libxslt1.1 \
-            fonts-dejavu-core
+            fonts-liberation2
 
       - name: Install dev dependencies
         run: |
@@ -54,7 +53,7 @@ jobs:
   run-orchestrator:
     runs-on: ubuntu-latest
     needs: build-and-test
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -64,18 +63,17 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
+
       - name: Install OS packages for WeasyPrint
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             libcairo2 \
             libpango-1.0-0 \
-            libpangoft2-1.0-0 \
+            libpangocairo-1.0-0 \
             libgdk-pixbuf-2.0-0 \
             libffi-dev \
-            libxml2 \
-            libxslt1.1 \
-            fonts-dejavu-core
+            fonts-liberation2
 
       - name: Install dependencies
         run: |
@@ -90,27 +88,38 @@ jobs:
 
       - name: Run orchestrator (LIVE)
         env:
+          # Google OAuth
           GOOGLE_CLIENT_ID_V2:     ${{ secrets.GOOGLE_CLIENT_ID_V2 }}
           GOOGLE_CLIENT_SECRET_V2: ${{ secrets.GOOGLE_CLIENT_SECRET_V2 }}
           GOOGLE_REFRESH_TOKEN:    ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          GOOGLE_TOKEN_URI:        ${{ secrets.GOOGLE_TOKEN_URI || 'https://oauth2.googleapis.com/token' }}
-          GOOGLE_CALENDAR_IDS:     ${{ secrets.GOOGLE_CALENDAR_IDS || 'primary' }}
-          CAL_LOOKAHEAD_DAYS:   30
-          CAL_LOOKBACK_DAYS:    2
-          HUBSPOT_ACCESS_TOKEN: ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
-          SMTP_HOST:            ${{ secrets.SMTP_HOST }}
-          SMTP_PORT:            ${{ secrets.SMTP_PORT }}
-          SMTP_USER:            ${{ secrets.SMTP_USER }}
-          SMTP_PASS:            ${{ secrets.SMTP_PASS }}
-          SMTP_SECURE:          ${{ secrets.SMTP_SECURE }}
-          MAIL_FROM:            ${{ secrets.MAIL_FROM }}
-          A2A_TEST_MODE:        "0"
+          GOOGLE_TOKEN_URI:        ${{ secrets.GOOGLE_TOKEN_URI != '' && secrets.GOOGLE_TOKEN_URI || 'https://oauth2.googleapis.com/token' }}
+          # Kalender
+          GOOGLE_CALENDAR_IDS:     ${{ secrets.GOOGLE_CALENDAR_IDS }}
+          CAL_LOOKAHEAD_DAYS:      30
+          CAL_LOOKBACK_DAYS:       2
+          # Mail/SMTP/IMAP
+          MAIL_FROM:               ${{ secrets.MAIL_FROM }}
+          SMTP_HOST:               ${{ secrets.SMTP_HOST }}
+          SMTP_PORT:               ${{ secrets.SMTP_PORT }}
+          SMTP_USER:               ${{ secrets.SMTP_USER }}
+          SMTP_PASS:               ${{ secrets.SMTP_PASS }}
+          SMTP_SECURE:             ${{ secrets.SMTP_SECURE }}
+          IMAP_HOST:               ${{ secrets.IMAP_HOST }}
+          IMAP_PORT:               ${{ secrets.IMAP_PORT }}
+          IMAP_USER:               ${{ secrets.IMAP_USER }}
+          IMAP_PASS:               ${{ secrets.IMAP_PASS }}
+          # HubSpot (falls erforderlich)
+          HUBSPOT_ACCESS_TOKEN:    ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
+          HUBSPOT_PORTAL_ID:       ${{ secrets.HUBSPOT_PORTAL_ID }}
+          # Sonstiges
+          A2A_TEST_MODE:           "0"
         run: python -m core.orchestrator
 
       - name: Upload exports
         uses: actions/upload-artifact@v4
         with:
-          name: exports
+          name: exports-${{ github.run_id }}
           path: |
             output/exports/**
-            logs/workflows/**
+          if-no-files-found: warn
+          retention-days: 7
