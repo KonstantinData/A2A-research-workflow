@@ -50,8 +50,8 @@ def _assert_live_ready() -> None:
     ensure_mail_from()
     # v2-only
     legacy = [
-        "GOOGLE_" + "CLIENT_ID",
-        "GOOGLE_" + "CLIENT_SECRET",
+        "GOOGLE_CLIENT_ID" + "_V2",
+        "GOOGLE_CLIENT_SECRET" + "_V2",
         "GOOGLE_" + "0",
         "GOOGLE_" + "OAUTH_JSON",
         "GOOGLE_" + "CREDENTIALS_JSON",
@@ -62,8 +62,8 @@ def _assert_live_ready() -> None:
         )
     required = [
         "GOOGLE_REFRESH_TOKEN",
-        "GOOGLE_CLIENT_ID_V2",
-        "GOOGLE_CLIENT_SECRET_V2",
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
         "SMTP_HOST",
         "SMTP_PORT",
         "SMTP_USER",

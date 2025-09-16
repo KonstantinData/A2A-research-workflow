@@ -147,7 +147,7 @@ def fetch_contacts(
         return out
     except Exception as e:
         code, hint = classify_oauth_error(e)
-        cid_tail = (os.getenv("GOOGLE_CLIENT_ID_V2") or "")[-8:]
+        cid_tail = (os.getenv("GOOGLE_CLIENT_ID") or "")[-8:]
         log_step(
             "contacts",
             "fetch_error",

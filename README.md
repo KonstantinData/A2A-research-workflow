@@ -77,8 +77,8 @@ sources.
    docker compose -f ops/docker-compose.yml up
    ```
 3. For scheduled runs via GitHub Actions, define repository secrets:
-   - `GOOGLE_CLIENT_ID_V2`
-   - `GOOGLE_CLIENT_SECRET_V2`
+   - `GOOGLE_CLIENT_ID`
+   - `GOOGLE_CLIENT_SECRET`
    - `GOOGLE_REFRESH_TOKEN`
    - `HUBSPOT_ACCESS_TOKEN`
    - `SMTP_HOST`
@@ -95,9 +95,9 @@ PDF generation relies on WeasyPrint system libraries, installed by the Dockerfil
 
 ## Google OAuth & Token Rotation
 
-> **Note:** <span style="color:red">v2-only</span> – legacy Google OAuth environment names (previous client ID/secret or JSON variants) will fail at startup.
+> **Note:** <span style="color:red">v2-only</span> – legacy Google OAuth environment names (e.g. the deprecated `_V2` or JSON variants) will fail at startup.
 
-The refresh token is bound to the exact client (ID/secret); mixing clients causes `invalid_grant` errors. To re-issue a refresh token, generate a consent URL with `access_type=offline` and `prompt=consent`. Only the v2 client (`GOOGLE_CLIENT_ID_V2`/`GOOGLE_CLIENT_SECRET_V2`) is supported.
+The refresh token is bound to the exact client (ID/secret); mixing clients causes `invalid_grant` errors. To re-issue a refresh token, generate a consent URL with `access_type=offline` and `prompt=consent`. Only the Google OAuth client configured via `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` is supported.
 
 ## LIVE mode
 
@@ -233,8 +233,8 @@ CRM.
 | `ALLOWLIST_EMAIL_DOMAIN` | Allow outbound emails only to addresses in this domain | – |
 | `MAIL_TO` | Recipient e‑mail for reports | – |
 | `TRIGGER_WORDS_FILE` | Path to trigger words list | `config/trigger_words.txt` |
-| `GOOGLE_CLIENT_ID_V2` | Google OAuth client ID | – |
-| `GOOGLE_CLIENT_SECRET_V2` | Google OAuth client secret | – |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID | – |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | – |
 | `GOOGLE_REFRESH_TOKEN` | Google OAuth refresh token | – |
 | `GOOGLE_CALENDAR_IDS` | Comma-separated calendar IDs to poll | `primary` |
 | `CAL_LOOKAHEAD_DAYS` | Days ahead to fetch events | `14` |

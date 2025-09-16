@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import sys, re
 from pathlib import Path
-rx = re.compile(r"GOOGLE_CLIENT_(ID|SECRET)(?!_V2)\b|GOOGLE_(0|OAUTH_JSON|CREDENTIALS_JSON)\b")
+rx = re.compile(r"GOOGLE_CLIENT_(?:ID|SECRET)_V2\b|GOOGLE_(0|OAUTH_JSON|CREDENTIALS_JSON)\b")
 bad = []
 for p in Path('.').rglob('*'):
     if p.is_file() and p.suffix in {'.py','.md','.yaml','.yml','.env','.ini','.json','.j2','.txt','.html'}:
