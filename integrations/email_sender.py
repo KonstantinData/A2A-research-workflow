@@ -8,6 +8,7 @@ the tests can assert against it.
 
 from __future__ import annotations
 
+import inspect
 from datetime import datetime
 from email.utils import make_msgid
 from typing import Optional, Sequence
@@ -68,6 +69,25 @@ def _validate_recipient(to: str) -> str | None:
             return None
 
     return cleaned_to
+
+
+def _supports_keyword_argument(func, name: str) -> bool:
+    """Return ``True`` if *func* accepts ``name`` as a keyword argument."""
+
+    try:
+        signature = inspect.signature(func)
+    except (TypeError, ValueError):
+        # Builtins or mocks without introspectable signatures – assume they
+        # tolerate extra keywords so correlation details are not dropped.
+        return True
+
+    if name in signature.parameters:
+        return True
+
+    return any(
+        parameter.kind is inspect.Parameter.VAR_KEYWORD
+        for parameter in signature.parameters.values()
+    )
 
 
 def _generate_message_id(identifier: Optional[str]) -> str | None:
@@ -153,8 +173,12 @@ def send(
 
     message_id = _generate_message_id(task_id)
 
+    deliver_kwargs = {}
+    if message_id and _supports_keyword_argument(_deliver, "message_id"):
+        deliver_kwargs["message_id"] = message_id
+
     try:
-        _deliver(validated_to, subject, body, attachments, message_id=message_id)
+        _deliver(validated_to, subject, body, attachments, **deliver_kwargs)
         log_step(
             "orchestrator", "mail_sent", {"to": validated_to, "subject": subject}
         )
@@ -218,6 +242,9 @@ def send_email(
     delays = [5, 15, 45]
     last_exc: Exception | None = None
     message_id = _generate_message_id(task_id)
+    deliver_kwargs = {}
+    if message_id and _supports_keyword_argument(_deliver, "message_id"):
+        deliver_kwargs["message_id"] = message_id
 
     for attempt in range(3):
         try:
@@ -226,7 +253,7 @@ def send_email(
                 subject,
                 body,
                 attach_paths,
-                message_id=message_id,
+                **deliver_kwargs,
             )
             log_step(
                 "orchestrator",
@@ -282,11 +309,16 @@ def request_missing_fields(task: dict, missing_fields: list[str], recipient_emai
         )
     )
 
+    send_kwargs = {}
+    task_id = task.get("id")
+    if task_id and _supports_keyword_argument(send_email, "task_id"):
+        send_kwargs["task_id"] = task_id
+
     send_email(
         to=recipient_email,
         subject=subject,
         body=body,
-        task_id=task.get("id"),
+        **send_kwargs,
     )
 
 
@@ -321,11 +353,16 @@ def send_missing_fields_reminder(
     if allow and not recipient_email.lower().endswith(f"@{allow.lower()}"):
         log_step("mailer", "reminder_skipped_invalid_domain", {"to": recipient_email}, severity="warning")
         return
+    send_kwargs = {}
+    task_id = task.get("id")
+    if task_id and _supports_keyword_argument(send_email, "task_id"):
+        send_kwargs["task_id"] = task_id
+
     send_email(
         to=recipient_email,
         subject=subject,
         body=body,
-        task_id=task.get("id"),
+        **send_kwargs,
     )
 
 
