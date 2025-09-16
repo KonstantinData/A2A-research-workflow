@@ -77,8 +77,6 @@ def fetch_contacts(
         page_limit = SETTINGS.contacts_page_limit
     if build is None or Request is None:  # pragma: no cover
         log_step("contacts", "google_api_client_missing", {}, severity="error")
-        from core.logging import log_event
-        log_event({"status": "google_api_client_missing", "severity": "error"})
         if os.getenv("LIVE_MODE", "1") == "1":
             raise RuntimeError("google_api_client_missing")
         return []
@@ -92,14 +90,6 @@ def fetch_contacts(
                 {"mode": "v2-only"},
                 severity="error",
             )
-            from core.logging import log_event
-            log_event(
-                {
-                    "status": "missing_google_oauth_env",
-                    "severity": "error",
-                    "mode": "v2-only",
-                }
-            )
             return []
 
         if all(
@@ -109,9 +99,12 @@ def fetch_contacts(
             try:
                 creds.token = refresh_access_token()
             except OAuthError:
-                from core.logging import log_event
-
-                log_event({"status": "google_invalid_grant", "severity": "error"})
+                log_step(
+                    "contacts",
+                    "google_invalid_grant",
+                    {"message": "Refresh token rejected"},
+                    severity="error",
+                )
                 return []
 
         service = build("people", "v1", credentials=creds, cache_discovery=False)
@@ -124,7 +117,6 @@ def fetch_contacts(
         out: List[Dict[str, Any]] = []
         page_token: Optional[str] = None
         pages = 0
-        from core.logging import log_event
         while True:  # pragma: no cover (in CI meist gemonkeypatched)
             resp = (
                 service.people()
@@ -142,7 +134,11 @@ def fetch_contacts(
             for person in resp.get("connections", []) or []:
                 cid = person.get("resourceName") or person.get("id")
                 if cid:
-                    log_event({"event_id": cid, "status": "ingested"})
+                    log_step(
+                        "contacts",
+                        "contact_ingested",
+                        {"contact_id": cid},
+                    )
                 out.append(person)
             page_token = resp.get("nextPageToken")
             pages += 1
@@ -157,17 +153,6 @@ def fetch_contacts(
             "fetch_error",
             {"error": str(e), "code": code, "hint": hint, "client_id_tail": cid_tail},
             severity="error",
-        )
-        from core.logging import log_event
-        log_event(
-            {
-                "status": "contacts_fetch_error",
-                "error": str(e),
-                "code": code,
-                "hint": hint,
-                "client_id_tail": cid_tail,
-                "severity": "error",
-            }
         )
         return []
 

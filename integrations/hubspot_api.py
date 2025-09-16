@@ -10,6 +10,8 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
+from core.utils import log_step
+
 DEFAULT_TIMEOUT = 30
 HS_BASE = "https://api.hubapi.com"
 
@@ -22,18 +24,65 @@ def _request_with_retry(method: str, url: str, **kwargs: Any) -> requests.Respon
     while True:
         try:
             response = requests.request(method, url, **kwargs)
-        except requests.RequestException:
+        except requests.RequestException as exc:
             if attempt >= max_retries:
+                log_step(
+                    "hubspot",
+                    "request_exception",
+                    {
+                        "method": method,
+                        "url": url,
+                        "error": str(exc),
+                    },
+                    severity="error",
+                )
                 raise
+            sleep_for = 0.5 * (2**attempt) + random.uniform(0, 0.1)
+            log_step(
+                "hubspot",
+                "request_retry",
+                {
+                    "method": method,
+                    "url": url,
+                    "attempt": attempt + 1,
+                    "error": str(exc),
+                    "backoff_seconds": round(sleep_for, 2),
+                },
+                severity="warning",
+            )
+            time.sleep(sleep_for)
+            attempt += 1
+            continue
         else:
             if response.status_code != 429 and not 500 <= response.status_code < 600:
                 return response
             if attempt >= max_retries:
+                log_step(
+                    "hubspot",
+                    "request_failed",
+                    {
+                        "method": method,
+                        "url": url,
+                        "status": response.status_code,
+                    },
+                    severity="error",
+                )
                 return response
-
-        sleep_for = 0.5 * (2**attempt) + random.uniform(0, 0.1)
-        time.sleep(sleep_for)
-        attempt += 1
+            sleep_for = 0.5 * (2**attempt) + random.uniform(0, 0.1)
+            log_step(
+                "hubspot",
+                "request_retry",
+                {
+                    "method": method,
+                    "url": url,
+                    "attempt": attempt + 1,
+                    "status": response.status_code,
+                    "backoff_seconds": round(sleep_for, 2),
+                },
+                severity="warning",
+            )
+            time.sleep(sleep_for)
+            attempt += 1
 
 # The static company data is used as a lightweight substitute for a real
 # CRM or HubSpot look‑up.  In the live system these helpers would
@@ -62,7 +111,14 @@ def upsert_company(data: Dict[str, Any]) -> Optional[str]:
     """Create or update a company in HubSpot."""
     token = _token()
     if not token:
-        if os.getenv("LIVE_MODE", "1") == "1":
+        live_mode = os.getenv("LIVE_MODE", "1") == "1"
+        log_step(
+            "hubspot",
+            "missing_access_token",
+            {"operation": "upsert_company", "live_mode": live_mode},
+            severity="critical" if live_mode else "error",
+        )
+        if live_mode:
             raise RuntimeError("HUBSPOT_ACCESS_TOKEN missing in LIVE mode")
         return None
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
@@ -82,8 +138,18 @@ def upsert_company(data: Dict[str, Any]) -> Optional[str]:
         results = (resp.json() or {}).get("results") or []
         if results:
             company_id = results[0].get("id")
+            log_step(
+                "hubspot",
+                "company_domain_match",
+                {"domain": domain, "company_id": company_id},
+            )
             _update_company(company_id, core, headers)
             return company_id
+        log_step(
+            "hubspot",
+            "company_domain_not_found",
+            {"domain": domain},
+        )
     # 2) Create
     company_id = _create_company(core, headers)
     return company_id
@@ -114,7 +180,16 @@ def _create_company(core: Dict[str, Any], headers: Dict[str, str]) -> Optional[s
         timeout=DEFAULT_TIMEOUT,
     )
     resp.raise_for_status()
-    return (resp.json() or {}).get("id")
+    company_id = (resp.json() or {}).get("id")
+    log_step(
+        "hubspot",
+        "company_created",
+        {
+            "company_id": company_id,
+            "domain": payload["properties"].get("domain"),
+        },
+    )
+    return company_id
 
 
 def _update_company(company_id: str, core: Dict[str, Any], headers: Dict[str, str]) -> None:
@@ -127,13 +202,28 @@ def _update_company(company_id: str, core: Dict[str, Any], headers: Dict[str, st
         timeout=DEFAULT_TIMEOUT,
     )
     resp.raise_for_status()
+    log_step(
+        "hubspot",
+        "company_updated",
+        {
+            "company_id": company_id,
+            "domain": payload["properties"].get("domain"),
+        },
+    )
 
 
 def check_existing_report(company_id: str) -> Optional[Dict[str, Any]]:
     """Return latest report (id, name, createdAt) for ``company_id`` if present."""
     token = _token()
     if not token:
-        if os.getenv("LIVE_MODE", "1") == "1":
+        live_mode = os.getenv("LIVE_MODE", "1") == "1"
+        log_step(
+            "hubspot",
+            "missing_access_token",
+            {"operation": "check_existing_report", "live_mode": live_mode},
+            severity="critical" if live_mode else "error",
+        )
+        if live_mode:
             raise RuntimeError("HUBSPOT_ACCESS_TOKEN missing in LIVE mode")
         return None
 
@@ -156,13 +246,36 @@ def check_existing_report(company_id: str) -> Optional[Dict[str, Any]]:
     )
     resp.raise_for_status()
     results = resp.json().get("results", [])
-    return results[0] if results else None
+    if results:
+        record = results[0]
+        log_step(
+            "hubspot",
+            "existing_report_found",
+            {
+                "company_id": company_id,
+                "report_id": record.get("id"),
+            },
+        )
+        return record
+    log_step(
+        "hubspot",
+        "existing_report_not_found",
+        {"company_id": company_id},
+    )
+    return None
 
 
 def attach_pdf(pdf_path: Path, company_id: str) -> Optional[Dict[str, Any]]:
     token = _token()
     if not token:
-        if os.getenv("LIVE_MODE", "1") == "1":
+        live_mode = os.getenv("LIVE_MODE", "1") == "1"
+        log_step(
+            "hubspot",
+            "missing_access_token",
+            {"operation": "attach_pdf", "live_mode": live_mode},
+            severity="critical" if live_mode else "error",
+        )
+        if live_mode:
             raise RuntimeError("HUBSPOT_ACCESS_TOKEN missing in LIVE mode")
         return None
     headers = {"Authorization": f"Bearer {token}"}
@@ -189,6 +302,15 @@ def attach_pdf(pdf_path: Path, company_id: str) -> Optional[Dict[str, Any]]:
         timeout=DEFAULT_TIMEOUT,
     )
     assoc.raise_for_status()
+    log_step(
+        "hubspot",
+        "report_uploaded",
+        {
+            "company_id": company_id,
+            "file_id": file_id,
+            "file_name": pdf_path.name,
+        },
+    )
     return {"file_id": file_id}
 
 

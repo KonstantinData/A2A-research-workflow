@@ -20,11 +20,13 @@ reconciles them with pending tasks.  Two components cooperate:
    stored in the same state file so the reader can resume after restarts
    and skip duplicates.
 
-Additional diagnostics are appended to ``replies.jsonl`` for every
-message.  The log distinguishes between successfully processed replies,
-messages that did not contain structured data, and duplicates that were
-skipped because their ``Message-ID`` already exists in the processed
-state.
+Additional diagnostics are emitted through ``core.utils.log_step`` using the
+``email_reader`` source for every message.  The structured log stream
+distinguishes between successfully processed replies, messages without
+structured data and duplicates that were skipped because their
+``Message-ID`` already exists in the processed state.  The shared telemetry
+format makes reply processing events available alongside calendar and contacts
+fetches.
 
 The state file contains two keys:
 

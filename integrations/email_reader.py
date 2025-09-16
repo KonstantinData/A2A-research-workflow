@@ -7,34 +7,14 @@ import json
 import os
 import re
 import time
-import logging as _py_logging
 from email.header import decode_header
 from email.message import Message
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
-import importlib.util as _ilu
 
 from core import parser
+from core.utils import log_step
 from config.settings import SETTINGS
-
-_JSONL_PATH = Path(__file__).resolve().parents[1] / "a2a_logging" / "jsonl_sink.py"
-_spec = _ilu.spec_from_file_location("jsonl_sink", _JSONL_PATH)
-_mod = _ilu.module_from_spec(_spec)
-assert _spec and _spec.loader
-_spec.loader.exec_module(_mod)
-append_jsonl = _mod.append
-
-logger = _py_logging.getLogger(__name__)
-
-
-def _reply_log_path() -> Path:
-    return SETTINGS.workflows_dir / "replies.jsonl"
-
-
-def _append_reply_log(record: Dict[str, Any]) -> None:
-    path = _reply_log_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    append_jsonl(path, record)
 
 
 def _state_path() -> Path:
@@ -222,9 +202,15 @@ def fetch_replies() -> List[Dict[str, Any]]:
     pwd = os.getenv("IMAP_PASS")
     folder = os.getenv("IMAP_FOLDER", "INBOX")
     if not all([host, user, pwd]):
-        logger.info("IMAP credentials not configured; skipping fetch")
-        _append_reply_log(
-            {"status": "imap_not_configured", "severity": "info"},
+        log_step(
+            "email_reader",
+            "imap_not_configured",
+            {
+                "host_configured": bool(host),
+                "user_configured": bool(user),
+                "folder": folder,
+            },
+            severity="info",
         )
         return []
 
@@ -260,12 +246,11 @@ def fetch_replies() -> List[Dict[str, Any]]:
             message_id = f"imap-{uid}"
 
         if message_id in processed_ids:
-            _append_reply_log(
-                {
-                    "status": "reply_duplicate_skipped",
-                    "message_id": message_id,
-                    "severity": "info",
-                }
+            log_step(
+                "email_reader",
+                "reply_duplicate_skipped",
+                {"message_id": message_id},
+                severity="info",
             )
             imap.store(msg_id, "+FLAGS", "(\\Seen)")
             continue
@@ -341,34 +326,35 @@ def fetch_replies() -> List[Dict[str, Any]]:
                     "fields": fields,
                 }
             )
-            _append_reply_log(
+            log_step(
+                "email_reader",
+                "reply_received",
                 {
-                    "status": "reply_received",
                     "event_id": event_id,
                     "task_id": task_id or event_id,
                     "fields_completed": list(fields.keys()),
-                    "source": "email",
                     "message_id": message_id,
-                }
+                    "from": from_addr,
+                },
             )
         else:
-            _append_reply_log(
+            log_step(
+                "email_reader",
+                "reply_no_fields",
                 {
-                    "status": "reply_no_fields",
                     "task_id": task_id or event_id,
                     "event_id": event_id,
                     "message_id": message_id,
-                    "severity": "info",
-                }
+                },
+                severity="info",
             )
 
         if not (task_id or event_id):
-            _append_reply_log(
-                {
-                    "status": "reply_unmatched",
-                    "message_id": message_id,
-                    "severity": "warning",
-                }
+            log_step(
+                "email_reader",
+                "reply_unmatched",
+                {"message_id": message_id},
+                severity="warning",
             )
 
         imap.store(msg_id, "+FLAGS", "(\\Seen)")
@@ -391,8 +377,11 @@ def poll_replies(interval: int = 600) -> None:
         try:
             fetch_replies()
         except Exception as e:
-            _append_reply_log(
-                {"status": "error", "error": str(e), "severity": "warning"},
+            log_step(
+                "email_reader",
+                "poll_error",
+                {"error": str(e)},
+                severity="warning",
             )
         time.sleep(interval)
 
