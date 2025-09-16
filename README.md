@@ -32,7 +32,7 @@ flowchart LR
    `google-api-python-client` and `google-auth` packages. Missing Google
    API libraries log a `google_api_client_missing` step for Calendar and
    Contacts.
-3. Set required environment variables as needed. SMTP/IMAP/HubSpot/Google variables are listed in [`.env.example`](.env.example) and documented in [`ops/CONFIG.md`](ops/CONFIG.md).
+3. Set required environment variables as needed. SMTP/IMAP/HubSpot/Google variables are configured in `.env` and documented in [`ops/CONFIG.md`](ops/CONFIG.md).
 4. Adjust trigger words in `config/trigger_words.txt` or point `TRIGGER_WORDS_FILE` to a custom list.
 
 ### Centralised paths
@@ -71,7 +71,7 @@ sources.
 
 ## LIVE Setup
 
-1. Copy [`.env.example`](.env.example) to `.env` and fill in the credentials (SMTP/IMAP/HubSpot/Google variables see [`ops/CONFIG.md`](ops/CONFIG.md)).
+1. Create a `.env` file and fill in the credentials (SMTP/IMAP/HubSpot/Google variables see [`ops/CONFIG.md`](ops/CONFIG.md)).
 2. Start the orchestrator with Docker Compose:
    ```bash
    docker compose -f ops/docker-compose.yml up
