@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Callable, Optional
 import shutil
@@ -43,23 +44,153 @@ _finalized = False
 _finalized_lock = threading.Lock()
 
 
+def _parse_trigger_words() -> List[str]:
+    raw = os.getenv("TRIGGER_WORDS")
+    words: List[str] = []
+    if raw:
+        parts = re.split(r"[,\n;]\s*|\s{2,}", raw.strip())
+        words = [p.strip() for p in parts if p.strip()]
+    if not words:
+        words = load_trigger_words()
+    deduped: List[str] = []
+    seen = set()
+    for word in words:
+        if not word or word in seen:
+            continue
+        deduped.append(word)
+        seen.add(word)
+    return deduped
+
+
+def _build_trigger_pattern(words: List[str], raw_regex: str | None) -> re.Pattern | None:
+    if raw_regex:
+        try:
+            return re.compile(raw_regex, re.IGNORECASE)
+        except re.error:
+            return None
+    if not words:
+        return None
+    escaped = [re.escape(w) for w in words if w]
+    if not escaped:
+        return None
+    return re.compile(r"\b(" + "|".join(escaped) + r")\b", re.IGNORECASE)
+
+
+def _event_text(payload: Dict[str, Any] | None) -> str:
+    if not payload:
+        return ""
+    fields: List[str] = []
+    for key in ("summary", "description", "location"):
+        value = payload.get(key)
+        if value:
+            fields.append(str(value))
+    attendees = payload.get("attendees") or []
+    for attendee in attendees:
+        if isinstance(attendee, dict):
+            email = attendee.get("email")
+            display = attendee.get("displayName")
+            if email:
+                fields.append(str(email))
+            if display:
+                fields.append(str(display))
+        elif attendee:
+            fields.append(str(attendee))
+    return "\n".join(fields)
+
+
+def _parse_calendar_ids(raw: str | None) -> List[str]:
+    if raw is None:
+        return []
+    value = raw.strip()
+    if not value:
+        return []
+    if value.startswith("["):
+        try:
+            arr = json.loads(value)
+            ids = [str(x).strip() for x in arr if str(x).strip()]
+            return list(dict.fromkeys(ids))
+        except Exception:
+            pass
+    parts = [p.strip() for p in re.split(r"[,\s;]+", value) if p.strip()]
+    return list(dict.fromkeys(parts))
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        return int(str(raw).strip())
+    except (TypeError, ValueError):
+        return default
+
+
+_TRIGGER_WORDS = _parse_trigger_words()
+_TRIGGER_REGEX_RAW = os.getenv("TRIGGER_REGEX") or ""
+_TRIGGER_PATTERN = _build_trigger_pattern(_TRIGGER_WORDS, _TRIGGER_REGEX_RAW)
+_TRIGGER_REGEX_ACTIVE = bool(_TRIGGER_REGEX_RAW and _TRIGGER_PATTERN)
+if _TRIGGER_REGEX_RAW and not _TRIGGER_REGEX_ACTIVE:
+    log_event(
+        {
+            "status": "trigger_regex_invalid",
+            "pattern": _TRIGGER_REGEX_RAW,
+            "severity": "warning",
+        }
+    )
+if not _TRIGGER_PATTERN:
+    _TRIGGER_PATTERN = _build_trigger_pattern(_TRIGGER_WORDS, None)
+    _TRIGGER_REGEX_ACTIVE = False
+
+_CAL_LOOKBACK_DAYS = _env_int("CAL_LOOKBACK_DAYS", SETTINGS.cal_lookback_days)
+_CAL_LOOKAHEAD_DAYS = _env_int("CAL_LOOKAHEAD_DAYS", SETTINGS.cal_lookahead_days)
+_GOOGLE_CALENDAR_IDS = _parse_calendar_ids(os.getenv("GOOGLE_CALENDAR_IDS"))
+if not _GOOGLE_CALENDAR_IDS:
+    _GOOGLE_CALENDAR_IDS = list(SETTINGS.google_calendar_ids or ["primary"])
+
+# Keep SETTINGS in sync with any runtime overrides for downstream consumers.
+SETTINGS.cal_lookback_days = _CAL_LOOKBACK_DAYS
+SETTINGS.cal_lookahead_days = _CAL_LOOKAHEAD_DAYS
+SETTINGS.google_calendar_ids = list(_GOOGLE_CALENDAR_IDS)
+SETTINGS.google_client_id = os.getenv("GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_ID_V2") or ""
+SETTINGS.google_client_secret = os.getenv("GOOGLE_CLIENT_SECRET") or os.getenv("GOOGLE_CLIENT_SECRET_V2") or ""
+SETTINGS.google_refresh_token = os.getenv("GOOGLE_REFRESH_TOKEN") or ""
+SETTINGS.google_token_uri = os.getenv("GOOGLE_TOKEN_URI") or getattr(
+    SETTINGS, "google_token_uri", "https://oauth2.googleapis.com/token"
+)
+
+log_event(
+    {
+        "status": "trigger_config",
+        "words_count": len(_TRIGGER_WORDS),
+        "regex": _TRIGGER_REGEX_ACTIVE,
+        "sample_words": _TRIGGER_WORDS[:10],
+    }
+)
+
+
+def _contains_trigger_event(payload: Dict[str, Any]) -> bool:
+    pattern = _TRIGGER_PATTERN
+    if not pattern:
+        return False
+    if isinstance(payload, str):
+        text = payload
+    else:
+        text = _event_text(payload or {})
+    if not text:
+        return False
+    return bool(pattern.search(text))
+
+
 # --------- LIVE readiness assertions ---------
 def _assert_live_ready() -> None:
     if os.getenv("LIVE_MODE", "1") != "1":
         return
     ensure_mail_from()
-    # v2-only
-    legacy = [
-        "GOOGLE_CLIENT_ID" + "_V2",
-        "GOOGLE_CLIENT_SECRET" + "_V2",
-        "GOOGLE_" + "0",
-        "GOOGLE_" + "OAUTH_JSON",
-        "GOOGLE_" + "CREDENTIALS_JSON",
-    ]
-    if any(os.getenv(k) for k in legacy):
-        raise RuntimeError(
-            "Legacy Google OAuth env present. Remove them; v2-only is enforced."
-        )
+    
+    def _is_set(name: str) -> bool:
+        if name in {"GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"}:
+            return bool(os.getenv(name) or os.getenv(f"{name}_V2"))
+        return bool(os.getenv(name))
     required = [
         "GOOGLE_REFRESH_TOKEN",
         "GOOGLE_CLIENT_ID",
@@ -71,7 +202,7 @@ def _assert_live_ready() -> None:
     ]
     if os.getenv("REQUIRE_HUBSPOT", "1") == "1":
         required.append("HUBSPOT_ACCESS_TOKEN")
-    missing = [k for k in required if not os.getenv(k)]
+    missing = [k for k in required if not _is_set(k)]
     if not os.getenv("MAIL_FROM"):
         missing.append("MAIL_FROM")
     if missing:
@@ -179,11 +310,9 @@ _calendar_last_error = trigger_utils._calendar_last_error
 
 
 def _as_trigger_from_event(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    from core.trigger_words import contains_trigger as _contains_trigger
-
     return trigger_utils._as_trigger_from_event(
         event,
-        contains_trigger=_contains_trigger,
+        contains_trigger=_contains_trigger_event,
     )
 
 
@@ -202,6 +331,7 @@ def gather_calendar_triggers(
         get_workflow_id=get_workflow_id,
         log_event=log_event,
         log_step=log_step,
+        contains_trigger=_contains_trigger_event,
     )
 
 
@@ -232,6 +362,7 @@ def gather_triggers(
         get_workflow_id=get_workflow_id,
         log_event=log_event,
         log_step=log_step,
+        contains_trigger=_contains_trigger_event,
     )
 
 
@@ -317,9 +448,9 @@ def run(
 
     if not triggers:
         details = {
-            "lookback_days": SETTINGS.cal_lookback_days,
-            "lookahead_days": SETTINGS.cal_lookahead_days,
-            "calendar_ids": SETTINGS.google_calendar_ids or ["primary"],
+            "lookback_days": _CAL_LOOKBACK_DAYS,
+            "lookahead_days": _CAL_LOOKAHEAD_DAYS,
+            "calendar_ids": _GOOGLE_CALENDAR_IDS or ["primary"],
         }
         log_step("orchestrator", "no_triggers_diagnostics", details, severity="info")
         log_event(

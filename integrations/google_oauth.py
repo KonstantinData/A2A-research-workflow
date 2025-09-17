@@ -17,6 +17,17 @@ except Exception:
 DEFAULT_TOKEN_URI = "https://oauth2.googleapis.com/token"
 
 
+def _get_env(name: str) -> Optional[str]:
+    value = os.getenv(name)
+    if value:
+        return value
+    if name in {"GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"}:
+        legacy = os.getenv(f"{name}_V2")
+        if legacy:
+            return legacy
+    return None
+
+
 class OAuthError(Exception):
     """Raised when refreshing an OAuth token fails."""
 
@@ -24,24 +35,12 @@ class OAuthError(Exception):
 def build_user_credentials(scopes: List[str]) -> Optional["Credentials"]:
     if Credentials is None:
         return None
-    client_id = os.getenv("GOOGLE_CLIENT_ID")
-    client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+    client_id = _get_env("GOOGLE_CLIENT_ID")
+    client_secret = _get_env("GOOGLE_CLIENT_SECRET")
     refresh_token = os.getenv("GOOGLE_REFRESH_TOKEN")
-    token_uri = os.getenv("GOOGLE_TOKEN_URI", DEFAULT_TOKEN_URI)
+    token_uri = os.getenv("GOOGLE_TOKEN_URI") or DEFAULT_TOKEN_URI
     if not (client_id and client_secret and refresh_token):
         return None
-    # Hard block if legacy vars are present to avoid accidental mixing.
-    legacy = [
-        "GOOGLE_CLIENT_ID" + "_V2",
-        "GOOGLE_CLIENT_SECRET" + "_V2",
-        "GOOGLE_" + "0",
-        "GOOGLE_" + "OAUTH_JSON",
-        "GOOGLE_" + "CREDENTIALS_JSON",
-    ]
-    if any(os.getenv(k) for k in legacy):
-        raise RuntimeError(
-            "Legacy Google OAuth variables detected; use GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET instead."
-        )
     return Credentials(
         token=None,
         refresh_token=refresh_token,
@@ -69,12 +68,17 @@ def classify_oauth_error(err: Exception) -> Tuple[str, str]:
 
 def refresh_access_token() -> str:
     payload = {
-        "client_id": getattr(SETTINGS, "google_client_id", ""),
-        "client_secret": getattr(SETTINGS, "google_client_secret", ""),
-        "refresh_token": getattr(SETTINGS, "google_refresh_token", ""),
+        "client_id": _get_env("GOOGLE_CLIENT_ID")
+        or getattr(SETTINGS, "google_client_id", ""),
+        "client_secret": _get_env("GOOGLE_CLIENT_SECRET")
+        or getattr(SETTINGS, "google_client_secret", ""),
+        "refresh_token": os.getenv("GOOGLE_REFRESH_TOKEN")
+        or getattr(SETTINGS, "google_refresh_token", ""),
         "grant_type": "refresh_token",
     }
-    token_uri = getattr(SETTINGS, "google_token_uri", DEFAULT_TOKEN_URI)
+    token_uri = os.getenv("GOOGLE_TOKEN_URI") or getattr(
+        SETTINGS, "google_token_uri", DEFAULT_TOKEN_URI
+    )
     r = requests.post(token_uri, data=payload, timeout=30)
     if r.status_code == 400 and "invalid_grant" in r.text:
         log_step(

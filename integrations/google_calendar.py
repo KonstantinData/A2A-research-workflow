@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import os, re
+import json
+import os
+import re
 import datetime as dt
 from typing import Any, Dict, List
 
@@ -23,16 +25,51 @@ except Exception:
 
 Normalized = Dict[str, Any]
 
-LOOKAHEAD_DAYS = SETTINGS.cal_lookahead_days
-LOOKBACK_DAYS = SETTINGS.cal_lookback_days
-CAL_IDS = SETTINGS.google_calendar_ids or ["primary"]
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        return int(str(raw).strip())
+    except (TypeError, ValueError):
+        return default
+
+
+def _parse_calendar_ids(value: str | None) -> List[str]:
+    if value is None:
+        return []
+    raw = value.strip()
+    if not raw:
+        return []
+    if raw.startswith("["):
+        try:
+            arr = json.loads(raw)
+            ids = [str(x).strip() for x in arr if str(x).strip()]
+            return list(dict.fromkeys(ids))
+        except Exception:
+            pass
+    parts = [p.strip() for p in re.split(r"[,\s;]+", raw) if p.strip()]
+    return list(dict.fromkeys(parts))
+
+
+def _calendar_ids() -> List[str]:
+    env_ids = _parse_calendar_ids(os.getenv("GOOGLE_CALENDAR_IDS"))
+    if env_ids:
+        return env_ids
+    fallback = getattr(SETTINGS, "google_calendar_ids", None) or ["primary"]
+    cleaned = [str(x).strip() for x in fallback if str(x).strip()]
+    return list(dict.fromkeys(cleaned)) or ["primary"]
+
+
 def _time_window() -> tuple[str, str]:
+    lookback = _env_int("CAL_LOOKBACK_DAYS", SETTINGS.cal_lookback_days)
+    lookahead = _env_int("CAL_LOOKAHEAD_DAYS", SETTINGS.cal_lookahead_days)
     now = dt.datetime.utcnow().replace(tzinfo=dt.timezone.utc)
-    tmin = now - dt.timedelta(days=LOOKBACK_DAYS)
-    tmax = now + dt.timedelta(days=LOOKAHEAD_DAYS)
+    tmin = now - dt.timedelta(days=lookback)
+    tmax = now + dt.timedelta(days=lookahead)
     return tmin.isoformat(), tmax.isoformat()
 
 
@@ -91,6 +128,7 @@ def extract_domain(text: str) -> str | None:
 
 def fetch_events() -> List[Normalized]:
     results: List[Normalized] = []
+    cal_ids = _calendar_ids()
     if not build or not Credentials:
         log_step("calendar", "google_api_client_missing", {}, severity="error")
         if os.getenv("LIVE_MODE", "1") == "1":
@@ -121,8 +159,9 @@ def fetch_events() -> List[Normalized]:
                 )
                 return []
         service = build("calendar", "v3", credentials=creds, cache_discovery=False)
+        first_calendar = cal_ids[0] if cal_ids else "primary"
         try:
-            service.calendarList().get(calendarId=CAL_IDS[0]).execute()
+            service.calendarList().get(calendarId=first_calendar).execute()
         except Exception as e:
             code, hint = classify_oauth_error(e)
             cid_tail = (os.getenv("GOOGLE_CLIENT_ID") or "")[-8:]
@@ -140,7 +179,7 @@ def fetch_events() -> List[Normalized]:
             return []
 
         tmin, tmax = _time_window()
-        for cal_id in CAL_IDS:
+        for cal_id in cal_ids:
             token = None
             while True:
                 resp = (
@@ -170,7 +209,7 @@ def fetch_events() -> List[Normalized]:
                 if not token:
                     break
 
-        log_step("calendar", "fetch_ok", {"calendars": CAL_IDS, "count": len(results)})
+        log_step("calendar", "fetch_ok", {"calendars": cal_ids, "count": len(results)})
     except Exception as e:  # pragma: no cover
         code, hint = classify_oauth_error(e)
         cid_tail = (os.getenv("GOOGLE_CLIENT_ID") or "")[-8:]

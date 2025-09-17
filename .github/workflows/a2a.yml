@@ -21,6 +21,16 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+      GOOGLE_TOKEN_URI: ${{ secrets.GOOGLE_TOKEN_URI || 'https://oauth2.googleapis.com/token' }}
+      GOOGLE_CALENDAR_IDS: ${{ secrets.GOOGLE_CALENDAR_IDS }}
+      CAL_LOOKBACK_DAYS: ${{ vars.CAL_LOOKBACK_DAYS || 14 }}
+      CAL_LOOKAHEAD_DAYS: ${{ vars.CAL_LOOKAHEAD_DAYS || 30 }}
+      TRIGGER_WORDS: ${{ vars.TRIGGER_WORDS }}
+      TRIGGER_REGEX: ${{ vars.TRIGGER_REGEX }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -54,6 +64,16 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-test
     timeout-minutes: 20
+    env:
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+      GOOGLE_TOKEN_URI: ${{ secrets.GOOGLE_TOKEN_URI || 'https://oauth2.googleapis.com/token' }}
+      GOOGLE_CALENDAR_IDS: ${{ secrets.GOOGLE_CALENDAR_IDS }}
+      CAL_LOOKBACK_DAYS: ${{ vars.CAL_LOOKBACK_DAYS || 14 }}
+      CAL_LOOKAHEAD_DAYS: ${{ vars.CAL_LOOKAHEAD_DAYS || 30 }}
+      TRIGGER_WORDS: ${{ vars.TRIGGER_WORDS }}
+      TRIGGER_REGEX: ${{ vars.TRIGGER_REGEX }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -78,7 +98,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; elif [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
@@ -86,17 +106,11 @@ jobs:
       - name: No dummy content guard
         run: python ops/no_demo_guard.py
 
+      - name: Probe calendar triggers
+        run: python tests/trigger_test.py --include-misses
+
       - name: Run orchestrator (LIVE)
         env:
-          # Google OAuth
-          GOOGLE_CLIENT_ID:        ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET:    ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GOOGLE_REFRESH_TOKEN:    ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          GOOGLE_TOKEN_URI:        ${{ secrets.GOOGLE_TOKEN_URI != '' && secrets.GOOGLE_TOKEN_URI || 'https://oauth2.googleapis.com/token' }}
-          # Kalender
-          GOOGLE_CALENDAR_IDS:     ${{ secrets.GOOGLE_CALENDAR_IDS }}
-          CAL_LOOKAHEAD_DAYS:      30
-          CAL_LOOKBACK_DAYS:       2
           # Mail/SMTP/IMAP
           MAIL_FROM:               ${{ secrets.MAIL_FROM }}
           SMTP_HOST:               ${{ secrets.SMTP_HOST }}
