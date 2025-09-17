@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-
 from typing import Any, Dict, List, Optional, Callable
 
 from config.settings import SETTINGS
@@ -71,10 +70,12 @@ def fetch_contacts(
     page_size: int | None = None, page_limit: int | None = None
 ) -> List[Dict[str, Any]]:
     """Live-Fetch (in Tests typischerweise gemonkeypatched)."""
+    # Werte erst zur Laufzeit aus SETTINGS lesen, nicht beim Import cachen
     if page_size is None:
         page_size = SETTINGS.contacts_page_size
     if page_limit is None:
         page_limit = SETTINGS.contacts_page_limit
+
     if build is None or Request is None:  # pragma: no cover
         log_step("contacts", "google_api_client_missing", {}, severity="error")
         if os.getenv("LIVE_MODE", "1") == "1":
@@ -94,7 +95,11 @@ def fetch_contacts(
 
         if all(
             getattr(SETTINGS, a, None)
-            for a in ("google_client_id", "google_client_secret", "google_refresh_token")
+            for a in (
+                "google_client_id",
+                "google_client_secret",
+                "google_refresh_token",
+            )
         ):
             try:
                 creds.token = refresh_access_token()
@@ -157,19 +162,10 @@ def fetch_contacts(
         return []
 
 
-# Für orchestrator.gather_triggers wird nur fetch_contacts gebraucht.
-# Wenn du später eine Normalisierung brauchst, kannst du hier eine Funktion ergänzen.
-
-
-def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None) -> List[Dict[str, Any]]:
-    """Fetch contacts and normalise them into trigger records.
-
-    The function extracts basic fields from the contact's notes and sends a
-    friendly e-mail when required fields are missing. It returns a list of
-    dictionaries compatible with the orchestrator's trigger format used in the
-    tests.
-    """
-
+def scheduled_poll(
+    fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None,
+) -> List[Dict[str, Any]]:
+    """Fetch contacts and normalise them into trigger records."""
     if fetch_fn is None:
         fetch_fn = fetch_contacts
     contacts = fetch_fn() or []
@@ -178,7 +174,11 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
     for person in contacts:
         email = _primary_email(person) or ""
         notes = _notes_blob(person)
-        names = [n.get("displayName") for n in person.get("names", []) if n.get("displayName")]
+        names = [
+            n.get("displayName")
+            for n in person.get("names", [])
+            if n.get("displayName")
+        ]
         joined_names = " ".join(names)
         summary_text = f"{notes} {joined_names}"
         matched_trigger = next(
@@ -193,7 +193,11 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
             log_step(
                 "contacts",
                 "trigger_detected",
-                {"contact_id": contact_id, "name": joined_names, "trigger": matched_trigger},
+                {
+                    "contact_id": contact_id,
+                    "name": joined_names,
+                    "trigger": matched_trigger,
+                },
             )
         else:
             suggestions = suggest_similar(summary_text)
@@ -230,8 +234,12 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
             )
             continue
 
-        company = parser.extract_company(notes) or parser.extract_company(joined_names) or ""
-        domain = parser.extract_domain(notes) or parser.extract_domain(joined_names) or ""
+        company = (
+            parser.extract_company(notes) or parser.extract_company(joined_names) or ""
+        )
+        domain = (
+            parser.extract_domain(notes) or parser.extract_domain(joined_names) or ""
+        )
         phone = parser.extract_phone(notes) or parser.extract_phone(joined_names) or ""
 
         payload: Dict[str, Any] = {
@@ -250,9 +258,8 @@ def scheduled_poll(fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None
         missing_opt = [f for f in optional_fields() if not payload.get(f)]
         try:
             if missing_req:
-                body = (
-                    "Please provide the following information:\n"
-                    + "\n".join(f"{f}:" for f in missing_req + missing_opt)
+                body = "Please provide the following information:\n" + "\n".join(
+                    f"{f}:" for f in missing_req + missing_opt
                 )
                 email_sender.send(
                     to=email or "admin@condata.io",
