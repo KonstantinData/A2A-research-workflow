@@ -22,6 +22,7 @@ except Exception:
 
 from integrations.google_oauth import build_user_credentials  # type: ignore
 from googleapiclient.discovery import build  # type: ignore
+from core.trigger_words import load_trigger_words
 
 CAL_SCOPE = "https://www.googleapis.com/auth/calendar.readonly"
 
@@ -122,6 +123,8 @@ def main() -> int:
 
     cal_ids = _parse_calendar_ids(args.cal_ids or os.getenv("GOOGLE_CALENDAR_IDS"))
     words = _split_words(args.words or os.getenv("TRIGGER_WORDS"))
+    if not words:
+        words = load_trigger_words()
     raw_regex = args.regex or os.getenv("TRIGGER_REGEX")
     pattern = _build_pattern(words, raw_regex)
 
