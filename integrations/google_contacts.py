@@ -32,11 +32,7 @@ SCOPES = [
 
 from core.trigger_words import load_trigger_words, contains_trigger, suggest_similar
 from core import summarize, parser
-from core.utils import (
-    required_fields,
-    optional_fields,
-    log_step,
-)
+from core.utils import required_fields, optional_fields, log_step
 from . import email_sender
 
 
@@ -78,7 +74,8 @@ def fetch_contacts(
 
     if build is None or Request is None:  # pragma: no cover
         log_step("contacts", "google_api_client_missing", {}, severity="error")
-        if SETTINGS.live_mode == 1:
+        # Raw env so tests that set LIVE_MODE=1 get the expected RuntimeError
+        if os.getenv("LIVE_MODE", "1") == "1":
             raise RuntimeError("google_api_client_missing")
         return []
 

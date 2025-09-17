@@ -25,12 +25,16 @@ Normalized = Dict[str, Any]
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
+# --- Test-facing module constants (can be monkeypatched in tests) ---
+LOOKAHEAD_DAYS = SETTINGS.cal_lookahead_days
+LOOKBACK_DAYS = SETTINGS.cal_lookback_days
+CAL_IDS: List[str] = SETTINGS.google_calendar_ids or ["primary"]
+
 
 def _time_window() -> tuple[str, str]:
     now = dt.datetime.utcnow().replace(tzinfo=dt.timezone.utc)
-    # Read values at runtime from SETTINGS (no import-time caching)
-    tmin = now - dt.timedelta(days=SETTINGS.cal_lookback_days)
-    tmax = now + dt.timedelta(days=SETTINGS.cal_lookahead_days)
+    tmin = now - dt.timedelta(days=LOOKBACK_DAYS)
+    tmax = now + dt.timedelta(days=LOOKAHEAD_DAYS)
     return tmin.isoformat(), tmax.isoformat()
 
 
@@ -91,7 +95,8 @@ def fetch_events() -> List[Normalized]:
     results: List[Normalized] = []
     if not build or not Credentials:
         log_step("calendar", "google_api_client_missing", {}, severity="error")
-        if SETTINGS.live_mode == 1:
+        # Use raw env so tests that set LIVE_MODE=1 get the expected RuntimeError
+        if os.getenv("LIVE_MODE", "1") == "1":
             raise RuntimeError("google_api_client_missing")
         return results
     try:
@@ -126,8 +131,8 @@ def fetch_events() -> List[Normalized]:
 
         service = build("calendar", "v3", credentials=creds, cache_discovery=False)
 
-        # Read calendar IDs at runtime from SETTINGS
-        cal_ids: List[str] = SETTINGS.google_calendar_ids or ["primary"]
+        # Use test-facing CAL_IDS (can be monkeypatched)
+        cal_ids: List[str] = CAL_IDS or ["primary"]
 
         try:
             service.calendarList().get(calendarId=cal_ids[0]).execute()
