@@ -1,66 +1,37 @@
-name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      # stabile Defaults für Unit-Tests (keine echten Außenbindungen)
-      TRIGGER_WORDS_FILE: tests/fixtures/triggers.txt
-      SMTP_HOST: localhost
-      SMTP_PORT: 2525
-      MAIL_FROM: ci@example.test
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install dev dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements-dev.txt
-
-      - name: Validate CI/CD workflow YAML
-        run: python -c "import yaml; yaml.safe_load(open('.github/workflows/ci_cd.yml'))"
-
-      - name: No-legacy-OAuth guard
-        run: python ops/no_legacy_oauth_guard.py
-
-      - name: Run tests
-        run: |
-          python -m pytest \
-            tests/test_calendar_fetch.py \
-            tests/test_ci_cd_workflow_yaml.py \
-            tests/test_orchestrator.py \
-            tests/test_utils.py -q
-
-      - name: Upload workflow logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: workflow-logs
-          path: logs/workflows
-
-  smoke:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: "Smoke: container build & run"
-        run: |
-          docker build -t a2a:ci -f ops/Dockerfile .
-          docker run --rm -e USE_PUSH_TRIGGERS=1 -v "$PWD"/output:/app/output a2a:ci || true
-          test -d output/exports
+ name: CI
+@@
+   build:
+     runs-on: ubuntu-latest
+     timeout-minutes: 15
+     env:
+-      # Stable defaults for unit tests (no real external connections)
+-      TRIGGER_WORDS_FILE: tests/fixtures/triggers.txt
+-      SMTP_HOST: localhost
+-      SMTP_PORT: 2525
+-      MAIL_FROM: ci@example.test
++      # Stable defaults for unit tests (no real external connections)
++      TRIGGER_WORDS_FILE: tests/fixtures/triggers.txt
++      SMTP_HOST: localhost
++      SMTP_PORT: 2525
++      MAIL_FROM: ci@example.test
+     steps:
+@@
+-      - name: Run tests
+-        run: |
+-          python -m pytest \
+-            tests/test_calendar_fetch.py \
+-            tests/test_ci_cd_workflow_yaml.py \
+-            tests/test_orchestrator.py \
+-            tests/test_utils.py -q
++      - name: Run tests
++        env:
++          # Force TEST mode (applied in settings.py: lookback=1, lookahead=14, live_mode=0)
++          A2A_TEST_MODE: "1"
++          LIVE_MODE: "0"
++          # Do NOT set CAL_* in CI; if they exist in repo/org settings, TEST mode ignores them
++        run: |
++          python -m pytest \
++            tests/test_calendar_fetch.py \
++            tests/test_ci_cd_workflow_yaml.py \
++            tests/test_orchestrator.py \
++            tests/test_utils.py -q
