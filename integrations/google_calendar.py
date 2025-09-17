@@ -23,16 +23,14 @@ except Exception:
 
 Normalized = Dict[str, Any]
 
-LOOKAHEAD_DAYS = SETTINGS.cal_lookahead_days
-LOOKBACK_DAYS = SETTINGS.cal_lookback_days
-CAL_IDS = SETTINGS.google_calendar_ids or ["primary"]
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 
 def _time_window() -> tuple[str, str]:
     now = dt.datetime.utcnow().replace(tzinfo=dt.timezone.utc)
-    tmin = now - dt.timedelta(days=LOOKBACK_DAYS)
-    tmax = now + dt.timedelta(days=LOOKAHEAD_DAYS)
+    # Laufzeitwerte direkt aus SETTINGS (kein Import-Caching)
+    tmin = now - dt.timedelta(days=SETTINGS.cal_lookback_days)
+    tmax = now + dt.timedelta(days=SETTINGS.cal_lookahead_days)
     return tmin.isoformat(), tmax.isoformat()
 
 
@@ -62,7 +60,7 @@ def _normalize(ev: Dict[str, Any], cal_id: str) -> Normalized:
 
 
 COMPANY_REGEX = r"\b([A-Z][A-Za-z0-9&.\- ]{2,}\s(?:GmbH|AG|KG|SE|Ltd|Inc|LLC))\b"
-DOMAIN_REGEX  = r"\b([a-z0-9\-]+\.[a-z]{2,})(/[\S]*)?\b"
+DOMAIN_REGEX = r"\b([a-z0-9\-]+\.[a-z]{2,})(/[\S]*)?\b"
 
 
 def contains_trigger(text: str) -> bool:
@@ -106,9 +104,14 @@ def fetch_events() -> List[Normalized]:
                 severity="error",
             )
             return []
+
         if all(
             getattr(SETTINGS, a, None)
-            for a in ("google_client_id", "google_client_secret", "google_refresh_token")
+            for a in (
+                "google_client_id",
+                "google_client_secret",
+                "google_refresh_token",
+            )
         ):
             try:
                 creds.token = refresh_access_token()
@@ -120,9 +123,14 @@ def fetch_events() -> List[Normalized]:
                     severity="error",
                 )
                 return []
+
         service = build("calendar", "v3", credentials=creds, cache_discovery=False)
+
+        # Kalender-IDs erst zur Laufzeit aus SETTINGS lesen
+        cal_ids: List[str] = SETTINGS.google_calendar_ids or ["primary"]
+
         try:
-            service.calendarList().get(calendarId=CAL_IDS[0]).execute()
+            service.calendarList().get(calendarId=cal_ids[0]).execute()
         except Exception as e:
             code, hint = classify_oauth_error(e)
             cid_tail = (os.getenv("GOOGLE_CLIENT_ID") or "")[-8:]
@@ -140,7 +148,7 @@ def fetch_events() -> List[Normalized]:
             return []
 
         tmin, tmax = _time_window()
-        for cal_id in CAL_IDS:
+        for cal_id in cal_ids:
             token = None
             while True:
                 resp = (
@@ -170,7 +178,7 @@ def fetch_events() -> List[Normalized]:
                 if not token:
                     break
 
-        log_step("calendar", "fetch_ok", {"calendars": CAL_IDS, "count": len(results)})
+        log_step("calendar", "fetch_ok", {"calendars": cal_ids, "count": len(results)})
     except Exception as e:  # pragma: no cover
         code, hint = classify_oauth_error(e)
         cid_tail = (os.getenv("GOOGLE_CLIENT_ID") or "")[-8:]
