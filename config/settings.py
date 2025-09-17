@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List
@@ -9,6 +10,7 @@ from .env import ensure_mail_from
 
 
 ensure_mail_from()
+_log = logging.getLogger(__name__)
 
 
 def _default_root() -> Path:
@@ -16,6 +18,24 @@ def _default_root() -> Path:
     if project_root:
         return Path(project_root).expanduser()
     return Path(__file__).resolve().parent.parent
+
+
+def _int_env(name: str, default: int) -> int:
+    """Parse integer env var with trimming + safe fallback + warning."""
+    raw = os.getenv(name, str(default))
+    try:
+        return int(str(raw).strip())
+    except Exception:
+        _log.warning("Invalid int for %s=%r; falling back to %d", name, raw, default)
+        return int(default)
+
+
+def _bool_env(name: str, default: bool) -> bool:
+    """Parse boolean-ish env var (1/0, true/false, yes/no, on/off)."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
 @dataclass
@@ -31,10 +51,10 @@ class _Settings:
 
     # --- Calendar / Contacts ---
     cal_lookback_days: int = field(
-        default_factory=lambda: int(os.getenv("CAL_LOOKBACK_DAYS", "1"))
+        default_factory=lambda: _int_env("CAL_LOOKBACK_DAYS", 1)
     )
     cal_lookahead_days: int = field(
-        default_factory=lambda: int(os.getenv("CAL_LOOKAHEAD_DAYS", "14"))
+        default_factory=lambda: _int_env("CAL_LOOKAHEAD_DAYS", 14)
     )
     google_calendar_ids: List[str] = field(
         default_factory=lambda: [
@@ -44,21 +64,21 @@ class _Settings:
         ]
     )
     contacts_page_size: int = field(
-        default_factory=lambda: int(os.getenv("CONTACTS_PAGE_SIZE", "200"))
+        default_factory=lambda: _int_env("CONTACTS_PAGE_SIZE", 200)
     )
     contacts_page_limit: int = field(
-        default_factory=lambda: int(os.getenv("CONTACTS_PAGE_LIMIT", "10"))
+        default_factory=lambda: _int_env("CONTACTS_PAGE_LIMIT", 10)
     )
 
     # --- LIVE / Policy ---
     # Email-Empfänger für Operator-/Admin-Alarme (Pflicht im LIVE)
     admin_email: str = field(default_factory=lambda: os.getenv("ADMIN_EMAIL", ""))
     # Harte LIVE-Schaltung (1=LIVE, 0=DEV); steuert Fail-Fast & No-Dummy-Policy
-    live_mode: int = field(default_factory=lambda: int(os.getenv("LIVE_MODE", "1")))
+    live_mode: int = field(default_factory=lambda: _int_env("LIVE_MODE", 1))
+    # Explizites Test-Profil (macht Tests deterministisch)
+    test_mode: bool = field(default_factory=lambda: _bool_env("A2A_TEST_MODE", False))
     # Erzwingt HubSpot-Live-Daten (1) statt statischer Dummydaten (0)
-    require_hubspot: int = field(
-        default_factory=lambda: int(os.getenv("REQUIRE_HUBSPOT", "0"))
-    )
+    require_hubspot: int = field(default_factory=lambda: _int_env("REQUIRE_HUBSPOT", 0))
     # Optional: E-Mail-Allowlist-Domain zum Schutz vor Fehlversand
     smtp_allowlist_domain: str = field(
         default_factory=lambda: os.getenv("ALLOWLIST_EMAIL_DOMAIN", "")
@@ -66,22 +86,22 @@ class _Settings:
 
     # --- Feature Flags ---
     use_push_triggers: bool = field(
-        default_factory=lambda: os.getenv("USE_PUSH_TRIGGERS", "0") == "1"
+        default_factory=lambda: _bool_env("USE_PUSH_TRIGGERS", False)
     )
     enable_pro_sources: bool = field(
-        default_factory=lambda: os.getenv("ENABLE_PRO_SOURCES", "0") == "1"
+        default_factory=lambda: _bool_env("ENABLE_PRO_SOURCES", False)
     )
     attach_pdf_to_hubspot: bool = field(
-        default_factory=lambda: os.getenv("ATTACH_PDF_TO_HUBSPOT", "1") == "1"
+        default_factory=lambda: _bool_env("ATTACH_PDF_TO_HUBSPOT", True)
     )
     enable_summary: bool = field(
-        default_factory=lambda: os.getenv("ENABLE_SUMMARY", "0") == "1"
+        default_factory=lambda: _bool_env("ENABLE_SUMMARY", False)
     )
     enable_graph_storage: bool = field(
-        default_factory=lambda: os.getenv("ENABLE_GRAPH_STORAGE", "0") == "1"
+        default_factory=lambda: _bool_env("ENABLE_GRAPH_STORAGE", False)
     )
     allow_static_company_data: bool = field(
-        default_factory=lambda: os.getenv("ALLOW_STATIC_COMPANY_DATA", "0") == "1"
+        default_factory=lambda: _bool_env("ALLOW_STATIC_COMPANY_DATA", False)
     )
 
     def __post_init__(self) -> None:
@@ -109,6 +129,16 @@ class _Settings:
         else:
             exports_subdir = os.getenv("EXPORTS_SUBDIR", "exports")
             self.exports_dir = self._resolve_subpath(self.output_dir, exports_subdir)
+
+        # TEST-PROFIL: harte Defaults + LIVE off, unabhängig von CI-ENV
+        if self.test_mode:
+            if os.getenv("CAL_LOOKBACK_DAYS"):
+                _log.warning("Ignoring CAL_LOOKBACK_DAYS in TEST mode")
+            if os.getenv("CAL_LOOKAHEAD_DAYS"):
+                _log.warning("Ignoring CAL_LOOKAHEAD_DAYS in TEST mode")
+            self.cal_lookback_days = 1
+            self.cal_lookahead_days = 14
+            self.live_mode = 0  # niemals hart failen (z. B. SMTP) in Tests
 
     def _resolve_path(self, value: str | Path) -> Path:
         path = Path(value).expanduser()
