@@ -28,6 +28,20 @@ Normalized = Dict[str, Any]
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 
+# Module level defaults are kept for compatibility with tests that patch these
+# attributes directly. Runtime helpers still read the live environment so CI
+# runs can override values via secrets/variables without relying on the
+# constants staying in sync.
+_DEFAULT_CAL_IDS = getattr(SETTINGS, "google_calendar_ids", None) or ["primary"]
+CAL_IDS = [
+    cid
+    for cid in (str(x).strip() for x in _DEFAULT_CAL_IDS)
+    if cid
+]
+LOOKBACK_DAYS = SETTINGS.cal_lookback_days
+LOOKAHEAD_DAYS = SETTINGS.cal_lookahead_days
+
+
 def _env_int(name: str, default: int) -> int:
     raw = os.getenv(name)
     if raw is None or not str(raw).strip():
@@ -59,14 +73,16 @@ def _calendar_ids() -> List[str]:
     env_ids = _parse_calendar_ids(os.getenv("GOOGLE_CALENDAR_IDS"))
     if env_ids:
         return env_ids
+    if CAL_IDS:
+        return list(dict.fromkeys(str(x).strip() for x in CAL_IDS if str(x).strip()))
     fallback = getattr(SETTINGS, "google_calendar_ids", None) or ["primary"]
     cleaned = [str(x).strip() for x in fallback if str(x).strip()]
     return list(dict.fromkeys(cleaned)) or ["primary"]
 
 
 def _time_window() -> tuple[str, str]:
-    lookback = _env_int("CAL_LOOKBACK_DAYS", SETTINGS.cal_lookback_days)
-    lookahead = _env_int("CAL_LOOKAHEAD_DAYS", SETTINGS.cal_lookahead_days)
+    lookback = _env_int("CAL_LOOKBACK_DAYS", LOOKBACK_DAYS)
+    lookahead = _env_int("CAL_LOOKAHEAD_DAYS", LOOKAHEAD_DAYS)
     now = dt.datetime.utcnow().replace(tzinfo=dt.timezone.utc)
     tmin = now - dt.timedelta(days=lookback)
     tmax = now + dt.timedelta(days=lookahead)
