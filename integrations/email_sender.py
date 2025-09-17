@@ -21,6 +21,7 @@ from config.env import ensure_mail_from
 from .mailer import send_email as _send_email  # tatsächlicher SMTP/Provider-Client
 from core.utils import log_step
 from integrations import email_reader
+from config.settings import SETTINGS
 
 
 def _validate_recipient(to: str) -> str | None:
@@ -137,7 +138,7 @@ def _deliver(
     mail_from = os.environ.get("MAIL_FROM") or user
     secure = os.environ.get("SMTP_SECURE", "ssl").lower()
     if not host or not user or not password:
-        if os.getenv("LIVE_MODE", "1") == "1":
+        if SETTINGS.live_mode == 1:
             raise RuntimeError("SMTP not configured; cannot send emails in LIVE mode")
         return
     allow_env = os.getenv("ALLOWLIST_EMAIL_DOMAIN", "").strip()
@@ -186,12 +187,8 @@ def send(
 
     try:
         _deliver(validated_to, subject, body, attachments, **deliver_kwargs)
-        log_step(
-            "orchestrator", "mail_sent", {"to": validated_to, "subject": subject}
-        )
-        _record_outbound_correlation(
-            message_id, task_id=task_id, event_id=event_id
-        )
+        log_step("orchestrator", "mail_sent", {"to": validated_to, "subject": subject})
+        _record_outbound_correlation(message_id, task_id=task_id, event_id=event_id)
     except Exception as e:  # pragma: no cover - network errors
         log_step(
             "orchestrator",
@@ -267,9 +264,7 @@ def send_email(
                 "mail_sent",
                 {"to": validated_to, "subject": subject},
             )
-            _record_outbound_correlation(
-                message_id, task_id=task_id, event_id=event_id
-            )
+            _record_outbound_correlation(message_id, task_id=task_id, event_id=event_id)
             return
         except Exception as e:  # pragma: no cover - network errors
             last_exc = e
@@ -291,7 +286,9 @@ def send_email(
         raise last_exc
 
 
-def request_missing_fields(task: dict, missing_fields: list[str], recipient_email: str) -> None:
+def request_missing_fields(
+    task: dict, missing_fields: list[str], recipient_email: str
+) -> None:
     """
     Send a collegial email to the event/contact creator asking for missing details.
     The colleague can simply reply to this email with the information.
@@ -351,14 +348,20 @@ def send_missing_fields_reminder(
         f"{missing_fmt}\n"
         "You can simply reply to this email with the information.\n"
         "Updating the calendar entry is optional.\n\n"
-        "Thanks a lot for your help!\n\n"
+        "Thanks a lot for your help!\n"
+        "\n"
         "Best regards,\n"
         "Your colleague from the Research Team"
     )
 
     allow = os.getenv("ALLOWLIST_EMAIL_DOMAIN")
     if allow and not recipient_email.lower().endswith(f"@{allow.lower()}"):
-        log_step("mailer", "reminder_skipped_invalid_domain", {"to": recipient_email}, severity="warning")
+        log_step(
+            "mailer",
+            "reminder_skipped_invalid_domain",
+            {"to": recipient_email},
+            severity="warning",
+        )
         return
     send_kwargs = {}
     task_id = task.get("id")
@@ -450,7 +453,9 @@ Thanks a lot for your support!
 
 
 # Backwards compatibility helper used in a few places in the project.
-def send_missing_info_reminder(trigger: dict) -> None:  # pragma: no cover - thin wrapper
+def send_missing_info_reminder(
+    trigger: dict,
+) -> None:  # pragma: no cover - thin wrapper
     creator_email = trigger.get("creator")
     creator_name = trigger.get("creator_name")
     title = trigger.get("title") or "Untitled Event"
