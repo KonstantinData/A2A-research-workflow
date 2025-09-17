@@ -6,7 +6,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Callable, Optional
+from typing import Any, Callable, Dict, List, Optional
 import shutil
 import threading
 
@@ -22,6 +22,7 @@ from core import exports as export_utils
 from core import hubspot_ops
 from core import run_loop
 from core import triggers as trigger_utils
+from core.trigger_words import load_trigger_words
 from config.env import ensure_mail_from
 from config.settings import SETTINGS
 from integrations.google_calendar import fetch_events, extract_company, extract_domain
@@ -151,8 +152,12 @@ if not _GOOGLE_CALENDAR_IDS:
 SETTINGS.cal_lookback_days = _CAL_LOOKBACK_DAYS
 SETTINGS.cal_lookahead_days = _CAL_LOOKAHEAD_DAYS
 SETTINGS.google_calendar_ids = list(_GOOGLE_CALENDAR_IDS)
-SETTINGS.google_client_id = os.getenv("GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_ID_V2") or ""
-SETTINGS.google_client_secret = os.getenv("GOOGLE_CLIENT_SECRET") or os.getenv("GOOGLE_CLIENT_SECRET_V2") or ""
+SETTINGS.google_client_id = os.getenv("GOOGLE_CLIENT_ID") or getattr(
+    SETTINGS, "google_client_id", ""
+)
+SETTINGS.google_client_secret = os.getenv("GOOGLE_CLIENT_SECRET") or getattr(
+    SETTINGS, "google_client_secret", ""
+)
 SETTINGS.google_refresh_token = os.getenv("GOOGLE_REFRESH_TOKEN") or ""
 SETTINGS.google_token_uri = os.getenv("GOOGLE_TOKEN_URI") or getattr(
     SETTINGS, "google_token_uri", "https://oauth2.googleapis.com/token"
@@ -188,8 +193,6 @@ def _assert_live_ready() -> None:
     ensure_mail_from()
     
     def _is_set(name: str) -> bool:
-        if name in {"GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"}:
-            return bool(os.getenv(name) or os.getenv(f"{name}_V2"))
         return bool(os.getenv(name))
     required = [
         "GOOGLE_REFRESH_TOKEN",

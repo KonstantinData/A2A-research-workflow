@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import os
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
 
 import requests
 
@@ -17,15 +17,19 @@ except Exception:
 DEFAULT_TOKEN_URI = "https://oauth2.googleapis.com/token"
 
 
+LEGACY_SUFFIX = "_V2"
+LEGACY_KEYS = tuple(f"GOOGLE_CLIENT_{part}" for part in ("ID", "SECRET"))
+
+
+def _check_for_legacy_env() -> None:
+    for base in LEGACY_KEYS:
+        legacy_key = base + LEGACY_SUFFIX
+        if os.getenv(legacy_key):
+            raise RuntimeError(f"Legacy Google OAuth environment variable detected: {legacy_key}")
+
+
 def _get_env(name: str) -> Optional[str]:
-    value = os.getenv(name)
-    if value:
-        return value
-    if name in {"GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"}:
-        legacy = os.getenv(f"{name}_V2")
-        if legacy:
-            return legacy
-    return None
+    return os.getenv(name)
 
 
 class OAuthError(Exception):
@@ -35,6 +39,7 @@ class OAuthError(Exception):
 def build_user_credentials(scopes: List[str]) -> Optional["Credentials"]:
     if Credentials is None:
         return None
+    _check_for_legacy_env()
     client_id = _get_env("GOOGLE_CLIENT_ID")
     client_secret = _get_env("GOOGLE_CLIENT_SECRET")
     refresh_token = os.getenv("GOOGLE_REFRESH_TOKEN")
@@ -67,6 +72,7 @@ def classify_oauth_error(err: Exception) -> Tuple[str, str]:
 
 
 def refresh_access_token() -> str:
+    _check_for_legacy_env()
     payload = {
         "client_id": _get_env("GOOGLE_CLIENT_ID")
         or getattr(SETTINGS, "google_client_id", ""),
