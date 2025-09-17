@@ -2,6 +2,7 @@ import datetime as dt
 import sys
 from pathlib import Path
 
+# Projekt-Root in den Pfad aufnehmen
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from integrations import email_sender
@@ -20,33 +21,42 @@ def test_send_reminder_formats_subject_and_body(monkeypatch):
         task_id=None,
         event_id=None,
     ):
-        captured['subject'] = subject
-        captured['body'] = body
+        captured["subject"] = subject
+        captured["body"] = body
 
-    monkeypatch.setattr(email_sender, 'send', fake_send)
+    # Allowlist passend zur Empfängeradresse setzen, damit send_reminder() nicht frühzeitig abbricht
+    monkeypatch.setenv("ALLOWLIST_EMAIL_DOMAIN", "condata.io")
+
+    # send() wird von send_reminder() aufgerufen -> dieses Ziel patchen
+    monkeypatch.setattr(email_sender, "send", fake_send)
 
     start = dt.datetime(2024, 5, 17, 9, 0)
     end = dt.datetime(2024, 5, 17, 10, 0)
 
     email_sender.send_reminder(
-        to='user@condata.io',
-        creator_email='user@condata.io',
-        creator_name='Alice',
-        event_id='evt123',
-        event_title='Team Sync',
+        to="user@condata.io",
+        creator_email="user@condata.io",
+        creator_name="Alice",
+        event_id="evt123",
+        event_title="Team Sync",
         event_start=start,
         event_end=end,
-        missing_fields=['Company', 'Web domain'],
+        missing_fields=["Company", "Web domain"],
     )
 
-    assert 'Team Sync' in captured['subject']
-    assert '2024-05-17' in captured['subject']
-    assert '09:00–10:00' in captured['subject']
-    assert 'Unknown' not in captured['subject']
-    assert '_' not in captured['subject']
+    # Subject-Checks
+    assert "Team Sync" in captured["subject"]
+    assert "2024-05-17" in captured["subject"]
+    assert "09:00–10:00" in captured["subject"]
+    assert "Unknown" not in captured["subject"]
+    assert "_" not in captured["subject"]
 
-    body = captured['body']
-    for field in ['Company:', 'Web domain:', 'Email:', 'Phone:']:
+    # Body-Checks
+    body = captured["body"]
+    for field in ["Company:", "Web domain:", "Email:", "Phone:"]:
         assert field in body
-    assert 'You might also update the calendar entry or contact record with these details.' in body
-    assert 'Unknown' not in body
+    assert (
+        "You might also update the calendar entry or contact record with these details."
+        in body
+    )
+    assert "Unknown" not in body

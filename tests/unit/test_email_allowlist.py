@@ -9,10 +9,12 @@ from integrations import email_sender, mailer
 
 
 def test_send_email_blocked_by_allowlist(monkeypatch):
-    monkeypatch.setenv("ALLOWLIST_EMAIL_DOMAIN", "example.com")
+    monkeypatch.setenv("ALLOWLIST_EMAIL_DOMAIN", "condata.io")
 
     deliveries: list[tuple] = []
-    monkeypatch.setattr(email_sender, "_deliver", lambda *a, **k: deliveries.append((a, k)))
+    monkeypatch.setattr(
+        email_sender, "_deliver", lambda *a, **k: deliveries.append((a, k))
+    )
 
     logs: list[tuple] = []
     monkeypatch.setattr(email_sender, "log_step", lambda *a, **k: logs.append((a, k)))
