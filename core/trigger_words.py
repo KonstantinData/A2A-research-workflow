@@ -10,6 +10,7 @@ from core.utils import normalize_text as _normalize_text
 
 try:  # Optional OpenAI integration
     import openai as _openai  # type: ignore
+
     if not os.getenv("OPENAI_API_KEY"):
         # Without an API key the library would fail on first use; keep it None so
         # tests run in offline environments.
@@ -38,6 +39,7 @@ TRIGGERS: List[str] = [
     "meetingvorbereitung",
     "terminvorbereitung",
     "unternehmensrecherche",
+    "customer-meeting",
 ]
 
 
@@ -74,7 +76,6 @@ def load_trigger_words() -> List[str]:
         variants.add(w.replace(" ", ""))
         variants.add(w.replace("-", ""))
     return sorted(variants)
-
 
 
 def _levenshtein_leq1(a: str, b: str) -> bool:
@@ -142,9 +143,7 @@ def contains_trigger(
             text.get("location") or "",
         ]
         attendee_emails = [
-            a.get("email", "")
-            for a in text.get("attendees", [])
-            if isinstance(a, dict)
+            a.get("email", "") for a in text.get("attendees", []) if isinstance(a, dict)
         ]
         parts.extend(attendee_emails)
         norm = " ".join(normalize_text(p) for p in parts if p)
@@ -164,7 +163,9 @@ def contains_trigger(
     return False
 
 
-def suggest_similar(text: str, *, threshold: float = 0.85, max_results: int = 3) -> List[str]:
+def suggest_similar(
+    text: str, *, threshold: float = 0.85, max_results: int = 3
+) -> List[str]:
     """Return trigger words that are similar to words in ``text``.
 
     The function performs a fuzzy comparison between each word in ``text`` and the
@@ -211,7 +212,9 @@ def extract_company(title: str, trigger: str) -> str:
         return "Unknown"
 
     remainder = title[idx + len(trigger) :].lstrip(" :-–—").strip()
-    remainder = re.sub(r"^(firma|company|client)\s+", "", remainder, flags=re.IGNORECASE)
+    remainder = re.sub(
+        r"^(firma|company|client)\s+", "", remainder, flags=re.IGNORECASE
+    )
     if remainder:
         return remainder
 
