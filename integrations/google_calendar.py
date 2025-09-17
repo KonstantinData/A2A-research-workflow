@@ -18,9 +18,12 @@ from .google_oauth import (
 
 try:
     from google.oauth2.credentials import Credentials
-    from googleapiclient.discovery import build
 except Exception:
     Credentials = None
+
+try:
+    from googleapiclient.discovery import build
+except Exception:
     build = None
 
 Normalized = Dict[str, Any]
@@ -145,7 +148,7 @@ def extract_domain(text: str) -> str | None:
 def fetch_events() -> List[Normalized]:
     results: List[Normalized] = []
     cal_ids = _calendar_ids()
-    if not build or not Credentials:
+    if build is None:
         log_step("calendar", "google_api_client_missing", {}, severity="error")
         if os.getenv("LIVE_MODE", "1") == "1":
             raise RuntimeError("google_api_client_missing")
@@ -160,9 +163,16 @@ def fetch_events() -> List[Normalized]:
                 severity="error",
             )
             return []
-        if all(
-            getattr(SETTINGS, a, None)
-            for a in ("google_client_id", "google_client_secret", "google_refresh_token")
+        if (
+            hasattr(creds, "token")
+            and all(
+                getattr(SETTINGS, a, None)
+                for a in (
+                    "google_client_id",
+                    "google_client_secret",
+                    "google_refresh_token",
+                )
+            )
         ):
             try:
                 creds.token = refresh_access_token()
