@@ -28,7 +28,7 @@ SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 def _time_window() -> tuple[str, str]:
     now = dt.datetime.utcnow().replace(tzinfo=dt.timezone.utc)
-    # Laufzeitwerte direkt aus SETTINGS (kein Import-Caching)
+    # Read values at runtime from SETTINGS (no import-time caching)
     tmin = now - dt.timedelta(days=SETTINGS.cal_lookback_days)
     tmax = now + dt.timedelta(days=SETTINGS.cal_lookahead_days)
     return tmin.isoformat(), tmax.isoformat()
@@ -91,7 +91,7 @@ def fetch_events() -> List[Normalized]:
     results: List[Normalized] = []
     if not build or not Credentials:
         log_step("calendar", "google_api_client_missing", {}, severity="error")
-        if os.getenv("LIVE_MODE", "1") == "1":
+        if SETTINGS.live_mode == 1:
             raise RuntimeError("google_api_client_missing")
         return results
     try:
@@ -126,7 +126,7 @@ def fetch_events() -> List[Normalized]:
 
         service = build("calendar", "v3", credentials=creds, cache_discovery=False)
 
-        # Kalender-IDs erst zur Laufzeit aus SETTINGS lesen
+        # Read calendar IDs at runtime from SETTINGS
         cal_ids: List[str] = SETTINGS.google_calendar_ids or ["primary"]
 
         try:

@@ -13,7 +13,7 @@ from .google_oauth import (
     OAuthError,
 )
 
-# Google libs optional in Tests
+# Google libs optional in tests
 try:  # pragma: no cover
     from google.auth.transport.requests import Request
     from googleapiclient.discovery import build
@@ -69,8 +69,8 @@ def _notes_blob(person: Dict[str, Any]) -> str:
 def fetch_contacts(
     page_size: int | None = None, page_limit: int | None = None
 ) -> List[Dict[str, Any]]:
-    """Live-Fetch (in Tests typischerweise gemonkeypatched)."""
-    # Werte erst zur Laufzeit aus SETTINGS lesen, nicht beim Import cachen
+    """Live fetch (usually monkeypatched in tests)."""
+    # Read at runtime from SETTINGS (no import-time caching)
     if page_size is None:
         page_size = SETTINGS.contacts_page_size
     if page_limit is None:
@@ -78,7 +78,7 @@ def fetch_contacts(
 
     if build is None or Request is None:  # pragma: no cover
         log_step("contacts", "google_api_client_missing", {}, severity="error")
-        if os.getenv("LIVE_MODE", "1") == "1":
+        if SETTINGS.live_mode == 1:
             raise RuntimeError("google_api_client_missing")
         return []
 
@@ -122,7 +122,7 @@ def fetch_contacts(
         out: List[Dict[str, Any]] = []
         page_token: Optional[str] = None
         pages = 0
-        while True:  # pragma: no cover (in CI meist gemonkeypatched)
+        while True:  # pragma: no cover (typically monkeypatched in CI)
             resp = (
                 service.people()
                 .connections()
@@ -165,7 +165,7 @@ def fetch_contacts(
 def scheduled_poll(
     fetch_fn: Optional[Callable[[], List[Dict[str, Any]]]] = None,
 ) -> List[Dict[str, Any]]:
-    """Fetch contacts and normalise them into trigger records."""
+    """Fetch contacts and normalize them into trigger records."""
     if fetch_fn is None:
         fetch_fn = fetch_contacts
     contacts = fetch_fn() or []
