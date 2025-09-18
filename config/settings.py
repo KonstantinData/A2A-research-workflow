@@ -6,14 +6,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List
 
-try:
-    from dotenv import load_dotenv
-    # Load .env file from project root
-    env_path = Path(__file__).resolve().parent.parent / ".env"
-    if env_path.exists():
-        load_dotenv(env_path)
-except ImportError:
-    pass  # dotenv not available, continue without it
+# Load .env file for local development (GitHub Actions uses secrets)
+if not os.getenv("GITHUB_ACTIONS"):
+    try:
+        from dotenv import load_dotenv
+        env_path = Path(__file__).resolve().parent.parent / ".env"
+        if env_path.exists():
+            load_dotenv(env_path)
+    except ImportError:
+        pass
 
 from .env import ensure_mail_from
 
