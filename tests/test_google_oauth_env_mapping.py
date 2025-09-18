@@ -10,12 +10,13 @@ def test_primary_envs_work(monkeypatch):
     monkeypatch.setenv("GOOGLE_REFRESH_TOKEN","rt")
     assert build_user_credentials(SCOPES) is not None
 
-def test_legacy_envs_cause_error(monkeypatch):
+def test_legacy_envs_ignored(monkeypatch):
+    """Legacy OAuth variables are now ignored (v2-only mode)."""
     monkeypatch.setenv("GOOGLE_CLIENT_ID","id")
     monkeypatch.setenv("GOOGLE_CLIENT_SECRET","sec")
     monkeypatch.setenv("GOOGLE_REFRESH_TOKEN","rt")
     legacy_key = "GOOGLE_CLIENT_ID" + "_V2"
     monkeypatch.setenv(legacy_key, "legacy")
-    with pytest.raises(RuntimeError):
-        build_user_credentials(SCOPES)
+    # Should work fine - legacy vars are ignored
+    assert build_user_credentials(SCOPES) is not None
 
