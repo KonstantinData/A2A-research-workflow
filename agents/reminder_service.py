@@ -105,6 +105,11 @@ class ReminderScheduler:
         processed = 0
         try:
             for task in self._open_tasks():
+                # Validate required task fields
+                if not all(key in task for key in ["employee_email", "missing_fields", "id", "trigger"]):
+                    logger.warning("Skipping task with missing fields: %s", task.get("id", "unknown"))
+                    continue
+                    
                 email_client.send_email(
                     task["employee_email"], task["missing_fields"], task_id=task["id"]
                 )

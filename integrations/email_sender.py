@@ -141,7 +141,10 @@ def _deliver(
 ) -> None:
     """Send message using environment configured SMTP credentials."""
     host = os.environ.get("SMTP_HOST")
-    port = int(os.environ.get("SMTP_PORT", 587))
+    try:
+        port = int(os.environ.get("SMTP_PORT", 587))
+    except ValueError:
+        port = 587
     user = os.environ.get("SMTP_USER")
     password = os.environ.get("SMTP_PASS")
     ensure_mail_from()

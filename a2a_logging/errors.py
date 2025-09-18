@@ -48,9 +48,11 @@ class HardFailError(A2AError):
                 labels=labels,
                 run_url=run_url,
             )
-        except Exception:
-            # We deliberately ignore errors here – the original exception is more
+        except requests.RequestException as e:
+            # We deliberately ignore GitHub API errors – the original exception is more
             # important than the failure to file an issue.
+            import logging
+            logging.getLogger(__name__).warning("Failed to create GitHub issue: %s", e)
             self.issue_url = None
 
 

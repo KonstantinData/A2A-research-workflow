@@ -135,13 +135,15 @@ def run_researchers(
                 )
                 
                 # Extract creator email with fallbacks
-                creator_email = (
-                    trigger.get("creator") or 
-                    payload.get("creatorEmail") or
-                    (payload.get("creator") or {}).get("email") or
-                    (payload.get("organizer") or {}).get("email") or
-                    payload.get("organizerEmail")
-                )
+                def _extract_creator_email(trigger, payload):
+                    return (
+                        trigger.get("creator") or 
+                        payload.get("creatorEmail") or
+                        (payload.get("creator") or {}).get("email") or
+                        (payload.get("organizer") or {}).get("email") or
+                        payload.get("organizerEmail")
+                    )
+                creator_email = _extract_creator_email(trigger, payload)
                 
                 if creator_email:
                     try:

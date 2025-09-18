@@ -20,6 +20,7 @@ def test_small_attachment_sent(monkeypatch, tmp_path):
 
     # Allowlist deaktivieren, sonst kehrt send_email() früh zurück
     monkeypatch.setenv("ALLOWLIST_EMAIL_DOMAIN", "")
+    monkeypatch.setenv("LIVE_MODE", "0")
 
     monkeypatch.setenv("SMTP_HOST", "localhost")
     monkeypatch.setenv("SMTP_USER", "u")
@@ -45,6 +46,7 @@ def test_large_attachment_skipped(monkeypatch, tmp_path):
 
     # Allowlist deaktivieren
     monkeypatch.setenv("ALLOWLIST_EMAIL_DOMAIN", "")
+    monkeypatch.setenv("LIVE_MODE", "0")
 
     monkeypatch.setenv("SMTP_HOST", "localhost")
     monkeypatch.setenv("SMTP_USER", "u")
