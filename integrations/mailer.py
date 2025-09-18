@@ -66,7 +66,7 @@ def _send_via_smtp(host: str, port: int, user: str, password: str, mail_from: st
             with smtplib.SMTP_SSL(host, port, context=context) as smtp:
                 smtp.login(user, password)
                 smtp.sendmail(mail_from, [recipient], msg.as_string())
-        elif secure == "tls":
+        elif secure in ("tls", "starttls"):
             with smtplib.SMTP(host, port) as smtp:
                 smtp.starttls(context=ssl.create_default_context())
                 smtp.login(user, password)
