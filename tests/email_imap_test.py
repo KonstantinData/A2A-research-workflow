@@ -14,8 +14,9 @@ try:
     from dotenv import load_dotenv, find_dotenv  # type: ignore
 
     load_dotenv(find_dotenv(usecwd=True))
-except Exception:
-    pass
+except ImportError as e:
+    import logging
+    logging.getLogger(__name__).warning("Failed to load dotenv: %s", e)
 
 
 def connect_imap(host: str, port: int, secure: str) -> imaplib.IMAP4:
@@ -50,7 +51,7 @@ def fetch_headers_uid(client: imaplib.IMAP4, uids: List[bytes]) -> List[Dict[str
                 if b"RFC822.SIZE" in meta:
                     try:
                         size = int(meta.split(b"RFC822.SIZE")[1].split()[0])
-                    except Exception:
+                    except (ValueError, IndexError):
                         size = None
         msg = BytesParser(policy=default_policy).parsebytes(headers_bytes or b"")
         out.append(
@@ -85,7 +86,7 @@ def fetch_headers_seq(client: imaplib.IMAP4, ids: List[bytes]) -> List[Dict[str,
                 if b"RFC822.SIZE" in meta:
                     try:
                         size = int(meta.split(b"RFC822.SIZE")[1].split()[0])
-                    except Exception:
+                    except (ValueError, IndexError):
                         size = None
         msg = BytesParser(policy=default_policy).parsebytes(headers_bytes or b"")
         out.append(
@@ -177,7 +178,7 @@ def main() -> int:
                     for c in getattr(client, "capabilities", [])
                 ]
             )
-        except Exception:
+        except (AttributeError, UnicodeDecodeError):
             capabilities = []
 
         typ, select_data = client.select(args.folder, readonly=True)
@@ -187,7 +188,7 @@ def main() -> int:
         try:
             if select_data and select_data[0]:
                 exists_count = int(select_data[0])
-        except Exception:
+        except (ValueError, IndexError, TypeError):
             exists_count = None
 
         # Build search criteria
@@ -238,7 +239,7 @@ def main() -> int:
         if client is not None:
             try:
                 client.logout()
-            except Exception:
+            except (OSError, imaplib.IMAP4.error):
                 pass
 
 

@@ -18,10 +18,10 @@ from . import email_sender
 def _mail_from() -> str:
     """Require MAIL_FROM via environment (set by Actions secrets/variables)."""
     ensure_mail_from()
-    try:
-        return os.environ["MAIL_FROM"]
-    except KeyError as e:
-        raise RuntimeError("MAIL_FROM not configured") from e
+    mail_from = os.environ.get("MAIL_FROM")
+    if not mail_from:
+        raise RuntimeError("MAIL_FROM not configured")
+    return mail_from
 
 
 def send_email(
