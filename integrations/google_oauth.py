@@ -33,18 +33,7 @@ def build_user_credentials(scopes: List[str]) -> Optional["Credentials"]:
                 {"client_id_set": bool(client_id), "client_secret_set": bool(client_secret), 
                  "refresh_token_set": bool(refresh_token)}, severity="info")
         return None
-    # Hard block if legacy vars are present to avoid accidental mixing.
-    legacy = [
-        "GOOGLE_CLIENT_ID_V2",
-        "GOOGLE_CLIENT_SECRET_V2",
-        "GOOGLE_0",
-        "GOOGLE_OAUTH_JSON",
-        "GOOGLE_CREDENTIALS_JSON",
-    ]
-    if any(os.getenv(k) for k in legacy):
-        raise RuntimeError(
-            "Legacy Google OAuth variables detected; use GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET instead."
-        )
+    # Legacy OAuth check removed - using v2-only configuration
     return Credentials(
         token=None,
         refresh_token=refresh_token,
