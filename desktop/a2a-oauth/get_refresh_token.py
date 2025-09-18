@@ -30,11 +30,9 @@ TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
 REDIRECT_PORT = 8888
 REDIRECT_URI = f"http://localhost:{REDIRECT_PORT}/"
 
-# Contacts + Calendar scopes required by the workflow. Adjust if the project
+# Calendar scopes required by the workflow. Adjust if the project
 # scope changes.
 SCOPES = [
-    "https://www.googleapis.com/auth/contacts.readonly",
-    "https://www.googleapis.com/auth/contacts.other.readonly",
     "https://www.googleapis.com/auth/calendar.readonly",
 ]
 

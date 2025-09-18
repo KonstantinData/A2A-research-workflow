@@ -240,10 +240,7 @@ def _collect_text(trigger: Dict[str, Any]) -> str:
         if value and isinstance(value, str):
             text_parts.append(value.strip())
     
-    # Contact notes
-    for contact in payload.get("contacts", []):
-        if isinstance(contact, dict) and contact.get("notes"):
-            text_parts.append(contact["notes"].strip())
+    # Contact notes removed - only calendar events supported
     
     # Location information
     location = payload.get("location")
@@ -257,7 +254,7 @@ def run(trigger: Dict[str, Any]) -> Dict[str, Any]:
     """Extract missing company fields using multiple strategies.
     
     Args:
-        trigger: Event or contact trigger containing payload data
+        trigger: Calendar event trigger containing payload data
         
     Returns:
         Dictionary with extracted company_name and/or domain fields

@@ -58,39 +58,7 @@ class GoogleCalendarService(ExternalService):
             raise
 
 
-class GoogleContactsService(ExternalService):
-    """Service wrapper for Google Contacts integration."""
-    
-    def __init__(self):
-        self._contacts_module = None
-        try:
-            from integrations import google_contacts
-            self._contacts_module = google_contacts
-        except ImportError:
-            pass
-    
-    def is_available(self) -> bool:
-        """Check if Google Contacts service is available."""
-        return self._contacts_module is not None
-    
-    def get_service_name(self) -> str:
-        return "google_contacts"
-    
-    @with_circuit_breaker("google_contacts", failure_threshold=3, recovery_timeout=60)
-    def fetch_contacts(self) -> List[Dict[str, Any]]:
-        """Fetch contacts with circuit breaker protection."""
-        if not self.is_available():
-            log_step("service", "unavailable", {"service": self.get_service_name()}, severity="warning")
-            return []
-        
-        try:
-            return self._contacts_module.fetch_contacts()
-        except Exception as e:
-            log_step("service", "fetch_failed", {
-                "service": self.get_service_name(),
-                "error": str(e)
-            }, severity="error")
-            raise
+
 
 
 class EmailService(ExternalService):
@@ -130,5 +98,4 @@ class EmailService(ExternalService):
 
 # Service instances
 google_calendar_service = GoogleCalendarService()
-google_contacts_service = GoogleContactsService()
 email_service = EmailService()

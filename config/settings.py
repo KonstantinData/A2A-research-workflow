@@ -59,7 +59,7 @@ class _Settings:
     exports_dir: Path = field(init=False)
     artifacts_dir: Path = field(init=False)
 
-    # --- Calendar / Contacts ---
+    # --- Calendar ---
     cal_lookback_days: int = field(
         default_factory=lambda: _int_env("CAL_LOOKBACK_DAYS", 1)
     )
@@ -73,12 +73,7 @@ class _Settings:
             if c.strip()
         ]
     )
-    contacts_page_size: int = field(
-        default_factory=lambda: _int_env("CONTACTS_PAGE_SIZE", 200)
-    )
-    contacts_page_limit: int = field(
-        default_factory=lambda: _int_env("CONTACTS_PAGE_LIMIT", 10)
-    )
+
 
     # --- LIVE / Policy ---
     # Email-Empfänger für Operator-/Admin-Alarme (Pflicht im LIVE)

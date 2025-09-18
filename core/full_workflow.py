@@ -20,7 +20,7 @@ The snippet below shows how to invoke the full workflow programmatically:
     from core.full_workflow import run_full_workflow
     run_full_workflow()
 
-This will poll Google Calendar and Contacts (unless ``USE_PUSH_TRIGGERS``
+This will poll Google Calendar (unless ``USE_PUSH_TRIGGERS``
 is set), perform all research steps and send a report to the creator
 for each trigger.
 """
@@ -147,7 +147,7 @@ def run_full_workflow(
     triggers: optional iterable
         Predefined triggers to process.  When omitted the function
         invokes :func:`core.orchestrator.gather_triggers` to poll
-        Google Calendar and Contacts.
+        Google Calendar.
     send_emails: bool, default True
         Whether to send e‑mail notifications to the trigger creators.  Set
         to ``False`` for batch processing or testing.
@@ -206,7 +206,7 @@ def run_full_workflow(
     if not triggers:
         # When no triggers were processed emit the no_triggers event
         try:
-            _orchestrator.log_event({"status": "no_triggers", "message": "No calendar or contact events matched trigger words"})
+            _orchestrator.log_event({"status": "no_triggers", "message": "No calendar events matched trigger words"})
         except Exception:
             pass
     return completed

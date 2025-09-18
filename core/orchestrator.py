@@ -24,7 +24,7 @@ from core import triggers as trigger_utils
 from config.env import ensure_mail_from
 from config.settings import SETTINGS
 from integrations.google_calendar import extract_company, extract_domain
-from core.services import google_calendar_service, google_contacts_service, email_service
+from core.services import google_calendar_service, email_service
 from integrations.google_oauth import build_user_credentials
 
 # Common status definitions
@@ -44,9 +44,7 @@ def fetch_events() -> List[Dict[str, Any]]:
     """Fetch calendar events - backward compatibility wrapper."""
     return google_calendar_service.fetch_events()
 
-def fetch_contacts() -> List[Dict[str, Any]]:
-    """Fetch contacts - backward compatibility wrapper."""
-    return google_contacts_service.fetch_contacts()
+
 
 _finalized = False
 _finalized_lock = threading.Lock()
@@ -98,7 +96,7 @@ def _copy_run_logs_to_export(workflow_id: str) -> None:
     for name in (
         f"{workflow_id}.jsonl",
         "calendar.jsonl",
-        "contacts.jsonl",
+
         "summary.json",
     ):
         s = src / name
@@ -183,7 +181,7 @@ def _missing_required(source: str, payload: Dict[str, Any]) -> List[str]:
 
 
 _calendar_fetch_logged = trigger_utils._calendar_fetch_logged
-_contacts_fetch_logged = trigger_utils._contacts_fetch_logged
+
 _calendar_last_error = trigger_utils._calendar_last_error
 
 
@@ -196,8 +194,7 @@ def _as_trigger_from_event(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     )
 
 
-def _as_trigger_from_contact(contact: Dict[str, Any]) -> Dict[str, Any]:
-    return trigger_utils._as_trigger_from_contact(contact)
+
 
 
 def gather_calendar_triggers(
@@ -214,16 +211,7 @@ def gather_calendar_triggers(
     )
 
 
-def gather_contact_triggers(
-    contacts: Optional[List[Dict[str, Any]]] = None,
-) -> List[Dict[str, Any]]:
-    return trigger_utils.gather_contact_triggers(
-        contacts,
-        fetch_contacts=fetch_contacts,
-        contacts_fetch_logged=_contacts_fetch_logged,
-        get_workflow_id=get_workflow_id,
-        log_event=log_event,
-    )
+
 
 
 def gather_triggers(
@@ -232,11 +220,11 @@ def gather_triggers(
 ) -> List[Dict[str, Any]]:
     return trigger_utils.gather_triggers(
         events,
-        contacts,
+        None,
         fetch_events=fetch_events,
-        fetch_contacts=fetch_contacts,
+        fetch_contacts=None,
         calendar_fetch_logged=_calendar_fetch_logged,
-        contacts_fetch_logged=_contacts_fetch_logged,
+        contacts_fetch_logged=None,
         calendar_last_error=_calendar_last_error,
         get_workflow_id=get_workflow_id,
         log_event=log_event,
@@ -289,28 +277,7 @@ def run(
                 event_id = event.get("event_id") or event.get("id")
                 if event_id:
                     log_event({"event_id": event_id, "status": "fetched"})
-            try:
-                contacts = fetch_contacts() or []
-            except Exception as exc:
-                log_event(
-                    {
-                        "status": "contacts_fetch_failed",
-                        "severity": "critical" if os.getenv("LIVE_MODE", "1") == "1" else "warning",
-                        "error": str(exc),
-                    }
-                )
-                if os.getenv("LIVE_MODE", "1") == "1":
-                    raise
-                contacts = []
-            for contact in contacts:
-                contact_id = (
-                    contact.get("contact_id")
-                    or contact.get("id")
-                    or contact.get("resourceName")
-                )
-                if contact_id:
-                    log_event({"event_id": contact_id, "status": "fetched"})
-            triggers = gather_triggers(events, contacts)
+            triggers = gather_triggers(events, None)
 
     triggers = run_loop.incorporate_email_replies(
         triggers,
@@ -341,7 +308,7 @@ def run(
         log_event(
             {
                 "status": "no_triggers",
-                "message": "No calendar or contact events matched trigger words",
+                "message": "No calendar events matched trigger words",
             }
         )
         export_utils.create_idle_artifacts(log_event=log_event)

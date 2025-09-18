@@ -2,18 +2,17 @@
 
 Automated Agent-to-Agent (A2A) research workflow for company data enrichment, HubSpot integration, and standardized PDF/CSV reporting using Python and GitHub Actions.
 
-The workflow operates exclusively in live mode and requires valid credentials for Google Calendar, Google Contacts, HubSpot, and an SMTP server.
+The workflow operates exclusively in live mode and requires valid credentials for Google Calendar, HubSpot, and an SMTP server.
 
 ## Project Overview
 
-This repository provides a skeleton implementation of the A2A research workflow. It orchestrates multiple research agents, consolidates their results, and produces PDF and CSV dossiers. HubSpot integration and Google Calendar/Contacts triggers are prepared but not yet fully implemented.
+This repository provides a skeleton implementation of the A2A research workflow. It orchestrates multiple research agents, consolidates their results, and produces PDF and CSV dossiers. HubSpot integration and Google Calendar triggers are prepared but not yet fully implemented.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
     GC[Google Calendar] -->|triggers| O[Orchestrator]
-    GCo[Google Contacts] -->|triggers| O
     O -->|dispatch| A[Research Agents]
     A --> C[Consolidation]
     C --> P[PDF/CSV]
@@ -28,10 +27,9 @@ flowchart LR
    ```bash
    pip install -r requirements.txt
    ```
-   The Google Calendar and Contacts integrations require the
+   The Google Calendar integration requires the
    `google-api-python-client` and `google-auth` packages. Missing Google
-   API libraries log a `google_api_client_missing` step for Calendar and
-   Contacts.
+   API libraries log a `google_api_client_missing` step for Calendar.
 3. Set required environment variables as needed. SMTP/IMAP/HubSpot/Google variables are listed in [`.env.example`](.env.example) and documented in [`ops/CONFIG.md`](ops/CONFIG.md).
 4. Adjust trigger words in `config/trigger_words.txt` or point `TRIGGER_WORDS_FILE` to a custom list.
 
@@ -64,7 +62,7 @@ The helper enriches every record with the active workflow identifier, severity
 and variant before writing to the JSONL telemetry stream.  Integration modules
 must not create their own loggers or print statements; instead they should
 describe the relevant event in `details` and set the severity to `"error"` or
-`"critical"` for failure paths.  This keeps calendar, contacts, HubSpot and
+`"critical"` for failure paths.  This keeps calendar, HubSpot and
 email integrations aligned with the orchestrator’s structured logging model and
 ensures downstream tooling receives consistent telemetry across all data
 sources.
@@ -105,7 +103,7 @@ The refresh token is bound to the exact client (ID/secret); mixing clients cause
 
 ## Workflow Description
 
-1. Poll Google Calendar and Contacts for new entries containing trigger words.
+1. Poll Google Calendar for new entries containing trigger words.
 2. Normalize each trigger with its creator e‑mail and source.
 3. Run duplicate checks in HubSpot.
 4. Execute research agents and classify results.

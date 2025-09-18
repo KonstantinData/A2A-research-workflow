@@ -65,9 +65,9 @@ def test_gather_triggers_mirrors_calendar_error(tmp_path, monkeypatch):
     records = []
     monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
     monkeypatch.setattr(orchestrator, "fetch_events", lambda: [])
-    monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
+
     monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: None)
-    monkeypatch.setattr(orchestrator, "_contacts_fetch_logged", lambda wf_id: None)
+
 
     orchestrator.log_step(
         "calendar", "fetch_error", {"error": "boom"}, severity="error"

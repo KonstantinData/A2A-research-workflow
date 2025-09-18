@@ -45,7 +45,6 @@ def get_workflow_id() -> str:
         WORKFLOW_ID = f"wf-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
         SUMMARY = {
             "events_detected": 0,
-            "contacts_detected": 0,
             "reminders_sent": 0,
             "reports_generated": 0,
             "mails_sent": 0,
@@ -64,8 +63,6 @@ def _update_summary(source: str, stage: str, severity: str) -> None:
     if stage == "trigger_detected":
         if source == "calendar":
             SUMMARY["events_detected"] += 1
-        elif source == "contacts":
-            SUMMARY["contacts_detected"] += 1
     if stage == "reminder_sent":
         SUMMARY["reminders_sent"] += 1
     if stage == "mail_sent":
@@ -164,7 +161,6 @@ def finalize_summary() -> None:
         "csv_rows": _csv_rows(csv_path) if csv_ok else 0,
         "empty_run": bool(
             payload.get("events_detected", 0) == 0
-            and payload.get("contacts_detected", 0) == 0
         ),
     }
 

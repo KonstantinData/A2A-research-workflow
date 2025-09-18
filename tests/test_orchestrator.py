@@ -81,9 +81,9 @@ def test_run_processes_event_missing_fields(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     events = [{"id": "1", "event_id": "e1", "summary": "Research meeting"}]
     monkeypatch.setattr(orchestrator, "fetch_events", lambda: events)
-    monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
+
     monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: None)
-    monkeypatch.setattr(orchestrator, "_contacts_fetch_logged", lambda wf_id: None)
+
     monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
     monkeypatch.setattr(reminder_service, "check_and_notify", lambda t: None)
     monkeypatch.setattr(field_completion_agent, "run", lambda t: {"company_name": "ACME", "domain": "acme.com"})
@@ -107,50 +107,7 @@ def test_run_processes_event_missing_fields(monkeypatch, tmp_path):
     assert '"status": "enriched_by_ai"' in logs
 
 
-def test_run_raises_contacts_fetch_failed_live_mode(monkeypatch, tmp_path):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("LIVE_MODE", "1")
-    monkeypatch.setattr(orchestrator, "fetch_events", lambda: [])
-
-    def raise_env_error():
-        raise RuntimeError("Missing Google OAuth env")
-
-    monkeypatch.setattr(orchestrator, "fetch_contacts", raise_env_error)
-    records = []
-    monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
-    from output import pdf_render, csv_export
-    monkeypatch.setattr(
-        pdf_render,
-        "render_pdf",
-        lambda rows, fields, meta=None, out_path=None: _write_stub_pdf(out_path),
-    )
-    monkeypatch.setattr(csv_export, "export_csv", lambda data, path: None)
-
-    with pytest.raises(RuntimeError):
-        orchestrator.run()
-    assert any(r.get("status") == "contacts_fetch_failed" for r in records)
 
 
-def test_run_handles_contacts_fetch_failed_test_mode(monkeypatch, tmp_path):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("LIVE_MODE", "0")
-    monkeypatch.setattr(orchestrator, "fetch_events", lambda: [])
 
-    def raise_env_error():
-        raise RuntimeError("Missing Google OAuth env")
 
-    monkeypatch.setattr(orchestrator, "fetch_contacts", raise_env_error)
-    monkeypatch.setattr(orchestrator, "gather_triggers", lambda e, c: [])
-    records = []
-    monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
-    from output import pdf_render, csv_export
-    monkeypatch.setattr(
-        pdf_render,
-        "render_pdf",
-        lambda rows, fields, meta=None, out_path=None: _write_stub_pdf(out_path),
-    )
-    monkeypatch.setattr(csv_export, "export_csv", lambda data, path: None)
-
-    res = orchestrator.run()
-    assert res == {"status": "idle"}
-    assert any(r.get("status") == "contacts_fetch_failed" for r in records)

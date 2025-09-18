@@ -24,9 +24,7 @@ def test_gather_triggers_logs_discard_reasons(tmp_path, monkeypatch):
         {"id": "2", "event_id": "2", "summary": "Research meeting"},
     ]
     monkeypatch.setattr(orchestrator, "fetch_events", lambda: events)
-    monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
     monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: None)
-    monkeypatch.setattr(orchestrator, "_contacts_fetch_logged", lambda wf_id: None)
 
     triggers = orchestrator.gather_triggers()
     assert len(triggers) == 1
@@ -46,54 +44,13 @@ def test_gather_triggers_logs_discard_reasons(tmp_path, monkeypatch):
 def test_gather_triggers_logs_no_calendar_events(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(orchestrator, "fetch_events", lambda: [])
-    monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
     monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: None)
-    monkeypatch.setattr(orchestrator, "_contacts_fetch_logged", lambda wf_id: None)
     records = []
     monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
 
     triggers = orchestrator.gather_triggers()
     assert triggers == []
     assert any(r.get("status") == "no_calendar_events" for r in records)
-
-
-def test_gather_triggers_logs_contacts_fetch_failed(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(orchestrator, "fetch_events", lambda: [])
-
-    monkeypatch.setenv("LIVE_MODE", "0")
-
-    def raise_env_error():
-        raise RuntimeError("Missing Google OAuth env")
-
-    monkeypatch.setattr(orchestrator, "fetch_contacts", raise_env_error)
-    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: None)
-    monkeypatch.setattr(orchestrator, "_contacts_fetch_logged", lambda wf_id: None)
-    records = []
-    monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
-
-    triggers = orchestrator.gather_triggers()
-    assert triggers == []
-    assert any(r.get("status") == "contacts_fetch_failed" for r in records)
-
-
-def test_gather_triggers_raises_contacts_fetch_failed_live_mode(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(orchestrator, "fetch_events", lambda: [])
-
-    def raise_env_error():
-        raise RuntimeError("Missing Google OAuth env")
-
-    monkeypatch.setattr(orchestrator, "fetch_contacts", raise_env_error)
-    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: None)
-    monkeypatch.setattr(orchestrator, "_contacts_fetch_logged", lambda wf_id: None)
-    monkeypatch.setenv("LIVE_MODE", "1")
-    records: list[dict[str, str]] = []
-    monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
-
-    with pytest.raises(RuntimeError):
-        orchestrator.gather_triggers()
-    assert any(r.get("status") == "contacts_fetch_failed" for r in records)
 
 
 def test_run_invokes_recovery_on_failure(tmp_path, monkeypatch):
@@ -141,19 +98,12 @@ def test_fetch_functions_log_ingested(tmp_path, monkeypatch):
         orchestrator.log_event({"event_id": "e1", "status": "ingested"})
         return [{"event_id": "e1", "summary": "Research meeting"}]
 
-    def fake_fetch_contacts():
-        orchestrator.log_event({"event_id": "c1", "status": "ingested"})
-        return [{"resourceName": "c1", "emailAddresses": [{"value": "a@b"}]}]
-
     monkeypatch.setattr(orchestrator, "fetch_events", fake_fetch_events)
-    monkeypatch.setattr(orchestrator, "fetch_contacts", fake_fetch_contacts)
     monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: None)
-    monkeypatch.setattr(orchestrator, "_contacts_fetch_logged", lambda wf_id: None)
 
     orchestrator.gather_triggers()
 
     assert any(r.get("status") == "ingested" and r.get("event_id") == "e1" for r in records)
-    assert any(r.get("status") == "ingested" and r.get("event_id") == "c1" for r in records)
 
 
 @pytest.mark.parametrize(
@@ -167,29 +117,7 @@ def test_fetch_functions_log_ingested(tmp_path, monkeypatch):
 def test_gather_triggers_logs_calendar_fetch_codes(tmp_path, monkeypatch, code, expected):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(orchestrator, "fetch_events", lambda: [])
-    monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
     monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: code)
-    monkeypatch.setattr(orchestrator, "_contacts_fetch_logged", lambda wf_id: None)
-    records = []
-    monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
-    orchestrator.gather_triggers()
-    assert any(r.get("status") == expected for r in records)
-
-
-@pytest.mark.parametrize(
-    "code,expected",
-    [
-        ("missing", "contacts_fetch_missing"),
-        ("missing_client", "contacts_fetch_missing_client"),
-        ("oauth_error", "contacts_fetch_oauth_error"),
-    ],
-)
-def test_gather_triggers_logs_contacts_fetch_codes(tmp_path, monkeypatch, code, expected):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(orchestrator, "fetch_events", lambda: [])
-    monkeypatch.setattr(orchestrator, "fetch_contacts", lambda: [])
-    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: None)
-    monkeypatch.setattr(orchestrator, "_contacts_fetch_logged", lambda wf_id: code)
     records = []
     monkeypatch.setattr(orchestrator, "log_event", lambda r: records.append(r))
     orchestrator.gather_triggers()

@@ -19,7 +19,7 @@ load_dotenv()
 
 SCOPES = [
     "https://www.googleapis.com/auth/calendar.readonly",
-    "https://www.googleapis.com/auth/contacts.readonly",
+
 ]
 
 REQUIRED = [

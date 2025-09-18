@@ -1,10 +1,8 @@
 {
-  // Für Kalender und Kontakte werden nur der Firmenname (company_name) und die
+  // Für Kalendereinträge werden nur der Firmenname (company_name) und die
   // Web-Domain (domain) als Pflichtfelder vorausgesetzt. Diese Felder können
-  // aus dem Kalendereintrag (Summary/Description) oder den Kontaktnotizen
-  // stammen. Alle übrigen Informationen wie Branche oder Beschreibung werden
-  // während der Recherche ergänzt.
+  // aus dem Kalendereintrag (Summary/Description) stammen. Alle übrigen
+  // Informationen wie Branche oder Beschreibung werden während der Recherche ergänzt.
   "calendar": ["company_name", "domain"],
-  "contacts": ["company_name", "domain"],
   "optional": ["email", "phone", "industry_group", "industry", "description"]
 }

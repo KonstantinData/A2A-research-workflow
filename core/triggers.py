@@ -39,19 +39,7 @@ def _as_trigger_from_event(
     }
 
 
-def _as_trigger_from_contact(contact: Dict[str, Any]) -> Dict[str, Any]:
-    email = ""
-    for item in contact.get("emailAddresses", []) or []:
-        value = (item or {}).get("value")
-        if value:
-            email = value
-            break
-    return {
-        "source": "contacts",
-        "creator": email,
-        "recipient": email,
-        "payload": contact,
-    }
+
 
 
 def _calendar_event_identifier(event: Dict[str, Any] | None) -> Optional[str]:
@@ -177,62 +165,7 @@ def gather_calendar_triggers(
     return triggers
 
 
-def gather_contact_triggers(
-    contacts: Optional[List[Dict[str, Any]]] = None,
-    *,
-    fetch_contacts: Callable[[], List[Dict[str, Any]]] | None = None,
-    contacts_fetch_logged: Callable[[str], Optional[str]] | None = None,
-    get_workflow_id: Callable[[], str] | None = None,
-    log_event: Callable[[Dict[str, Any]], None] | None = None,
-) -> List[Dict[str, Any]]:
-    if log_event is None:
-        from core.logging import log_event as default_log_event
 
-        log_event = default_log_event
-    if fetch_contacts is None:
-        from integrations.google_contacts import fetch_contacts as default_fetch_contacts
-
-        fetch_contacts = default_fetch_contacts
-    if get_workflow_id is None:
-        from core.utils import get_workflow_id as default_get_workflow_id
-
-        get_workflow_id = default_get_workflow_id
-
-    workflow_id = get_workflow_id()
-
-    if contacts is None:
-        try:
-            contacts = fetch_contacts() or []
-        except Exception as exc:
-            log_event(
-                {
-                    "status": "contacts_fetch_failed",
-                    "severity": "warning",
-                    "error": str(exc),
-                }
-            )
-            if os.getenv("LIVE_MODE", "1") == "1":
-                raise
-            contacts = []
-        code = contacts_fetch_logged(workflow_id) if contacts_fetch_logged else None
-        if code:
-            log_event(
-                {
-                    "status": f"contacts_fetch_{code}",
-                    "severity": "warning",
-                    "message": "Proceeding without contacts logs",
-                }
-            )
-
-    if not contacts:
-        log_event({"status": "no_contacts", "severity": "warning"})
-        return []
-
-    return [
-        trigger
-        for trigger in (_as_trigger_from_contact(contact) for contact in contacts)
-        if trigger
-    ]
 
 
 def gather_triggers(
@@ -268,15 +201,7 @@ def gather_triggers(
                 contains_trigger=contains_trigger,
             )
         )
-        triggers.extend(
-            gather_contact_triggers(
-                contacts,
-                fetch_contacts=fetch_contacts,
-                contacts_fetch_logged=contacts_fetch_logged,
-                get_workflow_id=get_workflow_id,
-                log_event=log_event,
-            )
-        )
+        # Contacts integration removed - only calendar triggers
         return triggers
     except Exception as exc:
         log_event({"severity": "critical", "where": "gather_triggers", "error": str(exc)})
@@ -328,36 +253,12 @@ def _calendar_fetch_logged(workflow_id: str) -> Optional[str]:
     return "missing"
 
 
-def _contacts_fetch_logged(workflow_id: str) -> Optional[str]:
-    path = SETTINGS.workflows_dir / "contacts.jsonl"
-    if not path.exists():
-        return "missing"
-    statuses_seen: set[str] = set()
-    try:
-        with path.open("r", encoding="utf-8") as handle:
-            for line in handle:
-                try:
-                    record = json.loads(line)
-                except Exception:
-                    continue
-                if record.get("workflow_id") == workflow_id:
-                    statuses_seen.add(record.get("status"))
-    except Exception:
-        return "missing"
-    if "fetch_call" in statuses_seen:
-        return None
-    if "google_api_client_missing" in statuses_seen:
-        return "missing_client"
-    if "missing_google_oauth_env" in statuses_seen or "fetch_error" in statuses_seen:
-        return "oauth_error"
-    return "missing"
+
 
 
 __all__ = [
     "gather_calendar_triggers",
-    "gather_contact_triggers",
     "gather_triggers",
     "_calendar_last_error",
     "_calendar_fetch_logged",
-    "_contacts_fetch_logged",
 ]
