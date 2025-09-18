@@ -20,7 +20,8 @@ def _as_trigger_from_event(
         "source": "calendar",
         "creator": (payload.get("creator") or {}).get("email")
         or payload.get("creatorEmail"),
-        "recipient": (payload.get("organizer") or {}).get("email"),
+        "recipient": (payload.get("organizer") or {}).get("email")
+        or payload.get("organizerEmail"),
         "payload": payload,
     }
 

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple
 
-from core.triggers import gather_calendar_triggers
+from core.triggers import _as_trigger_from_event, gather_calendar_triggers
+from integrations import google_calendar
 
 
 def test_gather_calendar_triggers_accepts_payload_id():
@@ -31,3 +32,21 @@ def test_gather_calendar_triggers_accepts_payload_id():
     assert triggers[0]["payload"]["summary"] == "besuchsvorbereitung"
     assert not any(step[1] == "event_discarded" for step in logged_steps)
     assert not any(event.get("status") == "no_calendar_events" for event in logged_events)
+
+
+def test_normalized_event_keeps_recipient():
+    raw_event = {
+        "id": "evt-1",
+        "summary": "Besuchsvorbereitung call",
+        "creator": {"email": "alice@example.com"},
+        "organizer": {"email": "bob@example.com"},
+    }
+
+    normalized = google_calendar._normalize(raw_event, "primary")
+    event = dict(normalized)
+    event["payload"] = dict(normalized)
+
+    trigger = _as_trigger_from_event(event, contains_trigger=lambda payload: True)
+
+    assert trigger is not None
+    assert trigger["recipient"] == "bob@example.com"

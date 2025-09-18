@@ -57,6 +57,8 @@ def _normalize(ev: Dict[str, Any], cal_id: str) -> Normalized:
         "end": ev.get("end"),
         "creatorEmail": (ev.get("creator") or {}).get("email"),
         "creator": ev.get("creator"),
+        "organizer": ev.get("organizer"),
+        "organizerEmail": (ev.get("organizer") or {}).get("email"),
         "calendarId": cal_id,
         "company_name": company,
         "domain": domain,
