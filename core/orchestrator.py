@@ -284,13 +284,13 @@ def run(
         if SETTINGS.use_push_triggers:
             triggers = []
         else:
-            events = google_calendar_service.fetch_events() or []
+            events = fetch_events() or []
             for event in events:
                 event_id = event.get("event_id") or event.get("id")
                 if event_id:
                     log_event({"event_id": event_id, "status": "fetched"})
             try:
-                contacts = google_contacts_service.fetch_contacts() or []
+                contacts = fetch_contacts() or []
             except Exception as exc:
                 log_event(
                     {
