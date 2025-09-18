@@ -124,21 +124,21 @@ def run_researchers(
             added_fields = {key: value for key, value in enriched.items() if not payload.get(key)}
             if enriched:
                 payload.update(enriched)
-            missing = missing_required(trigger.get("source", ""), payload)
-            if missing:
-                # Check if we have company_name AND domain - if so, proceed to research
-                has_company = bool(payload.get("company_name"))
-                has_domain = bool(payload.get("domain"))
-                
-                if has_company and has_domain:
-                    # Complete info available - proceed to internal search
-                    log_event({
-                        "event_id": event_id,
-                        "status": "complete_info_available",
-                        "company": payload.get("company_name"),
-                        "domain": payload.get("domain")
-                    })
-                else:
+            # Check if we have company_name AND domain - if so, proceed to research
+            has_company = bool(payload.get("company_name"))
+            has_domain = bool(payload.get("domain"))
+            
+            if has_company and has_domain:
+                # Complete info available - proceed to internal search
+                log_event({
+                    "event_id": event_id,
+                    "status": "complete_info_available",
+                    "company": payload.get("company_name"),
+                    "domain": payload.get("domain")
+                })
+            else:
+                missing = missing_required(trigger.get("source", ""), payload)
+                if missing:
                     # Missing critical info - send human-in-the-loop email
                     log_event(
                         {
