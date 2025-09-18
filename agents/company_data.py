@@ -85,7 +85,11 @@ class CompanyInfo:
 # ("wz2008"), the Austrian ÖNACE ("onace") and the Swiss NOGA
 # ("noga").  These codes mirror those used in the original data model
 # and serve as a bridge for systems that still consume them.
-_COMPANY_DATA: Dict[str, CompanyInfo] = {
+_COMPANY_DATA: Dict[str, CompanyInfo] = {}
+# Reverse lookup for O(1) neighbor lookups
+_NAME_TO_INFO: Dict[str, CompanyInfo] = {}
+
+_COMPANY_DATA = {
     # Fictional manufacturing firm used in many examples
     "acme gmbh": CompanyInfo(
         company_name="Acme GmbH",
@@ -210,9 +214,15 @@ def neighbours_for(name: str) -> List[CompanyInfo]:
     info = lookup_company(name)
     if not info:
         return []
+    
+    # Initialize reverse lookup if empty
+    if not _NAME_TO_INFO:
+        for ci in _COMPANY_DATA.values():
+            _NAME_TO_INFO[ci.company_name.lower()] = ci
+    
     result = []
     for n in info.neighbors:
-        ci = lookup_company(n)
+        ci = _NAME_TO_INFO.get(n.lower())
         if ci:
             result.append(ci)
     return result

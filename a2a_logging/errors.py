@@ -48,7 +48,7 @@ class HardFailError(A2AError):
                 labels=labels,
                 run_url=run_url,
             )
-        except requests.RequestException as e:
+        except Exception as e:
             # We deliberately ignore GitHub API errors – the original exception is more
             # important than the failure to file an issue.
             import logging

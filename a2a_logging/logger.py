@@ -86,6 +86,7 @@ def get_logger(
 
 SEVERITY_LEVELS = {
     "critical": _py_logging.CRITICAL,
+    "error": _py_logging.ERROR,
     "warning": _py_logging.WARNING,
     "info": _py_logging.INFO,
 }

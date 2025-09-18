@@ -67,5 +67,6 @@ jobs:
       - name: "Smoke: container build & run"
         run: |
           docker build -t a2a:ci -f ops/Dockerfile .
-          docker run --rm -e USE_PUSH_TRIGGERS=1 -v "$PWD"/output:/app/output a2a:ci || true
+          set -e
+          docker run --rm -e USE_PUSH_TRIGGERS=1 -v "$PWD"/output:/app/output a2a:ci
           test -d output/exports

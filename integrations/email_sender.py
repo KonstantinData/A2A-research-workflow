@@ -210,7 +210,7 @@ def send(
                 "to": validated_to,
                 "subject": subject,
                 "error": str(e),
-                "event_id": task_id,
+                "task_id": task_id,
             },
             severity="critical",
         )
@@ -291,7 +291,7 @@ def send_email(
                         "to": validated_to,
                         "subject": subject,
                         "error": str(e),
-                        "event_id": task_id,
+                        "task_id": task_id,
                     },
                     severity="critical",
                 )
@@ -468,7 +468,7 @@ def send_missing_info_reminder(
     title = trigger.get("title") or "Untitled Event"
     start_iso = trigger.get("start_iso")
     end_iso = trigger.get("end_iso")
-    tz = trigger.get("timezone")
+    # timezone not used in current implementation
     start_dt = datetime.fromisoformat(start_iso) if start_iso else None
     end_dt = datetime.fromisoformat(end_iso) if end_iso else None
     send_reminder(

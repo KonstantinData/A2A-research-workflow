@@ -29,14 +29,17 @@ def build_user_credentials(scopes: List[str]) -> Optional["Credentials"]:
     refresh_token = os.getenv("GOOGLE_REFRESH_TOKEN")
     token_uri = os.getenv("GOOGLE_TOKEN_URI", DEFAULT_TOKEN_URI)
     if not (client_id and client_secret and refresh_token):
+        log_step("google_oauth", "credentials_missing", 
+                {"client_id_set": bool(client_id), "client_secret_set": bool(client_secret), 
+                 "refresh_token_set": bool(refresh_token)}, severity="info")
         return None
     # Hard block if legacy vars are present to avoid accidental mixing.
     legacy = [
-        "GOOGLE_CLIENT_ID" + "_V2",
-        "GOOGLE_CLIENT_SECRET" + "_V2",
-        "GOOGLE_" + "0",
-        "GOOGLE_" + "OAUTH_JSON",
-        "GOOGLE_" + "CREDENTIALS_JSON",
+        "GOOGLE_CLIENT_ID_V2",
+        "GOOGLE_CLIENT_SECRET_V2",
+        "GOOGLE_0",
+        "GOOGLE_OAUTH_JSON",
+        "GOOGLE_CREDENTIALS_JSON",
     ]
     if any(os.getenv(k) for k in legacy):
         raise RuntimeError(

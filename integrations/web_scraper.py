@@ -15,8 +15,9 @@ def scrape(url: str, *, timeout: int = 10) -> str:
     are implemented – callers may parse the returned HTML as needed.
     """
 
+    headers = {'User-Agent': 'A2A-Research-Workflow/1.0'}
     try:
-        resp = requests.get(url, timeout=timeout)
+        resp = requests.get(url, timeout=timeout, headers=headers)
     except requests.RequestException as exc:
         log_step(
             "web_scraper",

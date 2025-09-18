@@ -12,6 +12,71 @@ import smtplib
 import ssl
 
 
+def _validate_recipient(recipient: str, allowed_domain: str | None) -> str:
+    """Validate and normalize recipient address."""
+    recipient = recipient.strip()
+    if not recipient:
+        raise ValueError("Recipient address must not be empty")
+    
+    domain_guard = (allowed_domain or "").strip().lstrip("@").lower()
+    if domain_guard:
+        if "@" not in recipient:
+            raise ValueError("Recipient address is missing a domain part")
+        recipient_domain = recipient.rsplit("@", 1)[-1].lower()
+        if recipient_domain != domain_guard:
+            raise ValueError("Recipient domain is not allowlisted")
+    return recipient
+
+
+def _create_message(mail_from: str, to: str, subject: str, body: str, message_id: str | None) -> MIMEMultipart:
+    """Create base email message."""
+    msg = MIMEMultipart()
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+    msg["From"] = mail_from
+    msg["To"] = to
+    msg["Subject"] = subject
+    if message_id:
+        msg["Message-ID"] = message_id
+    return msg
+
+
+def _add_attachments(msg: MIMEMultipart, attachments: list[str] | None) -> None:
+    """Add file attachments to message."""
+    for path in attachments or []:
+        try:
+            resolved_path = Path(path).resolve()
+            if not resolved_path.exists() or not resolved_path.is_file():
+                continue
+            
+            with resolved_path.open("rb") as fh:
+                part = MIMEBase("application", "octet-stream")
+                part.set_payload(fh.read())
+            encoders.encode_base64(part)
+            part.add_header("Content-Disposition", f'attachment; filename="{resolved_path.name}"')
+            msg.attach(part)
+        except (OSError, ValueError):
+            continue
+
+
+def _send_via_smtp(host: str, port: int, user: str, password: str, mail_from: str, recipient: str, msg: MIMEMultipart, secure: str) -> None:
+    """Send message via SMTP connection."""
+    try:
+        if secure == "ssl":
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL(host, port, context=context) as smtp:
+                smtp.login(user, password)
+                smtp.sendmail(mail_from, [recipient], msg.as_string())
+        elif secure == "tls":
+            with smtplib.SMTP(host, port) as smtp:
+                smtp.starttls(context=ssl.create_default_context())
+                smtp.login(user, password)
+                smtp.sendmail(mail_from, [recipient], msg.as_string())
+        else:
+            raise ValueError(f"Unsupported secure mode: {secure}")
+    except Exception as exc:
+        raise RuntimeError(f"Failed to send email via {host}:{port} using {secure}") from exc
+
+
 def send_email(
     host: str,
     port: int,
@@ -26,73 +91,9 @@ def send_email(
     allowed_domain: str | None = None,
     message_id: str | None = None,
 ) -> None:
-    """Send an e-mail via SMTP using the selected security mode.
-
-    Parameters
-    ----------
-    host, port, user, password, mail_from: SMTP connection details.
-    to, subject, body: Message details.
-    secure: ``"ssl"`` or ``"tls"`` (STARTTLS).
-    attachments: optional list of file paths to include.
-    allowed_domain: optional domain restriction (case-insensitive).
-    """
-
-    recipient = to.strip()
-    if not recipient:
-        raise ValueError("Recipient address must not be empty")
-
-    domain_guard = (allowed_domain or "").strip().lstrip("@").lower()
-    if domain_guard:
-        if "@" not in recipient:
-            raise ValueError("Recipient address is missing a domain part")
-        recipient_domain = recipient.rsplit("@", 1)[-1].lower()
-        if recipient_domain != domain_guard:
-            raise ValueError("Recipient domain is not allowlisted")
-
-    msg = MIMEMultipart()
-    msg.attach(MIMEText(body, "plain", "utf-8"))
-    msg["From"] = mail_from
-    msg["To"] = recipient
-    msg["Subject"] = subject
-    if message_id:
-        msg["Message-ID"] = message_id
-
-    for path in attachments or []:
-        p = Path(path)
-        try:
-            # Sanitize path to prevent directory traversal
-            resolved_path = p.resolve()
-            # Only allow files that actually exist and are files (not directories)
-            if not resolved_path.exists() or not resolved_path.is_file():
-                continue
-            
-            with resolved_path.open("rb") as fh:
-                part = MIMEBase("application", "octet-stream")
-                part.set_payload(fh.read())
-            encoders.encode_base64(part)
-            # Use only the filename, not the full path for security
-            safe_filename = resolved_path.name
-            part.add_header("Content-Disposition", f'attachment; filename="{safe_filename}"')
-            msg.attach(part)
-        except (OSError, ValueError):
-            # Skip unreadable/invalid attachment – higher level already logged
-            continue
-
-    try:
-        if secure == "ssl":
-            context = ssl.create_default_context()
-            with smtplib.SMTP_SSL(host, port, context=context) as smtp:
-                smtp.login(user, password)
-                smtp.sendmail(mail_from, [recipient], msg.as_string())
-        elif secure == "tls":
-            with smtplib.SMTP(host, port) as smtp:
-                smtp.starttls(context=ssl.create_default_context())
-                smtp.login(user, password)
-                smtp.sendmail(mail_from, [recipient], msg.as_string())
-        else:  # pragma: no cover - defensive programming
-            raise ValueError(f"Unsupported secure mode: {secure}")
-    except Exception as exc:  # pragma: no cover - network errors
-        raise RuntimeError(
-            f"Failed to send email via {host}:{port} using {secure}"
-        ) from exc
+    """Send an e-mail via SMTP using the selected security mode."""
+    recipient = _validate_recipient(to, allowed_domain)
+    msg = _create_message(mail_from, recipient, subject, body, message_id)
+    _add_attachments(msg, attachments)
+    _send_via_smtp(host, port, user, password, mail_from, recipient, msg, secure)
 

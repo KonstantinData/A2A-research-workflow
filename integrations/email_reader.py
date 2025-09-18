@@ -182,13 +182,15 @@ def _update_correlation_index(
     for mid in message_ids:
         if not mid:
             continue
-        entry = index.get(mid, {}).copy()
-        before = entry.copy()
-        if task_id:
+        entry = index.get(mid, {})
+        if task_id and entry.get("task_id") != task_id:
+            entry = entry.copy() if entry else {}
             entry["task_id"] = task_id
-        if event_id:
+            index[mid] = entry
+            changed = True
+        if event_id and entry.get("event_id") != event_id:
+            entry = entry.copy() if entry else {}
             entry["event_id"] = event_id
-        if entry != before:
             index[mid] = entry
             changed = True
     return changed
@@ -371,9 +373,11 @@ def fetch_replies() -> List[Dict[str, Any]]:
     return results
 
 
-def poll_replies(interval: int = 600) -> None:
+def poll_replies(interval: int = 600, shutdown_flag=None) -> None:
     """Continuously poll the inbox for replies every ``interval`` seconds."""
     while True:
+        if shutdown_flag and shutdown_flag.is_set():
+            break
         try:
             fetch_replies()
         except Exception as e:

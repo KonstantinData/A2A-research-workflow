@@ -57,7 +57,7 @@ def get_workflow_id() -> str:
 def _update_summary(source: str, stage: str, severity: str) -> None:
     global SUMMARY
     # Validate inputs to prevent manipulation
-    if not isinstance(source, str) or not isinstance(stage, str) or not isinstance(severity, str):
+    if not all(isinstance(x, str) for x in [source, stage, severity]):
         return
     
     if stage == "trigger_detected":
@@ -251,7 +251,8 @@ def mark_processed(item_id: str, updated: str, logfile) -> None:
     """Record ``item_id`` with ``updated`` in ``logfile``."""
     # Sanitize logfile path to prevent directory traversal
     safe_path = Path(logfile).resolve()
-    if not str(safe_path).startswith(str(SETTINGS.workflows_dir.resolve())):
+    allowed_base = SETTINGS.workflows_dir.resolve()
+    if not str(safe_path).startswith(str(allowed_base)):
         raise ValueError(f"Invalid logfile path: {logfile}")
     append_jsonl(safe_path, {"id": item_id, "updated": updated})
 

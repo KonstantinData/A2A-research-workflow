@@ -230,7 +230,8 @@ def extract_company(title: str, trigger: str) -> str:
     if idx == -1:
         return "Unknown"
 
-    remainder = title[idx + len(trigger) :].lstrip(" :-–—").strip()
+    # Use consistent text source for slicing to avoid index mismatch
+    remainder = norm_title[idx + len(norm_trigger):].lstrip(" :-–—").strip()
     remainder = re.sub(
         r"^(firma|company|client)\s+", "", remainder, flags=re.IGNORECASE
     )

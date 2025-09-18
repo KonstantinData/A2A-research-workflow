@@ -37,6 +37,8 @@ Raw = Dict[str, Any]
 
 # Simple in-memory cache keyed by company_domain (fallback: company_name)
 _CACHE: Dict[str, Tuple[float, Raw]] = {}
+# Domain-to-company mapping for O(1) lookups
+_DOMAIN_MAPPING: Dict[str, str] = {}
 _CACHE_CLIENT = None
 REDIS_URL = os.getenv("INTERNAL_FETCH_REDIS_URL")
 if REDIS_URL and redis is not None:
@@ -84,9 +86,18 @@ def _find_company(name: str, domain: str) -> Dict[str, Any]:
 
     if SETTINGS.allow_static_company_data and _lookup_company and _all_company_names:
         if domain:
-            for comp_name in _all_company_names():
+            # Initialize domain mapping if empty
+            if not _DOMAIN_MAPPING:
+                for comp_name in _all_company_names():
+                    ci = _lookup_company(comp_name)
+                    if ci:
+                        _DOMAIN_MAPPING[ci.company_domain.lower()] = comp_name
+            
+            # O(1) domain lookup
+            comp_name = _DOMAIN_MAPPING.get(domain.strip().lower())
+            if comp_name:
                 ci = _lookup_company(comp_name)
-                if ci and ci.company_domain.lower() == domain.strip().lower():
+                if ci:
                     return {
                         "id": f"static-{ci.company_domain}",
                         "properties": {"name": ci.company_name, "domain": ci.company_domain},

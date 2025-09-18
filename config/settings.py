@@ -146,9 +146,12 @@ class _Settings:
             self.live_mode = 0  # niemals hart failen (z. B. SMTP) in Tests
 
     def _resolve_path(self, value: str | Path) -> Path:
-        path = Path(value).expanduser()
+        path = Path(value).expanduser().resolve()
         if not path.is_absolute():
-            path = self.root_dir / path
+            path = (self.root_dir / path).resolve()
+        # Validate path is within project boundaries
+        if not str(path).startswith(str(self.root_dir)):
+            raise ValueError(f"Path outside project root: {path}")
         return path
 
     @staticmethod

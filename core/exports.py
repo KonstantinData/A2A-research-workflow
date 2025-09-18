@@ -55,25 +55,17 @@ def create_idle_artifacts(
         )
         log_event({"status": "artifact_pdf", "path": str(pdf_path)})
     except Exception as exc:
-        log_event(
-            {
-                "status": "artifact_pdf_error",
-                "error": str(exc),
-                "severity": "warning",
-            }
-        )
+        from core.utils import log_step
+        log_step("exports", "artifact_pdf_error", 
+                {"error": str(exc)}, severity="warning")
 
     try:
         csv_export.export_csv([], csv_path)
         log_event({"status": "artifact_csv", "path": str(csv_path)})
     except Exception as exc:
-        log_event(
-            {
-                "status": "artifact_csv_error",
-                "error": str(exc),
-                "severity": "warning",
-            }
-        )
+        from core.utils import log_step
+        log_step("exports", "artifact_csv_error", 
+                {"error": str(exc)}, severity="warning")
 
     return pdf_path, csv_path
 
@@ -113,8 +105,10 @@ def export_report(
             )
         if csv_path.exists() and csv_path.stat().st_size < 5:
             fallback_csv([], csv_path)
-    except Exception:
-        pass
+    except Exception as exc:
+        from core.utils import log_step
+        log_step("exports", "fallback_artifact_error", 
+                {"error": str(exc)}, severity="warning")
 
     log_event({"event_id": first_event_id, "status": "artifact_pdf", "path": str(pdf_path)})
     log_event({"event_id": first_event_id, "status": "artifact_csv", "path": str(csv_path)})

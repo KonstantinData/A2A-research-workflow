@@ -179,8 +179,11 @@ def main() -> int:
                     matched = bool(m)
                     if matched:
                         try:
-                            found = list({t.lower() for t in pattern.findall(text)})
-                            matched_terms = found[:5]
+                            # Use match groups instead of separate findall call
+                            if m.groups():
+                                matched_terms = [m.group(1).lower()]
+                            else:
+                                matched_terms = [m.group(0).lower()]
                         except Exception:
                             matched_terms = []
                 rec = {

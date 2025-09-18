@@ -31,16 +31,20 @@ def _result_to_graph(result: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
     """Convert a result dictionary into node and edge collections."""
     nodes: List[Dict[str, Any]] = []
     edges: List[Dict[str, Any]] = []
+    node_ids = set()  # Track existing node IDs to prevent duplicates
 
     source_id = result.get("source", "result")
     nodes.append({"id": source_id, "type": "source", "properties": {}})
+    node_ids.add(source_id)
 
     creator = result.get("creator")
     if creator:
         creator_id = str(creator)
-        nodes.append(
-            {"id": creator_id, "type": "person", "properties": {"role": "creator"}}
-        )
+        if creator_id not in node_ids:
+            nodes.append(
+                {"id": creator_id, "type": "person", "properties": {"role": "creator"}}
+            )
+            node_ids.add(creator_id)
         edges.append(
             {"source": creator_id, "target": source_id, "type": "CREATED", "properties": {}}
         )
@@ -48,9 +52,11 @@ def _result_to_graph(result: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
     recipient = result.get("recipient")
     if recipient:
         recipient_id = str(recipient)
-        nodes.append(
-            {"id": recipient_id, "type": "person", "properties": {"role": "recipient"}}
-        )
+        if recipient_id not in node_ids:
+            nodes.append(
+                {"id": recipient_id, "type": "person", "properties": {"role": "recipient"}}
+            )
+            node_ids.add(recipient_id)
         edges.append(
             {"source": source_id, "target": recipient_id, "type": "ASSIGNED", "properties": {}}
         )
