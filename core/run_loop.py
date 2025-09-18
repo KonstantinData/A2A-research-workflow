@@ -126,55 +126,69 @@ def run_researchers(
                 payload.update(enriched)
             missing = missing_required(trigger.get("source", ""), payload)
             if missing:
-                log_event(
-                    {
-                        "event_id": event_id,
-                        "status": statuses.PENDING,
-                        "missing": missing,
-                    }
-                )
+                # Check if we have company_name AND domain - if so, proceed to research
+                has_company = bool(payload.get("company_name"))
+                has_domain = bool(payload.get("domain"))
                 
-                # Extract creator email with fallbacks
-                def _extract_creator_email(trigger, payload):
-                    return (
-                        trigger.get("creator") or 
-                        payload.get("creatorEmail") or
-                        (payload.get("creator") or {}).get("email") or
-                        (payload.get("organizer") or {}).get("email") or
-                        payload.get("organizerEmail")
-                    )
-                creator_email = _extract_creator_email(trigger, payload)
-                
-                if creator_email:
-                    try:
-                        email_sender.send_email(
-                            to=creator_email,
-                            subject="Missing information for research",
-                            body="Please reply with: " + ", ".join(missing),
-                            task_id=payload.get("task_id") or event_id,
-                        )
-                        log_event({
-                            "event_id": event_id,
-                            "status": "missing_fields_email_sent",
-                            "to": creator_email,
-                            "missing": missing
-                        })
-                    except (ValueError, RuntimeError, ConnectionError) as e:
-                        log_event({
-                            "event_id": event_id,
-                            "status": "email_send_failed",
-                            "error": str(e),
-                            "to": creator_email,
-                            "severity": "error"
-                        })
-                else:
+                if has_company and has_domain:
+                    # Complete info available - proceed to internal search
                     log_event({
                         "event_id": event_id,
-                        "status": "no_creator_email",
-                        "severity": "warning",
-                        "payload_keys": list(payload.keys())
+                        "status": "complete_info_available",
+                        "company": payload.get("company_name"),
+                        "domain": payload.get("domain")
                     })
-                continue
+                else:
+                    # Missing critical info - send human-in-the-loop email
+                    log_event(
+                        {
+                            "event_id": event_id,
+                            "status": statuses.PENDING,
+                            "missing": missing,
+                        }
+                    )
+                    
+                    # Extract creator email with fallbacks
+                    def _extract_creator_email(trigger, payload):
+                        return (
+                            trigger.get("creator") or 
+                            payload.get("creatorEmail") or
+                            (payload.get("creator") or {}).get("email") or
+                            (payload.get("organizer") or {}).get("email") or
+                            payload.get("organizerEmail")
+                        )
+                    creator_email = _extract_creator_email(trigger, payload)
+                    
+                    if creator_email:
+                        try:
+                            email_sender.send_email(
+                                to=creator_email,
+                                subject="Missing information for research",
+                                body="Please reply with: " + ", ".join(missing),
+                                task_id=payload.get("task_id") or event_id,
+                            )
+                            log_event({
+                                "event_id": event_id,
+                                "status": "missing_fields_email_sent",
+                                "to": creator_email,
+                                "missing": missing
+                            })
+                        except (ValueError, RuntimeError, ConnectionError) as e:
+                            log_event({
+                                "event_id": event_id,
+                                "status": "email_send_failed",
+                                "error": str(e),
+                                "to": creator_email,
+                                "severity": "error"
+                            })
+                    else:
+                        log_event({
+                            "event_id": event_id,
+                            "status": "no_creator_email",
+                            "severity": "warning",
+                            "payload_keys": list(payload.keys())
+                        })
+                    continue  # Skip research for incomplete data
             elif added_fields:
                 log_event(
                     {
