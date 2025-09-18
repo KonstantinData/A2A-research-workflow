@@ -109,6 +109,27 @@ def _write_html_pdf(html: str, out_path: Path) -> None:
     HTML(string=html).write_pdf(str(out_path))
 
 
+def _sanitize_path(path: Path | str | None, default_name: str) -> Path:
+    """Sanitize file path to prevent directory traversal attacks."""
+    if path is None:
+        return SETTINGS.exports_dir / default_name
+    
+    path_obj = Path(path)
+    # Resolve to absolute path and check if it's within allowed directory
+    try:
+        resolved = path_obj.resolve()
+        exports_dir = SETTINGS.exports_dir.resolve()
+        
+        # Check if the resolved path is within the exports directory
+        if not str(resolved).startswith(str(exports_dir)):
+            # If outside exports dir, use filename only in exports dir
+            return exports_dir / path_obj.name
+        return resolved
+    except (OSError, ValueError):
+        # If path resolution fails, use safe default
+        return SETTINGS.exports_dir / default_name
+
+
 def render_pdf(
     rows: list[dict[str, Any]],
     fields: list[str],
@@ -126,7 +147,7 @@ def render_pdf(
     normalized_fields: List[str] = list(fields or [])
     normalized_meta: Dict[str, Any] = dict(meta or {})
 
-    destination = Path(out_path) if out_path else SETTINGS.exports_dir / "report.pdf"
+    destination = _sanitize_path(out_path, "report.pdf")
     destination.parent.mkdir(parents=True, exist_ok=True)
 
     if not normalized_rows:

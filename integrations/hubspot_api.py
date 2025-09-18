@@ -172,14 +172,23 @@ def _map_core_to_properties(core: Dict[str, Any]) -> Dict[str, Any]:
 
 def _create_company(core: Dict[str, Any], headers: Dict[str, str]) -> Optional[str]:
     payload = {"properties": _map_core_to_properties(core)}
-    resp = _request_with_retry(
-        "post",
-        f"{HS_BASE}/crm/v3/objects/companies",
-        headers=headers,
-        json=payload,
-        timeout=DEFAULT_TIMEOUT,
-    )
-    resp.raise_for_status()
+    try:
+        resp = _request_with_retry(
+            "post",
+            f"{HS_BASE}/crm/v3/objects/companies",
+            headers=headers,
+            json=payload,
+            timeout=DEFAULT_TIMEOUT,
+        )
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        log_step(
+            "hubspot",
+            "company_create_failed",
+            {"error": str(e), "domain": payload["properties"].get("domain")},
+            severity="error"
+        )
+        raise
     company_id = (resp.json() or {}).get("id")
     log_step(
         "hubspot",
@@ -279,7 +288,18 @@ def attach_pdf(pdf_path: Path, company_id: str) -> Optional[Dict[str, Any]]:
             raise RuntimeError("HUBSPOT_ACCESS_TOKEN missing in LIVE mode")
         return None
     headers = {"Authorization": f"Bearer {token}"}
-    files = {"file": (pdf_path.name, pdf_path.read_bytes(), "application/pdf")}
+    try:
+        file_content = pdf_path.read_bytes()
+    except (OSError, IOError) as e:
+        log_step(
+            "hubspot",
+            "pdf_read_failed",
+            {"path": str(pdf_path), "error": str(e)},
+            severity="error"
+        )
+        return None
+    
+    files = {"file": (pdf_path.name, file_content, "application/pdf")}
     data = {"folderPath": "A2A Reports"}
     up = _request_with_retry(
         "post",

@@ -32,8 +32,12 @@ def incorporate_email_replies(
         for reply in list(replies):
             try:
                 email_listener.run(json.dumps(reply))
-            except Exception:
-                pass
+            except (ValueError, TypeError, KeyError) as e:
+                log_event({
+                    "status": "email_listener_error",
+                    "error": str(e),
+                    "severity": "warning"
+                })
             if reply.get("task_id") == task_id:
                 payload.update(reply.get("fields", {}))
                 event_id = payload.get("event_id") or reply.get("event_id")
@@ -135,8 +139,13 @@ def run_researchers(
                         body="Please reply with: " + ", ".join(missing),
                         task_id=payload.get("task_id") or event_id,
                     )
-                except Exception:
-                    pass
+                except (ValueError, RuntimeError, ConnectionError) as e:
+                    log_event({
+                        "event_id": event_id,
+                        "status": "email_send_failed",
+                        "error": str(e),
+                        "severity": "error"
+                    })
                 continue
             elif added_fields:
                 log_event(

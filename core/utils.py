@@ -100,7 +100,7 @@ def _aggregate_severities(workflow_id: str) -> dict:
             for line in fh:
                 try:
                     rec = json.loads(line)
-                except Exception:
+                except (json.JSONDecodeError, ValueError):
                     continue
                 sev = (rec.get("severity") or "").lower()
                 if sev == "error":
@@ -126,11 +126,11 @@ def finalize_summary() -> None:
                 for line in fh:
                     try:
                         rec = json.loads(line)
-                    except Exception:
+                    except (json.JSONDecodeError, ValueError):
                         continue
                     if rec.get("workflow_id") == wf_id:
                         calendar_logs.append(rec)
-        except Exception:
+        except (OSError, IOError):
             calendar_logs = []
 
     if SUMMARY.get("events_detected") or SUMMARY.get("reports_generated"):
@@ -234,11 +234,11 @@ def already_processed(item_id: str, updated: str, logfile) -> bool:
             for line in fh:
                 try:
                     rec = json.loads(line)
-                except Exception:
+                except (json.JSONDecodeError, ValueError):
                     continue
                 if rec.get("id") == item_id and rec.get("updated") == updated:
                     return True
-    except Exception:
+    except (OSError, IOError):
         return False
     return False
 

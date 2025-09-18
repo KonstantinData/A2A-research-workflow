@@ -60,14 +60,22 @@ def send_email(
     for path in attachments or []:
         p = Path(path)
         try:
-            with p.open("rb") as fh:
+            # Sanitize path to prevent directory traversal
+            resolved_path = p.resolve()
+            # Only allow files that actually exist and are files (not directories)
+            if not resolved_path.exists() or not resolved_path.is_file():
+                continue
+            
+            with resolved_path.open("rb") as fh:
                 part = MIMEBase("application", "octet-stream")
                 part.set_payload(fh.read())
             encoders.encode_base64(part)
-            part.add_header("Content-Disposition", f'attachment; filename="{p.name}"')
+            # Use only the filename, not the full path for security
+            safe_filename = resolved_path.name
+            part.add_header("Content-Disposition", f'attachment; filename="{safe_filename}"')
             msg.attach(part)
-        except Exception:
-            # Skip unreadable attachment – higher level already logged
+        except (OSError, ValueError):
+            # Skip unreadable/invalid attachment – higher level already logged
             continue
 
     try:
