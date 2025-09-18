@@ -455,6 +455,15 @@ def list_company_reports(company_id: str) -> List[Dict[str, Any]]:
         may contain keys such as ``id`` and ``type``.  An empty list
         indicates no previous reports.
     """
+    # Handle static/test company IDs - return empty list instead of making API call
+    if company_id and company_id.startswith("static-"):
+        log_step(
+            "hubspot",
+            "static_company_reports_skipped",
+            {"company_id": company_id},
+        )
+        return []
+    
     token = _token()
     if not token:
         if os.getenv("LIVE_MODE", "1") == "1":
