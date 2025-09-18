@@ -280,7 +280,7 @@ def run(trigger: Dict[str, Any]) -> Dict[str, Any]:
     
     best_result = ExtractionResult()
     
-    for extractor in extractors:
+    for extractor in run._extractors:
         try:
             result = extractor.extract(text, payload)
             
