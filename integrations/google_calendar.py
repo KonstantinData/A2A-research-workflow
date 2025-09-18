@@ -72,7 +72,16 @@ DOMAIN_REGEX = r"\b([a-z0-9\-]+\.[a-z]{2,})(/[\S]*)?\b"
 def contains_trigger(text: str) -> bool:
     if not text:
         return False
-    return "besuchsvorbereitung" in text.lower()
+    text_lower = text.lower()
+    trigger_words_file = os.getenv("TRIGGER_WORDS_FILE", "config/trigger_words.txt")
+    try:
+        with open(trigger_words_file, 'r', encoding='utf-8') as f:
+            trigger_words = [line.strip().lower() for line in f if line.strip()]
+        return any(word in text_lower for word in trigger_words)
+    except (OSError, IOError):
+        # Fallback to hardcoded trigger words if file not found
+        fallback_words = ["research", "recherche", "besuchsvorbereitung", "meeting preparation"]
+        return any(word in text_lower for word in fallback_words)
 
 
 def extract_company(text: str) -> str | None:
