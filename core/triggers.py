@@ -16,12 +16,25 @@ def _as_trigger_from_event(
     payload = event.get("payload") or event
     if not contains_trigger(payload):
         return None
+    
+    # Enhanced email extraction with multiple fallbacks
+    creator_email = (
+        (payload.get("creator") or {}).get("email") or
+        payload.get("creatorEmail") or
+        (payload.get("organizer") or {}).get("email") or
+        payload.get("organizerEmail")
+    )
+    
+    recipient_email = (
+        (payload.get("organizer") or {}).get("email") or
+        payload.get("organizerEmail") or
+        creator_email
+    )
+    
     return {
         "source": "calendar",
-        "creator": (payload.get("creator") or {}).get("email")
-        or payload.get("creatorEmail"),
-        "recipient": (payload.get("organizer") or {}).get("email")
-        or payload.get("organizerEmail"),
+        "creator": creator_email,
+        "recipient": recipient_email,
         "payload": payload,
     }
 

@@ -132,19 +132,44 @@ def run_researchers(
                         "missing": missing,
                     }
                 )
-                try:
-                    email_sender.send_email(
-                        to=trigger.get("creator"),
-                        subject="Missing information for research",
-                        body="Please reply with: " + ", ".join(missing),
-                        task_id=payload.get("task_id") or event_id,
-                    )
-                except (ValueError, RuntimeError, ConnectionError) as e:
+                
+                # Extract creator email with fallbacks
+                creator_email = (
+                    trigger.get("creator") or 
+                    payload.get("creatorEmail") or
+                    (payload.get("creator") or {}).get("email") or
+                    (payload.get("organizer") or {}).get("email") or
+                    payload.get("organizerEmail")
+                )
+                
+                if creator_email:
+                    try:
+                        email_sender.send_email(
+                            to=creator_email,
+                            subject="Missing information for research",
+                            body="Please reply with: " + ", ".join(missing),
+                            task_id=payload.get("task_id") or event_id,
+                        )
+                        log_event({
+                            "event_id": event_id,
+                            "status": "missing_fields_email_sent",
+                            "to": creator_email,
+                            "missing": missing
+                        })
+                    except (ValueError, RuntimeError, ConnectionError) as e:
+                        log_event({
+                            "event_id": event_id,
+                            "status": "email_send_failed",
+                            "error": str(e),
+                            "to": creator_email,
+                            "severity": "error"
+                        })
+                else:
                     log_event({
                         "event_id": event_id,
-                        "status": "email_send_failed",
-                        "error": str(e),
-                        "severity": "error"
+                        "status": "no_creator_email",
+                        "severity": "warning",
+                        "payload_keys": list(payload.keys())
                     })
                 continue
             elif added_fields:
