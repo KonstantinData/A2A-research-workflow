@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import importlib
+import json
 import os
-from pathlib import Path
 import shutil
 
 from integrations import email_sender
@@ -33,10 +33,31 @@ def handle_failure(event_id: str | None, error: Exception) -> None:
     )
 
     try:
-        log_path = SETTINGS.workflows_dir / f"{event_id}.jsonl"
-        can_restart = log_path.exists()
+        workflows_dir = SETTINGS.workflows_dir
+        latest_status = None
+        entry_found = False
 
-        if can_restart:
+        if workflows_dir.exists():
+            for path in sorted(workflows_dir.glob("*.jsonl")):
+                try:
+                    with path.open("r", encoding="utf-8") as fh:
+                        for line in fh:
+                            try:
+                                record = json.loads(line)
+                            except Exception:
+                                continue
+                            if record.get("event_id") != event_id:
+                                continue
+                            entry_found = True
+                            status = record.get("status")
+                            if status and status != "fetched":
+                                latest_status = status
+                except Exception:
+                    continue
+
+        terminal_statuses = statuses.FINAL_STATUSES | statuses.PAUSE_STATUSES
+
+        if entry_found and latest_status not in terminal_statuses:
             log_event({"event_id": event_id, "status": "restart_attempted"})
             return
 
