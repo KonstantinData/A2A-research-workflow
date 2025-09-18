@@ -26,8 +26,12 @@ def _read_artifact(filename: str) -> List[str]:
         data = json.loads(text)
         if isinstance(data, list):
             return [str(x) for x in data]
-    except Exception:
-        pass
+    except (OSError, IOError) as e:
+        import logging
+        logging.getLogger(__name__).warning("Failed to read artifact %s: %s", filename, e)
+    except (json.JSONDecodeError, ValueError) as e:
+        import logging
+        logging.getLogger(__name__).warning("Failed to parse artifact %s: %s", filename, e)
     return []
 
 

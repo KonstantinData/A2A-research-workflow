@@ -217,7 +217,7 @@ def scheduled_poll(
                             "suggestions": suggestions,
                         },
                     )
-                except Exception as e:
+                except (ValueError, RuntimeError, ConnectionError) as e:
                     log_step(
                         "contacts",
                         "trigger_confirmation_error",
@@ -268,7 +268,7 @@ def scheduled_poll(
                     "reminder_sent",
                     {"contact_id": contact_id, "missing_fields": missing_req},
                 )
-        except Exception as e:
+        except (ValueError, RuntimeError, ConnectionError) as e:
             log_step(
                 "contacts",
                 "reminder_error",

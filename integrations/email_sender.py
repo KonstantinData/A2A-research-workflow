@@ -34,6 +34,16 @@ def _validate_recipient(to: str) -> str | None:
     validated address to the low level mailer for defence in depth.
     """
 
+    # Basic email format validation
+    if not re.match(r'^[^@]+@[^@]+\.[^@]+$', to.strip()):
+        log_step(
+            "mailer",
+            "email_skipped_invalid_format",
+            {"to": to},
+            severity="warning",
+        )
+        return None
+    
     cleaned_to = to.strip()
     allow_env = os.getenv("ALLOWLIST_EMAIL_DOMAIN", "").strip()
     allowed_domain = allow_env.lstrip("@").lower()
@@ -354,14 +364,8 @@ def send_missing_fields_reminder(
         "Your colleague from the Research Team"
     )
 
-    allow = os.getenv("ALLOWLIST_EMAIL_DOMAIN")
-    if allow and not recipient_email.lower().endswith(f"@{allow.lower()}"):
-        log_step(
-            "mailer",
-            "reminder_skipped_invalid_domain",
-            {"to": recipient_email},
-            severity="warning",
-        )
+    validated_to = _validate_recipient(recipient_email)
+    if not validated_to:
         return
     send_kwargs = {}
     task_id = task.get("id")
@@ -369,7 +373,7 @@ def send_missing_fields_reminder(
         send_kwargs["task_id"] = task_id
 
     send_email(
-        to=recipient_email,
+        to=validated_to,
         subject=subject,
         body=body,
         **send_kwargs,

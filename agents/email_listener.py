@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from email import message_from_string
 from typing import Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import time
 import re
@@ -47,6 +47,8 @@ def _get_body(msg) -> str:
             if part.get_content_type() == "text/plain" and not part.get_filename():
                 charset = part.get_content_charset() or "utf-8"
                 payload = part.get_payload(decode=True)
+                if payload is None:
+                    continue
                 if isinstance(payload, bytes):
                     parts.append(payload.decode(charset, errors="replace"))
                 else:
@@ -129,7 +131,7 @@ def update_task(task_id: str, provided_data: Dict[str, str]) -> Dict[str, Any] |
     """Update task record with ``provided_data`` and mark as completed."""
     if not task_id:
         return None
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     with tasks_db._connect() as conn:
         conn.execute(
             "UPDATE tasks SET missing_fields = ?, status = ?, updated_at = ? WHERE id = ?",
@@ -173,7 +175,7 @@ def process_email(raw_email: str) -> Dict[str, Any]:
     if not task_id:
         return {"error": "task_id not found"}
 
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     with tasks_db._connect() as conn:
         conn.execute(
             "UPDATE tasks SET missing_fields = ?, updated_at = ? WHERE id = ?",

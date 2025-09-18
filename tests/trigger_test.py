@@ -38,8 +38,9 @@ def _parse_calendar_ids(value: str | None) -> List[str]:
             arr = _json.loads(value)
             ids = [str(x).strip() for x in arr if str(x).strip()]
             return list(dict.fromkeys(ids)) or ["primary"]
-        except Exception:
-            pass
+        except ImportError as e:
+            import logging
+            logging.getLogger(__name__).warning("Failed to load dotenv: %s", e)
     parts = [p.strip() for p in re.split(r"[,\s;]+", value) if p.strip()]
     return list(dict.fromkeys(parts)) or ["primary"]
 

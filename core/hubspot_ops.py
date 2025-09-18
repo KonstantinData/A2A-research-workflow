@@ -33,8 +33,9 @@ def check_existing_and_prompt(
                 ),
                 task_id=first_event_id,
             )
-        except Exception:
-            pass
+        except (ValueError, RuntimeError, ConnectionError) as e:
+            import logging
+            logging.getLogger(__name__).warning("Failed to send existing report email: %s", e)
 
     log_event({"event_id": first_event_id, "status": "report_exists_query"})
 
@@ -75,7 +76,13 @@ def upsert_and_attach(
 ) -> Tuple[Any, bool]:
     new_company_id = company_id
     if new_company_id is None and hubspot_upsert:
-        new_company_id = hubspot_upsert(consolidated)
+        try:
+            new_company_id = hubspot_upsert(consolidated)
+        except (ValueError, RuntimeError, ConnectionError) as e:
+            import logging
+            logging.getLogger(__name__).error("HubSpot upsert failed: %s", e)
+            recovery_agent.handle_failure(first_event_id, e)
+            return None, False
 
     if (
         getattr(settings, "attach_pdf_to_hubspot", False)

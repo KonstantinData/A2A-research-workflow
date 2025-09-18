@@ -31,7 +31,8 @@ def incorporate_email_replies(
         )
         for reply in list(replies):
             try:
-                email_listener.run(json.dumps(reply))
+                # Pass reply dict directly instead of JSON string to avoid command injection
+                email_listener.run(reply)
             except (ValueError, TypeError, KeyError) as e:
                 log_event({
                     "status": "email_listener_error",

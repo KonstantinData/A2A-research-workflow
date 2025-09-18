@@ -49,8 +49,12 @@ def _write_artifact(filename: str, data: Any) -> None:
         out_dir = SETTINGS.artifacts_dir
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / filename).write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    except Exception:
-        pass
+    except (OSError, IOError) as e:
+        import logging
+        logging.getLogger(__name__).warning("Failed to write artifact %s: %s", filename, e)
+    except (TypeError, ValueError) as e:
+        import logging
+        logging.getLogger(__name__).warning("Failed to serialize data for artifact %s: %s", filename, e)
 
 
 def _log_workflow(record: Dict[str, Any]) -> None:

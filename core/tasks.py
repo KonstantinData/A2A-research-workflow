@@ -49,21 +49,25 @@ def _log_action(action: str, task: Dict[str, Any]) -> None:
 
 
 def _connect() -> sqlite3.Connection:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute(
-        '''CREATE TABLE IF NOT EXISTS tasks (
-               id TEXT PRIMARY KEY,
-               trigger TEXT NOT NULL,
-               missing_fields TEXT NOT NULL,
-               employee_email TEXT NOT NULL,
-               status TEXT NOT NULL,
-               created_at TEXT NOT NULL,
-               updated_at TEXT NOT NULL
-           )'''
-    )
-    return conn
+    try:
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        conn.execute(
+            '''CREATE TABLE IF NOT EXISTS tasks (
+                   id TEXT PRIMARY KEY,
+                   trigger TEXT NOT NULL,
+                   missing_fields TEXT NOT NULL,
+                   employee_email TEXT NOT NULL,
+                   status TEXT NOT NULL,
+                   created_at TEXT NOT NULL,
+                   updated_at TEXT NOT NULL
+               )'''
+        )
+        return conn
+    except (sqlite3.Error, OSError) as e:
+        logger.error("Database connection failed: %s", e)
+        raise RuntimeError(f"Failed to connect to database: {e}") from e
 
 
 # ---------------------------------------------------------------------------
@@ -128,10 +132,15 @@ def get_task(task_id: str) -> Optional[Dict[str, Any]]:
         row = cur.fetchone()
         if not row:
             return None
+        try:
+            missing_fields = json.loads(row['missing_fields'])
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.warning("Invalid JSON in missing_fields for task %s: %s", row['id'], e)
+            missing_fields = []
         task = {
             'id': row['id'],
             'trigger': row['trigger'],
-            'missing_fields': json.loads(row['missing_fields']),
+            'missing_fields': missing_fields,
             'employee_email': row['employee_email'],
             'status': row['status'],
             'created_at': datetime.fromisoformat(row['created_at']),
@@ -153,10 +162,15 @@ def update_task_status(task_id: str, status: str) -> Optional[Dict[str, Any]]:
         row = cur.fetchone()
     if not row:
         return None
+    try:
+        missing_fields = json.loads(row['missing_fields'])
+    except (json.JSONDecodeError, TypeError) as e:
+        logger.warning("Invalid JSON in missing_fields for task %s: %s", row['id'], e)
+        missing_fields = []
     task = {
         'id': row['id'],
         'trigger': row['trigger'],
-        'missing_fields': json.loads(row['missing_fields']),
+        'missing_fields': missing_fields,
         'employee_email': row['employee_email'],
         'status': row['status'],
         'created_at': datetime.fromisoformat(row['created_at']),
