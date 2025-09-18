@@ -23,8 +23,8 @@ from core import run_loop
 from core import triggers as trigger_utils
 from config.env import ensure_mail_from
 from config.settings import SETTINGS
-from integrations.google_calendar import fetch_events, extract_company, extract_domain
-from integrations.google_contacts import fetch_contacts
+from integrations.google_calendar import extract_company, extract_domain
+from core.services import google_calendar_service, google_contacts_service, email_service
 from integrations.google_oauth import build_user_credentials
 
 # Common status definitions
@@ -275,13 +275,13 @@ def run(
         if SETTINGS.use_push_triggers:
             triggers = []
         else:
-            events = fetch_events() or []
+            events = google_calendar_service.fetch_events() or []
             for event in events:
                 event_id = event.get("event_id") or event.get("id")
                 if event_id:
                     log_event({"event_id": event_id, "status": "fetched"})
             try:
-                contacts = fetch_contacts() or []
+                contacts = google_contacts_service.fetch_contacts() or []
             except Exception as exc:
                 log_event(
                     {

@@ -11,11 +11,13 @@ from typing import Any, Dict, List, Optional
 import requests
 
 from core.utils import log_step
+from core.circuit_breaker import with_circuit_breaker
 
 DEFAULT_TIMEOUT = 30
 HS_BASE = "https://api.hubapi.com"
 
 
+@with_circuit_breaker("hubspot", failure_threshold=3, recovery_timeout=30, expected_exception=requests.RequestException)
 def _request_with_retry(method: str, url: str, **kwargs: Any) -> requests.Response:
     """Perform a HubSpot API request with retry/backoff for transient failures."""
 

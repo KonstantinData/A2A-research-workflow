@@ -173,7 +173,7 @@ class ReminderScheduler:
 
     def _now(self) -> datetime:
         """Return current datetime, extracted for ease of testing."""
-        return datetime.now()
+        return datetime.now(timezone.utc)
 
     def _sleep(self, seconds: float) -> None:
         """Sleep for a number of seconds, isolated for testing."""
@@ -221,7 +221,7 @@ def check_and_notify(triggers: list[dict]) -> None:
         append_jsonl(
             reminder_log,
             {
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 "status": "reminder_sent",
                 "source": trig["source"],
                 "recipient": trig["recipient"],
