@@ -80,7 +80,7 @@ def contains_trigger(text: str) -> bool:
         return any(word in text_lower for word in trigger_words)
     except (OSError, IOError):
         # Fallback to hardcoded trigger words if file not found
-        fallback_words = ["research", "recherche", "besuchsvorbereitung", "meeting preparation"]
+        fallback_words = ["research", "recherche", "meeting preparation", "besuchsvorbereitung"]
         return any(word in text_lower for word in fallback_words)
 
 
