@@ -18,6 +18,9 @@ def test_small_attachment_sent(monkeypatch, tmp_path):
         called["attachments"] = attachments
         called["body"] = body
 
+    def fake_validate(to):
+        return to  # Always return the recipient as valid
+
     # Allowlist deaktivieren, sonst kehrt send_email() früh zurück
     monkeypatch.setenv("ALLOWLIST_EMAIL_DOMAIN", "")
     monkeypatch.setenv("LIVE_MODE", "0")
@@ -25,8 +28,14 @@ def test_small_attachment_sent(monkeypatch, tmp_path):
     monkeypatch.setenv("SMTP_HOST", "localhost")
     monkeypatch.setenv("SMTP_USER", "u")
     monkeypatch.setenv("SMTP_PASS", "p")
+    
+    # Patch SETTINGS.live_mode directly since it's already initialized
+    from config.settings import SETTINGS
+    monkeypatch.setattr(SETTINGS, "live_mode", 0)
+    
     monkeypatch.setattr(email_sender, "_deliver", fake_deliver)
-
+    monkeypatch.setattr(email_sender, "_validate_recipient", fake_validate)
+    
     email_sender.send_email("a@b", "sub", "body", attachments=[str(file)])
     assert called["attachments"] == [str(file)]
 
@@ -41,6 +50,9 @@ def test_large_attachment_skipped(monkeypatch, tmp_path):
         called["attachments"] = attachments
         called["body"] = body
 
+    def fake_validate(to):
+        return to  # Always return the recipient as valid
+
     logs = []
     monkeypatch.setattr(email_sender, "log_step", lambda *a, **k: logs.append((a, k)))
 
@@ -51,8 +63,14 @@ def test_large_attachment_skipped(monkeypatch, tmp_path):
     monkeypatch.setenv("SMTP_HOST", "localhost")
     monkeypatch.setenv("SMTP_USER", "u")
     monkeypatch.setenv("SMTP_PASS", "p")
+    
+    # Patch SETTINGS.live_mode directly since it's already initialized
+    from config.settings import SETTINGS
+    monkeypatch.setattr(SETTINGS, "live_mode", 0)
+    
     monkeypatch.setattr(email_sender, "_deliver", fake_deliver)
-
+    monkeypatch.setattr(email_sender, "_validate_recipient", fake_validate)
+    
     email_sender.send_email("a@b", "sub", "body", attachments=[str(file)])
     assert called["attachments"] == []
     assert str(file) in called["body"]
