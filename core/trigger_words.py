@@ -122,6 +122,11 @@ def _hybrid_match(word: str, trigger: str) -> bool:
     return _levenshtein_leq1(word, trigger) or _fuzzy_match(word, trigger)
 
 
+@lru_cache(maxsize=128)
+def _get_normalized_triggers() -> List[str]:
+    """Cache normalized trigger words for better performance."""
+    return [normalize_text(trig) for trig in load_trigger_words()]
+
 def contains_trigger(
     text: str | dict, triggers: Optional[Iterable[str]] = None
 ) -> bool:
@@ -150,15 +155,29 @@ def contains_trigger(
     else:
         norm = normalize_text(text)
 
-    words = re.findall(r"\b\w+\b", norm)
-
-    for trig in triggers or load_trigger_words():
-        norm_trig = normalize_text(trig)
-        if re.search(rf"\b{re.escape(norm_trig)}\b", norm):
-            return True
-        for w in words:
-            if _hybrid_match(w, norm_trig):
+    # Use cached normalized triggers if no custom triggers provided
+    if triggers is None:
+        norm_triggers = _get_normalized_triggers()
+        # Fast exact match check first
+        for norm_trig in norm_triggers:
+            if re.search(rf"\b{re.escape(norm_trig)}\b", norm):
                 return True
+        
+        # Only do expensive fuzzy matching if no exact matches
+        words = re.findall(r"\b\w+\b", norm)
+        for norm_trig in norm_triggers:
+            for w in words:
+                if _hybrid_match(w, norm_trig):
+                    return True
+    else:
+        words = re.findall(r"\b\w+\b", norm)
+        for trig in triggers:
+            norm_trig = normalize_text(trig)
+            if re.search(rf"\b{re.escape(norm_trig)}\b", norm):
+                return True
+            for w in words:
+                if _hybrid_match(w, norm_trig):
+                    return True
 
     return False
 

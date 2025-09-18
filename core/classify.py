@@ -93,28 +93,36 @@ def classify(data: Dict[str, Any]) -> Dict[str, Any]:
 
     text = _collect_text(data)
 
-    result: Dict[str, Any] = {
-        "nace": [],
-        "wz2008": [],
-        "onace": [],
-        "noga": [],
-        "labels": {"nace": {}, "wz2008": {}, "onace": {}, "noga": {}},
-        "gpt_tags": [],
+    # Use sets for O(1) duplicate detection
+    codes_sets = {
+        "nace": set(),
+        "wz2008": set(),
+        "onace": set(),
+        "noga": set(),
     }
+    gpt_tags_set = set()
+    labels = {"nace": {}, "wz2008": {}, "onace": {}, "noga": {}}
 
     for keyword, mapping in CLASSIFICATION_KEYWORDS.items():
         if keyword in text:
             for scheme in ("nace", "wz2008", "onace", "noga"):
                 code = mapping[scheme]
-                codes_list: List[str] = result[scheme]
-                if code not in codes_list:
-                    codes_list.append(code)
-                    result["labels"][scheme][code] = mapping["label_de"]
-            if keyword not in result["gpt_tags"]:
-                result["gpt_tags"].append(keyword)
+                if code not in codes_sets[scheme]:
+                    codes_sets[scheme].add(code)
+                    labels[scheme][code] = mapping["label_de"]
+            gpt_tags_set.add(keyword)
 
-    for tag in data.get("gpt_tags", []):
-        if tag not in result["gpt_tags"]:
-            result["gpt_tags"].append(tag)
+    # Add explicit GPT tags
+    gpt_tags_set.update(data.get("gpt_tags", []))
+
+    # Convert sets back to lists for output
+    result: Dict[str, Any] = {
+        "nace": sorted(codes_sets["nace"]),
+        "wz2008": sorted(codes_sets["wz2008"]),
+        "onace": sorted(codes_sets["onace"]),
+        "noga": sorted(codes_sets["noga"]),
+        "labels": labels,
+        "gpt_tags": sorted(gpt_tags_set),
+    }
 
     return result

@@ -34,7 +34,7 @@ def _log_event_impl(record: Dict[str, Any]) -> None:
         .isoformat()
         .replace("+00:00", "Z"),
         "severity": record.get("severity", "info"),
-        "workflow_id": get_workflow_id(),
+        "workflow_id": wf,
         "details": {},
     }
 

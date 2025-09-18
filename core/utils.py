@@ -175,6 +175,15 @@ def finalize_summary() -> None:
     except Exception:
         pass
 
+# Translation table for efficient character replacement
+_NORMALIZE_TRANSLATION = str.maketrans({
+    # Dash variants
+    "–": "-", "—": "-", "‐": "-", "‑": "-", "‒": "-", "―": "-",
+    # German umlauts
+    "ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss",
+    "Ä": "ae", "Ö": "oe", "Ü": "ue"
+})
+
 def normalize_text(text: str) -> str:
     if not text:
         return ""
@@ -182,17 +191,8 @@ def normalize_text(text: str) -> str:
     text = unicodedata.normalize("NFKC", text)
     # Alles klein
     text = text.lower()
-    # Alle Varianten von Bindestrichen vereinheitlichen
-    dash_variants = ["–", "—", "‐", "‑", "-", "‒", "―"]  # includes U+2011 (non-breaking hyphen)
-    for d in dash_variants:
-        text = text.replace(d, "-")
-    # Umlaute vereinheitlichen (optional für bessere Treffer)
-    text = (
-        text.replace("ä", "ae")
-            .replace("ö", "oe")
-            .replace("ü", "ue")
-            .replace("ß", "ss")
-    )
+    # All character replacements in single pass
+    text = text.translate(_NORMALIZE_TRANSLATION)
     return text
 
 
@@ -208,8 +208,12 @@ def _required_fields() -> Dict[str, List[str]]:
         # content.  This is a small helper and avoids pulling in extra
         # dependencies just for lenient JSON parsing.
         text = path.read_text(encoding="utf-8")
-        lines = [line.split("//", 1)[0] for line in text.splitlines()]  # remove trailing ``//`` comments
-        cleaned = "\n".join(lines)
+        # Only process lines if comments exist
+        if "//" in text:
+            lines = [line.split("//", 1)[0] for line in text.splitlines()]
+            cleaned = "\n".join(lines)
+        else:
+            cleaned = text
         return json.loads(cleaned)
     except FileNotFoundError:
         return {}
