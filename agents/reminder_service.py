@@ -72,14 +72,22 @@ def task_age_in_days(task: dict) -> int:
 def maybe_send_reminder(task: dict) -> None:
     if task.get("status") != "awaiting employee response":
         return
+    
+    # Validate required fields before accessing them
+    missing_fields = task.get("missing_fields")
+    employee_email = task.get("employee_email")
+    
+    if not missing_fields or not employee_email:
+        return
+    
     days = task_age_in_days(task)
     if days == 2:
         email_sender.send_missing_fields_reminder(
-            task, task["missing_fields"], task["employee_email"], final=False
+            task, missing_fields, employee_email, final=False
         )
     elif days == 6:
         email_sender.send_missing_fields_reminder(
-            task, task["missing_fields"], task["employee_email"], final=True
+            task, missing_fields, employee_email, final=True
         )
 
 
