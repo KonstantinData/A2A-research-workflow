@@ -39,6 +39,15 @@ from agents import reminder_service, email_listener, field_completion_agent, rec
 
 CAL_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
+# Backward compatibility functions for tests
+def fetch_events() -> List[Dict[str, Any]]:
+    """Fetch calendar events - backward compatibility wrapper."""
+    return google_calendar_service.fetch_events()
+
+def fetch_contacts() -> List[Dict[str, Any]]:
+    """Fetch contacts - backward compatibility wrapper."""
+    return google_contacts_service.fetch_contacts()
+
 _finalized = False
 _finalized_lock = threading.Lock()
 
