@@ -40,6 +40,20 @@ def _as_trigger_from_contact(contact: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _calendar_event_identifier(event: Dict[str, Any] | None) -> Optional[str]:
+    if not isinstance(event, dict):
+        return None
+    if event.get("event_id"):
+        return str(event["event_id"])
+    payload = event.get("payload")
+    if isinstance(payload, dict):
+        identifier = payload.get("event_id") or payload.get("id")
+        if identifier:
+            return str(identifier)
+    identifier = event.get("id")
+    return str(identifier) if identifier else None
+
+
 def gather_calendar_triggers(
     events: Optional[List[Dict[str, Any]]] = None,
     *,
@@ -109,7 +123,7 @@ def gather_calendar_triggers(
             }
         )
 
-    if not events or not any((event or {}).get("event_id") for event in events):
+    if not events or not any(_calendar_event_identifier(event) for event in events):
         log_event({"status": "no_calendar_events", "severity": "warning"})
         events = []
 
@@ -120,7 +134,7 @@ def gather_calendar_triggers(
         trigger = _as_trigger_from_event(event, contains_trigger=contains_trigger)
         if trigger is None:
             payload = event.get("payload") or event
-            event_id = payload.get("event_id") or payload.get("id")
+            event_id = _calendar_event_identifier(event)
             log_step(
                 "calendar",
                 "event_discarded",
