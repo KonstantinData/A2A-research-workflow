@@ -295,7 +295,7 @@ def run(
                 log_event(
                     {
                         "status": "contacts_fetch_failed",
-                        "severity": "warning",
+                        "severity": "critical" if os.getenv("LIVE_MODE", "1") == "1" else "warning",
                         "error": str(exc),
                     }
                 )
