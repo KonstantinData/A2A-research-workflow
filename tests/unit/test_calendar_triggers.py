@@ -32,6 +32,11 @@ def test_gather_calendar_triggers_accepts_payload_id():
     assert triggers[0]["payload"]["summary"] == "besuchsvorbereitung"
     assert not any(step[1] == "event_discarded" for step in logged_steps)
     assert not any(event.get("status") == "no_calendar_events" for event in logged_events)
+    trigger_steps = [step for step in logged_steps if step[1] == "trigger_detected"]
+    assert len(trigger_steps) == 1
+    assert trigger_steps[0][0] == "calendar"
+    assert trigger_steps[0][2]["event"]["id"] == "abc"
+    assert trigger_steps[0][2]["event"]["summary"] == "besuchsvorbereitung"
 
 
 def test_normalized_event_keeps_recipient():

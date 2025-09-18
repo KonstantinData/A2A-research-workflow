@@ -145,10 +145,10 @@ def gather_calendar_triggers(
 
     triggers: List[Dict[str, Any]] = []
     for event in events:
+        payload = event.get("payload") or event
+        event_id = _calendar_event_identifier(event)
         trigger = _as_trigger_from_event(event, contains_trigger=contains_trigger)
         if trigger is None:
-            payload = event.get("payload") or event
-            event_id = _calendar_event_identifier(event)
             log_step(
                 "calendar",
                 "event_discarded",
@@ -163,6 +163,16 @@ def gather_calendar_triggers(
             if event_id:
                 log_event({"event_id": event_id, "status": statuses.NOT_RELEVANT})
             continue
+        log_step(
+            "calendar",
+            "trigger_detected",
+            {
+                "event": {
+                    "id": event_id,
+                    "summary": payload.get("summary", ""),
+                }
+            },
+        )
         triggers.append(trigger)
     return triggers
 
