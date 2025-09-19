@@ -1,6 +1,0 @@
-{"event_id": null, "status": "preflight_oauth_ok", "timestamp": "2025-09-19T10:05:12Z", "severity": "info", "workflow_id": "wf-20250919-100512-1f27a9", "details": {"provider": "google", "mode": "v2-only"}}
-{"event_id": null, "status": "workflow_started", "timestamp": "2025-09-19T10:05:12Z", "severity": "info", "workflow_id": "wf-20250919-100512-1f27a9", "details": {}}
-{"event_id": null, "status": "no_triggers_diagnostics", "timestamp": "2025-09-19T10:05:12Z", "severity": "info", "workflow_id": "wf-20250919-100512-1f27a9", "details": {"lookback_days": 1, "lookahead_days": 14, "calendar_ids": ["primary"]}}
-{"event_id": null, "status": "no_triggers", "timestamp": "2025-09-19T10:05:12Z", "severity": "info", "workflow_id": "wf-20250919-100512-1f27a9", "details": {"message": "No calendar events matched trigger words"}}
-{"event_id": null, "status": "artifact_pdf", "timestamp": "2025-09-19T10:05:12Z", "severity": "info", "workflow_id": "wf-20250919-100512-1f27a9", "details": {"path": "/app/output/exports/report.pdf"}}
-{"event_id": null, "status": "artifact_csv", "timestamp": "2025-09-19T10:05:12Z", "severity": "info", "workflow_id": "wf-20250919-100512-1f27a9", "details": {"path": "/app/output/exports/data.csv"}}
