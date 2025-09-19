@@ -189,7 +189,8 @@ def run_researchers(
                             "payload_keys": list(payload.keys())
                         })
                     continue  # Skip research for incomplete data
-            elif added_fields:
+            
+            if added_fields:
                 log_event(
                     {
                         "event_id": event_id,
