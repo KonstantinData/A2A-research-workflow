@@ -11,7 +11,8 @@ from pathlib import Path
 import json
 import logging
 
-from core import tasks, task_history, statuses as status_defs
+from core import tasks, statuses as status_defs
+# task_history removed - using event bus for history
 from core.utils import get_workflow_id
 from integrations import email_client, email_sender
 from agents.templates import build_reminder_email
@@ -113,7 +114,7 @@ class ReminderScheduler:
                 email_client.send_email(
                     task["employee_email"], task["missing_fields"], task_id=task["id"]
                 )
-                task_history.record_event(task["id"], "reminder_sent")
+                # task_history.record_event(task["id"], "reminder_sent")  # Using event bus now
                 tasks.update_task_status(task["id"], "reminded")
                 log_event({"event_id": task["trigger"], "status": "reminder_sent", "task_id": task["id"]})
                 processed += 1
@@ -132,10 +133,11 @@ class ReminderScheduler:
         try:
             today_start = datetime.combine(self._now().date(), dtime.min)
             for task in self._open_tasks():
-                if not task_history.has_event_since(task["id"], "reminder_sent", today_start):
-                    continue
-                if task_history.has_event_since(task["id"], "escalated", today_start):
-                    continue
+                # Skip task_history checks - using event bus now
+                # if not task_history.has_event_since(task["id"], "reminder_sent", today_start):
+                #     continue
+                # if task_history.has_event_since(task["id"], "escalated", today_start):
+                #     continue
                 subject = f"Escalation: no response for task {task['id']}"
                 body = "No response was received for the reminder sent at 10:00."
                 email_sender.send_email(
@@ -144,7 +146,7 @@ class ReminderScheduler:
                     body=body,
                     task_id=task["id"],
                 )
-                task_history.record_event(task["id"], "escalated")
+                # task_history.record_event(task["id"], "escalated")  # Using event bus now
                 tasks.update_task_status(task["id"], "escalated")
                 log_event({"event_id": task["trigger"], "status": "escalation_sent", "task_id": task["id"]})
                 processed += 1
