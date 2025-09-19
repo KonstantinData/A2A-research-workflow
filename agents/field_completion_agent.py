@@ -110,9 +110,9 @@ class RegexExtractor:
         ]
         
         self.COMPILED_DOMAIN_PATTERNS = [
-            re.compile(r"\b([a-z0-9\-]+\.[a-z]{2,})(?:/[^\s]*)?\b", re.IGNORECASE),
-            re.compile(r"(?:https?://)([a-z0-9\-]+\.[a-z]{2,})(?:/[^\s]*)?", re.IGNORECASE),
-            re.compile(r"(?:www\.)([a-z0-9\-]+\.[a-z]{2,})(?:/[^\s]*)?", re.IGNORECASE)
+            re.compile(r"(?:https?://)(?:www\.)?([a-z0-9\-]+\.[a-z]{2,})(?:/[^\s]*)?", re.IGNORECASE),
+            re.compile(r"(?:www\.)([a-z0-9\-]+\.[a-z]{2,})(?:/[^\s]*)?", re.IGNORECASE),
+            re.compile(r"\b([a-z0-9\-]+\.[a-z]{2,})(?:/[^\s]*)?\b", re.IGNORECASE)
         ]
     
     def extract(self, text: str, payload: Dict[str, Any]) -> ExtractionResult:
@@ -136,12 +136,34 @@ class RegexExtractor:
     
     def _extract_company_name(self, text: str) -> Optional[str]:
         """Extract company name using multiple patterns."""
+        # Try patterns in order of specificity
         for pattern in self.COMPILED_COMPANY_PATTERNS:
             matches = pattern.finditer(text)
             for match in matches:
                 candidate = match.group(1).strip()
                 if self._is_valid_company_name(candidate):
-                    return candidate  # Early termination for performance
+                    return candidate
+        
+        # Fallback: look for capitalized words that might be company names
+        # Split by lines first to avoid cross-line matches
+        lines = text.split('\n')
+        for line in lines:
+            words = line.split()
+            for i, word in enumerate(words):
+                if word and word[0].isupper() and len(word) > 2:
+                    # Check if next 1-2 words are also capitalized (company name pattern)
+                    company_parts = [word]
+                    for j in range(i + 1, min(i + 3, len(words))):
+                        if j < len(words) and words[j] and words[j][0].isupper():
+                            company_parts.append(words[j])
+                        else:
+                            break
+                    
+                    if len(company_parts) >= 1:
+                        candidate = " ".join(company_parts)
+                        if self._is_valid_company_name(candidate) and len(candidate) <= 50:
+                            return candidate
+        
         return None
     
     def _extract_domain(self, text: str, payload: Dict[str, Any]) -> Optional[str]:
@@ -151,6 +173,9 @@ class RegexExtractor:
             match = pattern.search(text)
             if match:
                 domain = match.group(1).lower().rstrip("/")
+                # Remove www. prefix if present
+                if domain.startswith("www."):
+                    domain = domain[4:]
                 if self._is_valid_domain(domain):
                     return domain
         
@@ -192,9 +217,27 @@ class RegexExtractor:
         # Filter out common false positives
         false_positives = {
             "Meeting", "Call", "Visit", "Discussion", "Project", "Client",
-            "Customer", "Team", "Department", "Office", "Building"
+            "Customer", "Team", "Department", "Office", "Building", "Event",
+            "Conference", "Workshop", "Training", "Session", "Appointment"
         }
-        return name not in false_positives
+        
+        # Check if it's a common false positive
+        if name in false_positives:
+            return False
+        
+        # Must contain at least one letter
+        if not any(c.isalpha() for c in name):
+            return False
+        
+        # Should not be all uppercase (likely acronym without context)
+        if name.isupper() and len(name) < 4:
+            return False
+        
+        # Should not contain line breaks or excessive whitespace
+        if '\n' in name or '  ' in name:
+            return False
+        
+        return True
     
     def _is_valid_domain(self, domain: str) -> bool:
         """Validate extracted domain with improved checks."""
@@ -240,12 +283,18 @@ def _collect_text(trigger: Dict[str, Any]) -> str:
         if value and isinstance(value, str):
             text_parts.append(value.strip())
     
-    # Contact notes removed - only calendar events supported
-    
     # Location information
     location = payload.get("location")
     if location and isinstance(location, str):
         text_parts.append(location.strip())
+    
+    # Add attendee information for context
+    attendees = payload.get("attendees", [])
+    for attendee in attendees:
+        if isinstance(attendee, dict):
+            name = attendee.get("displayName") or attendee.get("name")
+            if name and isinstance(name, str):
+                text_parts.append(name.strip())
     
     return "\n".join(filter(None, text_parts))
 

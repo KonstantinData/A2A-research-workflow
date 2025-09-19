@@ -232,8 +232,20 @@ def notify_reminders(
     *,
     reminder_service: Any,
 ) -> None:
+    """Send reminder notifications for pending triggers."""
     try:
-        reminder_service.check_and_notify(triggers)
+        # Convert triggers to the format expected by reminder service
+        reminder_triggers = []
+        for trigger in triggers:
+            payload = trigger.get("payload", {})
+            event_id = payload.get("event_id")
+            
+            # Only process triggers that need reminders
+            if event_id and not payload.get("company_name") and not payload.get("domain"):
+                reminder_triggers.append(trigger)
+        
+        if reminder_triggers:
+            reminder_service.check_and_notify(reminder_triggers)
     except Exception:
         pass
 

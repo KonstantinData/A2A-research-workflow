@@ -35,14 +35,14 @@ logger = logging.getLogger(__name__)
 
 def log_event(record: dict) -> None:
     """Write ``record`` to a workflow JSONL log with a common schema."""
-    ts = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-    path = SETTINGS.workflows_dir / f"{ts}_workflow.jsonl"
+    wf_id = get_workflow_id()
+    path = SETTINGS.workflows_dir / f"{wf_id}.jsonl"
     payload = {
         "event_id": record.get("event_id"),
         "status": record.get("status"),
         "timestamp": datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
         "severity": record.get("severity", "info"),
-        "workflow_id": get_workflow_id(),
+        "workflow_id": wf_id,
         "details": {},
     }
     for k, v in record.items():
@@ -209,30 +209,69 @@ def check_and_notify(triggers: list[dict]) -> None:
         event_id = payload.get("event_id") or trig.get("event_id")
         if not event_id:
             continue
-        if statuses.get(event_id) not in {status_defs.PENDING, status_defs.PENDING_ADMIN}:
+        
+        # Check if this event needs a reminder
+        current_status = statuses.get(event_id)
+        if current_status not in {status_defs.PENDING, status_defs.PENDING_ADMIN}:
             continue
-        email = build_reminder_email(
-            source=trig["source"],
-            recipient=trig["recipient"],
-            missing=trig["missing"],
+        
+        # Extract recipient from trigger structure
+        recipient = (
+            trig.get("recipient") or 
+            trig.get("creator") or
+            payload.get("creatorEmail") or
+            (payload.get("creator") or {}).get("email") or
+            (payload.get("organizer") or {}).get("email")
         )
-        email_sender.send(
-            to=email["recipient"],
-            subject=email["subject"],
-            body=email["body"],
-        )
-        reminder_log = _reminder_log_path()
-        reminder_log.parent.mkdir(parents=True, exist_ok=True)
-        append_jsonl(
-            reminder_log,
-            {
-                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-                "status": "reminder_sent",
-                "source": trig["source"],
-                "recipient": trig["recipient"],
-                "missing": trig["missing"],
-            },
-        )
+        
+        if not recipient:
+            continue
+        
+        # Extract missing fields info
+        missing = trig.get("missing", [])
+        if not missing:
+            # Check if we can determine what's missing
+            if not payload.get("company_name"):
+                missing.append("company_name")
+            if not payload.get("domain"):
+                missing.append("domain")
+        
+        if not missing:
+            continue
+        
+        try:
+            email = build_reminder_email(
+                source=trig.get("source", "calendar"),
+                recipient=recipient,
+                missing=missing,
+            )
+            email_sender.send(
+                to=email["recipient"],
+                subject=email["subject"],
+                body=email["body"],
+            )
+            
+            reminder_log = _reminder_log_path()
+            reminder_log.parent.mkdir(parents=True, exist_ok=True)
+            append_jsonl(
+                reminder_log,
+                {
+                    "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    "status": "reminder_sent",
+                    "event_id": event_id,
+                    "source": trig.get("source", "calendar"),
+                    "recipient": recipient,
+                    "missing": missing,
+                },
+            )
+        except Exception as e:
+            # Log the error but continue with other triggers
+            log_event({
+                "event_id": event_id,
+                "status": "reminder_send_failed",
+                "error": str(e),
+                "severity": "warning"
+            })
 
 
 __all__ = ["ReminderScheduler", "check_and_notify"]
