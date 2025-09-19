@@ -1,0 +1,9 @@
+{"workflow_id": "wf-20250918-111004-8edece", "trigger_source": "calendar", "status": "missing_google_oauth_env", "severity": "error", "variant": "v2", "mode": "v2-only"}
+{"workflow_id": "wf-20250918-111058-f1d460", "trigger_source": "calendar", "status": "event_ingested", "severity": "info", "variant": "v2", "event_id": "4u1qjrfkaoqk9tb82rlpqopl0p", "calendar_id": "primary"}
+{"workflow_id": "wf-20250918-111058-f1d460", "trigger_source": "calendar", "status": "event_ingested", "severity": "info", "variant": "v2", "event_id": "0v10dj94ldfn2lb9lmuoqof99q", "calendar_id": "primary"}
+{"workflow_id": "wf-20250918-111058-f1d460", "trigger_source": "calendar", "status": "event_ingested", "severity": "info", "variant": "v2", "event_id": "4umvanrapmir5vltdjhv5tm4kn", "calendar_id": "primary"}
+{"workflow_id": "wf-20250918-111058-f1d460", "trigger_source": "calendar", "status": "fetch_ok", "severity": "info", "variant": "v2", "calendars": ["primary"], "count": 3}
+{"workflow_id": "wf-20250918-111159-c90a5e", "trigger_source": "calendar", "status": "event_ingested", "severity": "info", "variant": "v2", "event_id": "4u1qjrfkaoqk9tb82rlpqopl0p", "calendar_id": "primary"}
+{"workflow_id": "wf-20250918-111159-c90a5e", "trigger_source": "calendar", "status": "event_ingested", "severity": "info", "variant": "v2", "event_id": "0v10dj94ldfn2lb9lmuoqof99q", "calendar_id": "primary"}
+{"workflow_id": "wf-20250918-111159-c90a5e", "trigger_source": "calendar", "status": "event_ingested", "severity": "info", "variant": "v2", "event_id": "4umvanrapmir5vltdjhv5tm4kn", "calendar_id": "primary"}
+{"workflow_id": "wf-20250918-111159-c90a5e", "trigger_source": "calendar", "status": "fetch_ok", "severity": "info", "variant": "v2", "calendars": ["primary"], "count": 3}

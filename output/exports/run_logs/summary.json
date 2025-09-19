@@ -1,0 +1,1 @@
+{"workflow_id": "wf-20250919-100512-1f27a9", "events_detected": 0, "reminders_sent": 0, "reports_generated": 1, "mails_sent": 0, "errors": 0, "warnings": 0, "run_mode": "reminder_only", "artifact_health": {"pdf_ok": true, "pdf_size": 6208, "csv_ok": true, "csv_rows": 0, "empty_run": true}}
