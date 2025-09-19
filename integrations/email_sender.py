@@ -67,11 +67,13 @@ def _validate_recipient(to: str) -> str | None:
             )
             return None
         recipient_domain = cleaned_to.rsplit("@", 1)[-1].lower()
-        if recipient_domain != allowed_domain:
+        # Allow sender's own domain for internal notifications
+        sender_domain = os.getenv("MAIL_FROM", "").rsplit("@", 1)[-1].lower() if "@" in os.getenv("MAIL_FROM", "") else ""
+        if recipient_domain != allowed_domain and recipient_domain != sender_domain:
             log_step(
                 "mailer",
                 "email_skipped_invalid_domain",
-                {"to": cleaned_to, "allowed_domain": allowed_domain},
+                {"to": cleaned_to, "allowed_domain": allowed_domain, "sender_domain": sender_domain},
                 severity="warning",
             )
             return None
