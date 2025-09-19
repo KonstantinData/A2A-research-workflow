@@ -15,13 +15,14 @@ WORKDIR /app
 COPY requirements.txt /app/
 RUN python -m pip install --upgrade pip && pip install -r requirements.txt
 
+# Copy application code first
+COPY . /app
+
 # Non-root user & writable dirs
 RUN useradd -m -u 1000 appuser
 RUN mkdir -p /app/output /app/logs /app/data
 RUN chown -R appuser:appuser /app
 USER appuser
-
-COPY . /app
 
 VOLUME ["/app/output", "/app/logs", "/app/data"]
 ENTRYPOINT ["python", "-m", "core.orchestrator"]
