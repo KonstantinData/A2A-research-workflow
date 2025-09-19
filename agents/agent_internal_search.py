@@ -73,9 +73,11 @@ def run(trigger: Normalized) -> Normalized:
     payload = trigger.get("payload", {})
     context = trigger.get("source", "")
 
-    # Map expected keys for downstream integrations
-    payload.setdefault("company_name", payload.get("company"))
-    payload.setdefault("company_domain", payload.get("domain"))
+    # Map expected keys for downstream integrations (preserve existing values)
+    if not payload.get("company_name") and payload.get("company"):
+        payload["company_name"] = payload.get("company")
+    if not payload.get("company_domain") and payload.get("domain"):
+        payload["company_domain"] = payload.get("domain")
     payload.setdefault("creator_email", payload.get("email") or trigger.get("creator"))
 
     missing_required, missing_optional = validate_required_fields(payload, context)

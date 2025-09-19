@@ -87,10 +87,20 @@ def export_report(
     pdf_path = outdir / "report.pdf"
     csv_path = outdir / "data.csv"
 
-    rows = list(consolidated.get("rows") or [])
-    fields = list(consolidated.get("fields") or [])
-    meta = consolidated.get("meta")
-    meta_dict = dict(meta) if isinstance(meta, dict) else None
+    # Convert flat consolidated dict to rows/fields format
+    if "rows" in consolidated and "fields" in consolidated:
+        # Already structured format
+        rows = list(consolidated.get("rows") or [])
+        fields = list(consolidated.get("fields") or [])
+    else:
+        # Flat format - convert to single row
+        meta = consolidated.get("meta", {})
+        # Exclude meta from the data row
+        data_row = {k: v for k, v in consolidated.items() if k != "meta"}
+        rows = [data_row] if data_row else []
+        fields = list(data_row.keys()) if data_row else []
+    
+    meta_dict = dict(consolidated.get("meta", {})) if isinstance(consolidated.get("meta"), dict) else None
 
     pdf_path = pdf_renderer(rows, fields, meta_dict, pdf_path)
     csv_exporter(rows, csv_path)
@@ -103,7 +113,7 @@ def export_report(
                 {"reason": "invalid_artifact_detected"},
                 pdf_path,
             )
-        if csv_path.exists() and csv_path.stat().st_size < 5:
+        if csv_path.exists() and csv_path.stat().st_size < 50:  # Account for header row
             fallback_csv([], csv_path)
     except Exception as exc:
         from core.utils import log_step

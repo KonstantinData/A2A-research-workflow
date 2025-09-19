@@ -222,13 +222,19 @@ class RegexExtractor:
             if isinstance(attendee, dict) and attendee.get("email"):
                 emails.append(attendee["email"])
         
-        # Extract domain from first valid business email
+        # Get own domain from environment to exclude it
+        own_domain = None
+        mail_from = os.getenv("MAIL_FROM") or os.getenv("SMTP_USER") or ""
+        if "@" in mail_from:
+            own_domain = mail_from.split("@")[1].lower()
+        
+        # Extract domain from first valid business email (excluding own domain)
         for email in emails:
             if "@" in email:
                 parts = email.split("@")
                 if len(parts) == 2:  # Validate email format
                     domain = parts[1].lower()
-                    if self._is_business_domain(domain):
+                    if self._is_business_domain(domain) and domain != own_domain:
                         return domain
         
         return None
