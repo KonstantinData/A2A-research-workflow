@@ -112,10 +112,11 @@ def test_ai_failure_triggers_email(monkeypatch):
     )
     logs = _collect_logs()
     assert f'"status": "{statuses.PENDING}"' in logs
-    assert len(send_calls) == 2
+    assert len(send_calls) == 1  # Only reminder email, no report email without company data
     subjects = {c["subject"] for c in send_calls}
-    assert "Your A2A research report" in subjects
     assert "Missing information for research" in subjects
+    # No report email should be sent when company data is missing
+    assert "Your A2A research report" not in subjects
 
 
 def test_email_reply_resumes(monkeypatch):
