@@ -68,5 +68,7 @@ jobs:
         run: |
           docker build -t a2a:ci -f ops/Dockerfile .
           set -e
+          mkdir -p output
+          sudo chown -R 1000:1000 output
           docker run --rm -e LIVE_MODE=0 -e USE_PUSH_TRIGGERS=1 -v "$PWD"/output:/app/output a2a:ci
           test -d output/exports
