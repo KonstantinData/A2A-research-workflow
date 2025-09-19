@@ -98,9 +98,19 @@ class RegexExtractor:
     
     def __init__(self):
         # Pre-compile regex patterns for performance
+        # Label-based patterns (e.g. "Company Name: Example GmbH")
+        self.LABELED_COMPANY_PATTERNS = [
+            re.compile(
+                r"(?:Company|Firma|Client|Customer|Organisation|Organization|Partner|Account)(?:\s+(?:Name|Info(?:rmation)?|Details?))?[ \t:=-]+([A-Za-z0-9ÄÖÜäöüß&., \-]{2,})",
+                re.IGNORECASE,
+            )
+        ]
+
         self.COMPILED_COMPANY_PATTERNS = [
             # Formal company suffixes
-            re.compile(r"\b([A-Z][A-Za-z0-9&.\s\-]*(?:GmbH|AG|KG|SE|Ltd|Inc|LLC|Corp|Company|Co\.|Group|Solutions|Technologies|Tech|Systems|Services))\b"),
+            re.compile(
+                r"\b([A-ZÄÖÜ][A-Za-z0-9ÄÖÜäöüß&.\-]*(?:[ \t]+[A-Z0-9ÄÖÜäöüß][A-Za-z0-9ÄÖÜäöüß&.\-]*){0,4}[ \t]+(?:GmbH|AG|KG|SE|Ltd|Inc|LLC|Corp|Company|Co\.|Group|Solutions|Technologies|Tech|Systems|Services))\b"
+            ),
             # Meeting/call contexts
             re.compile(r"(?:Meeting|Call|Visit|Discussion)\s+(?:with|at|to)\s+([A-Z][A-Za-z0-9&.\s\-]{2,30})(?:\s|$|[,.;])"),
             # Project/client contexts
@@ -137,10 +147,18 @@ class RegexExtractor:
     def _extract_company_name(self, text: str) -> Optional[str]:
         """Extract company name using multiple patterns."""
         # Try patterns in order of specificity
+        # Explicit label-based matches
+        for pattern in self.LABELED_COMPANY_PATTERNS:
+            match = pattern.search(text)
+            if match:
+                candidate = self._clean_candidate(match.group(1))
+                if self._is_valid_company_name(candidate):
+                    return candidate
+
         for pattern in self.COMPILED_COMPANY_PATTERNS:
             matches = pattern.finditer(text)
             for match in matches:
-                candidate = match.group(1).strip()
+                candidate = self._clean_candidate(match.group(1))
                 if self._is_valid_company_name(candidate):
                     return candidate
         
@@ -160,11 +178,17 @@ class RegexExtractor:
                             break
                     
                     if len(company_parts) >= 1:
-                        candidate = " ".join(company_parts)
+                        candidate = self._clean_candidate(" ".join(company_parts))
                         if self._is_valid_company_name(candidate) and len(candidate) <= 50:
                             return candidate
-        
+
         return None
+
+    @staticmethod
+    def _clean_candidate(text: str) -> str:
+        """Normalize whitespace and strip surrounding punctuation."""
+        cleaned = re.sub(r"\s+", " ", text).strip()
+        return cleaned.strip("-–—,:;()[]{}")
     
     def _extract_domain(self, text: str, payload: Dict[str, Any]) -> Optional[str]:
         """Extract domain from text or email addresses."""
@@ -224,11 +248,15 @@ class RegexExtractor:
         # Check if it's a common false positive
         if name in false_positives:
             return False
-        
+
         # Must contain at least one letter
         if not any(c.isalpha() for c in name):
             return False
-        
+
+        # Require at least one uppercase letter to avoid picking up plain sentences
+        if not any(c.isupper() for c in name if c.isalpha()):
+            return False
+
         # Should not be all uppercase (likely acronym without context)
         if name.isupper() and len(name) < 4:
             return False
@@ -275,27 +303,64 @@ class RegexExtractor:
 def _collect_text(trigger: Dict[str, Any]) -> str:
     """Collect all relevant text from trigger payload."""
     payload = trigger.get("payload", {})
-    text_parts = []
-    
+    text_parts: List[str] = []
+    seen: set[str] = set()
+
+    def _add_text(value: Optional[str]) -> None:
+        if not isinstance(value, str):
+            return
+        cleaned = value.strip()
+        if not cleaned:
+            return
+        if cleaned in seen:
+            return
+        seen.add(cleaned)
+        text_parts.append(cleaned)
+
     # Primary text fields
     for field in ("summary", "description", "notes", "title", "subject"):
-        value = payload.get(field)
-        if value and isinstance(value, str):
-            text_parts.append(value.strip())
-    
+        _add_text(payload.get(field))
+
     # Location information
-    location = payload.get("location")
-    if location and isinstance(location, str):
-        text_parts.append(location.strip())
-    
+    _add_text(payload.get("location"))
+
     # Add attendee information for context
     attendees = payload.get("attendees", [])
     for attendee in attendees:
         if isinstance(attendee, dict):
             name = attendee.get("displayName") or attendee.get("name")
-            if name and isinstance(name, str):
-                text_parts.append(name.strip())
-    
+            _add_text(name)
+
+    def _iter_nested_text(values: Any, depth: int = 0) -> None:
+        if depth > 3:
+            return
+        if isinstance(values, str):
+            _add_text(values)
+        elif isinstance(values, dict):
+            for key, val in values.items():
+                key_lower = key.lower() if isinstance(key, str) else ""
+                # Skip fields that tend to contain technical identifiers or emails
+                if key_lower in {"summary", "description", "notes", "title", "subject", "location"}:
+                    continue
+                if "email" in key_lower or key_lower in {"attendees", "creator", "organizer", "hangoutlink", "hangout_link", "htmllink"}:
+                    continue
+                _iter_nested_text(val, depth + 1)
+        elif isinstance(values, (list, tuple, set)):
+            for item in values:
+                _iter_nested_text(item, depth + 1)
+
+    nested_fields = [
+        payload.get("extendedProperties"),
+        payload.get("extended_properties"),
+        payload.get("customProperties"),
+        payload.get("custom_properties"),
+        payload.get("customFields"),
+        payload.get("custom_fields"),
+    ]
+    for value in nested_fields:
+        if value:
+            _iter_nested_text(value)
+
     return "\n".join(filter(None, text_parts))
 
 

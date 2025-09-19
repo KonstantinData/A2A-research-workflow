@@ -239,11 +239,24 @@ def notify_reminders(
         for trigger in triggers:
             payload = trigger.get("payload", {})
             event_id = payload.get("event_id")
-            
-            # Only process triggers that need reminders
-            if event_id and not payload.get("company_name") and not payload.get("domain"):
+            if not event_id:
+                continue
+
+            missing: List[str] = []
+            if not payload.get("company_name"):
+                missing.append("company_name")
+            if not payload.get("domain"):
+                missing.append("domain")
+
+            if missing:
+                existing_missing = trigger.get("missing")
+                if isinstance(existing_missing, list) and existing_missing:
+                    combined = list(dict.fromkeys(existing_missing + missing))
+                    trigger["missing"] = combined
+                else:
+                    trigger["missing"] = missing
                 reminder_triggers.append(trigger)
-        
+
         if reminder_triggers:
             reminder_service.check_and_notify(reminder_triggers)
     except Exception:
