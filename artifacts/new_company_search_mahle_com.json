@@ -1,0 +1,41 @@
+{
+  "company_name": "Mahle",
+  "company_domain": "mahle.com",
+  "website": "https://mahle.com",
+  "industry_group": "Services",
+  "industry": "consulting",
+  "description": "Mahle operates in the consulting sector. This is a generic fallback description when no detailed information is available in the static mapping.",
+  "classification": {
+    "nace": [
+      "70.22"
+    ],
+    "wz2008": [
+      "70.22"
+    ],
+    "onace": [
+      "70.22"
+    ],
+    "noga": [
+      "70.22"
+    ],
+    "labels": {
+      "nace": {
+        "70.22": "Unternehmensberatung"
+      },
+      "wz2008": {
+        "70.22": "Unternehmensberatung"
+      },
+      "onace": {
+        "70.22": "Unternehmensberatung"
+      },
+      "noga": {
+        "70.22": "Unternehmensberatung"
+      }
+    },
+    "gpt_tags": [
+      "consulting"
+    ]
+  },
+  "neighbor_level1": [],
+  "neighbor_level2": []
+}

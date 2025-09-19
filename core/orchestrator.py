@@ -328,9 +328,29 @@ def run(
         settings=SETTINGS,
     )
 
+    # Debug: Log research results
+    log_step("orchestrator", "research_results_debug", {
+        "results_count": len(results),
+        "results_summary": [{
+            "source": r.get("source", "unknown"),
+            "has_payload": bool(r.get("payload")),
+            "payload_keys": list(r.get("payload", {}).keys()) if r.get("payload") else []
+        } for r in results[:3]]  # First 3 results only
+    })
+
     run_loop.notify_reminders(triggers, reminder_service=reminder_service)
 
     consolidated = consolidate_fn(results) if consolidate_fn else {}
+    
+    # Debug: Log consolidated data
+    log_step("orchestrator", "consolidated_debug", {
+        "consolidated_keys": list(consolidated.keys()),
+        "has_company_name": bool(consolidated.get("company_name")),
+        "has_domain": bool(consolidated.get("domain")),
+        "company_name": consolidated.get("company_name"),
+        "domain": consolidated.get("domain")
+    })
+    
     log_event({"status": "consolidated", "count": len(results)})
 
     first_event_id = run_loop.first_event_id(triggers)
@@ -390,16 +410,20 @@ def run(
             finalize_run()
             return consolidated
 
-        recipient = (triggers or [{}])[0].get("recipient")
-        if recipient and pdf_path.exists():
-            try:
-                email_sender.send_email(
-                    to=recipient,
-                    subject="Your A2A research report",
-                    body="Please find the attached report.",
-                    attachments=[str(pdf_path)],
-                )
-                log_event({"event_id": first_event_id, "status": statuses.REPORT_SENT})
+        # Only send report if we have actual company data
+        has_company_data = bool(consolidated.get("company_name") and consolidated.get("domain"))
+        
+        if has_company_data:
+            recipient = (triggers or [{}])[0].get("recipient")
+            if recipient and pdf_path.exists():
+                try:
+                    email_sender.send_email(
+                        to=recipient,
+                        subject="Your A2A research report",
+                        body="Please find the attached report.",
+                        attachments=[str(pdf_path)],
+                    )
+                    log_event({"event_id": first_event_id, "status": statuses.REPORT_SENT})
             except Exception as exc:
                 recovery_agent.handle_failure(first_event_id, exc)
                 log_event(
@@ -417,19 +441,27 @@ def run(
                 )
                 finalize_run()
                 return consolidated
+            else:
+                log_event(
+                    {
+                        "event_id": first_event_id,
+                        "status": statuses.REPORT_NOT_SENT,
+                        "severity": "warning",
+                    }
+                )
+                log_step(
+                    "orchestrator",
+                    "report_not_sent",
+                    {"event_id": first_event_id},
+                    severity="warning",
+                )
         else:
             log_event(
                 {
                     "event_id": first_event_id,
-                    "status": statuses.REPORT_NOT_SENT,
-                    "severity": "warning",
+                    "status": "no_company_data_for_report",
+                    "severity": "info",
                 }
-            )
-            log_step(
-                "orchestrator",
-                "report_not_sent",
-                {"event_id": first_event_id},
-                severity="warning",
             )
     except Exception as exc:
         recovery_agent.handle_failure(first_event_id, exc)

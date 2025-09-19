@@ -33,6 +33,11 @@ def consolidate(results: Iterable[Normalized]) -> Dict[str, Any]:
 
     combined["creator"] = combined.get("creator") or None
     combined["recipient"] = combined.get("recipient") or None
+    
+    # Ensure domain field is available for CSV export
+    if not combined.get("domain") and combined.get("company_domain"):
+        combined["domain"] = combined.get("company_domain")
+    
     return combined
 
 
