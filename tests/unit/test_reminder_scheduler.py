@@ -7,7 +7,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from agents.reminder_service import ReminderScheduler, check_and_notify
-from core import tasks, task_history, statuses
+from core import tasks, statuses
+# task_history removed - using event bus
 from core.utils import get_workflow_id
 from integrations import email_client, email_sender
 from config.settings import SETTINGS
@@ -20,10 +21,10 @@ def _db_tmp(monkeypatch, tmp_path):
     # ensure modules use new DB path
     import importlib
     importlib.reload(tasks)
-    importlib.reload(task_history)
+    # importlib.reload(task_history)  # task_history removed
     yield
     importlib.reload(tasks)
-    importlib.reload(task_history)
+    # importlib.reload(task_history)  # task_history removed
 
 
 def test_send_reminders_records_history(monkeypatch):
@@ -89,7 +90,7 @@ def test_escalate_tasks_emails_admin(monkeypatch):
         return event_type == "reminder_sent"  # Simulate reminder was sent
     
     monkeypatch.setattr(ReminderScheduler, "_open_tasks", fake_open_tasks)
-    monkeypatch.setattr(task_history, "has_event_since", fake_has_event_since)
+    # monkeypatch.setattr(task_history, "has_event_since", fake_has_event_since)  # task_history removed
 
     scheduler = ReminderScheduler()
     scheduler.escalate_tasks()

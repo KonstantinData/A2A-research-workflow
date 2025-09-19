@@ -4,7 +4,8 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from core import orchestrator, tasks, task_history, statuses
+from core import orchestrator, tasks, statuses
+# task_history removed - using event bus
 from agents import field_completion_agent, reminder_service
 from integrations import email_sender, email_client
 from config.settings import SETTINGS
@@ -15,7 +16,7 @@ def _setup(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     db_path = tmp_path / "tasks.db"
     monkeypatch.setattr(tasks, "DB_PATH", db_path)
-    monkeypatch.setattr(task_history, "DB_PATH", db_path)
+    # monkeypatch.setattr(task_history, "DB_PATH", db_path)  # task_history removed
 
 
 def _stub_pdf(data, path):
@@ -151,8 +152,9 @@ def test_email_reply_resumes(monkeypatch):
 
 def test_reminder_and_escalation(monkeypatch):
     events = []
-    monkeypatch.setattr(task_history, "record_event", lambda tid, ev: events.append((tid, ev)))
-    monkeypatch.setattr(task_history, "has_event_since", lambda tid, ev, since: (tid, ev) in events)
+    # task_history mocking removed - using event bus
+    # monkeypatch.setattr(task_history, "record_event", lambda tid, ev: events.append((tid, ev)))
+    # monkeypatch.setattr(task_history, "has_event_since", lambda tid, ev, since: (tid, ev) in events)
     reminder_calls = []
     escalate_calls = []
     monkeypatch.setattr(email_client, "send_email", lambda to, fields, task_id=None: reminder_calls.append({"to": to, "task_id": task_id}))
