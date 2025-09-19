@@ -449,7 +449,7 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument("--website", default="")
     args = parser.parse_args(argv)
     _assert_live_ready()
-    if not _preflight_google():
+    if os.getenv("LIVE_MODE", "1") == "1" and not _preflight_google():
         raise SystemExit(2)
 
     try:
