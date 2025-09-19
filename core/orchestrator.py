@@ -424,23 +424,23 @@ def run(
                         attachments=[str(pdf_path)],
                     )
                     log_event({"event_id": first_event_id, "status": statuses.REPORT_SENT})
-            except Exception as exc:
-                recovery_agent.handle_failure(first_event_id, exc)
-                log_event(
-                    {
-                        "event_id": first_event_id,
-                        "status": statuses.REPORT_NOT_SENT,
-                        "severity": "critical",
-                    }
-                )
-                log_step(
-                    "orchestrator",
-                    "report_not_sent",
-                    {"event_id": first_event_id, "error": str(exc)},
-                    severity="critical",
-                )
-                finalize_run()
-                return consolidated
+                except Exception as exc:
+                    recovery_agent.handle_failure(first_event_id, exc)
+                    log_event(
+                        {
+                            "event_id": first_event_id,
+                            "status": statuses.REPORT_NOT_SENT,
+                            "severity": "critical",
+                        }
+                    )
+                    log_step(
+                        "orchestrator",
+                        "report_not_sent",
+                        {"event_id": first_event_id, "error": str(exc)},
+                        severity="critical",
+                    )
+                    finalize_run()
+                    return consolidated
             else:
                 log_event(
                     {
