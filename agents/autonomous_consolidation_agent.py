@@ -1,0 +1,44 @@
+"""Autonomous consolidation agent."""
+
+from __future__ import annotations
+
+from typing import Any, Dict, Optional
+
+from core.agent_controller import BaseAgent, AgentMetadata, AgentCapability
+from core.event_bus import EventBus, Event, EventType
+from core import consolidate
+
+
+class AutonomousConsolidationAgent(BaseAgent):
+    """Autonomous consolidation agent."""
+    
+    def __init__(self, event_bus: EventBus):
+        metadata = AgentMetadata(
+            name="consolidation_agent",
+            capabilities={AgentCapability.CONSOLIDATION},
+            priority=4,
+            max_concurrent=1
+        )
+        super().__init__(metadata, event_bus)
+    
+    def _register_handlers(self) -> None:
+        """Register event handlers."""
+        def sync_handler(event):
+            import asyncio
+            try:
+                asyncio.create_task(self.handle_event(event))
+            except Exception:
+                asyncio.run(self.handle_event(event))
+        self.event_bus.subscribe(EventType.CONSOLIDATION_REQUESTED, sync_handler)
+    
+    async def process_event(self, event: Event) -> Optional[Dict[str, Any]]:
+        """Process consolidation request."""
+        results = event.payload.get("results", [])
+        
+        if not results:
+            return {}
+        
+        # Use existing consolidation logic
+        consolidated = consolidate.consolidate(results)
+        
+        return consolidated

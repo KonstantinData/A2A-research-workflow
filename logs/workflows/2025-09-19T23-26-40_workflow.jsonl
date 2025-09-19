@@ -1,0 +1,1 @@
+{"status": "missing_optional_fields", "agent": "internal_company_research", "creator": "test@example.com", "missing": ["email", "phone", "industry_group", "industry", "description"], "timestamp": "2025-09-19T23:26:40Z"}

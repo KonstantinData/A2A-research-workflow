@@ -246,12 +246,13 @@ def extract_company(title: str, trigger: str) -> str:
             f'Title: "{title}"'
         )
         try:
-            resp = openai.ChatCompletion.create(
+            client = openai.OpenAI()
+            resp = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0,
             )
-            text = resp["choices"][0]["message"]["content"].strip()
+            text = resp.choices[0].message.content.strip() if resp.choices[0].message.content else "Unknown"
             return text or "Unknown"
         except Exception:  # pragma: no cover - defensive
             return "Unknown"

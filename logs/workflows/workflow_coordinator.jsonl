@@ -1,0 +1,1 @@
+{"workflow_id": "wf-20250919-232640-c5622b", "trigger_source": "workflow_coordinator", "status": "workflow_failed", "severity": "error", "variant": "v2", "correlation_id": "1ab7d5e3-8a6d-4f4f-a99e-f52c4506fe07", "error": "Missing mandatory fields: recipient", "failed_agent": "internal_search_agent"}

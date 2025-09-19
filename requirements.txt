@@ -23,3 +23,7 @@ reportlab>=3.6
 
 # Env file loader
 python-dotenv
+
+# Optional: FastAPI for web interface
+fastapi
+uvicorn

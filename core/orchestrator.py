@@ -20,6 +20,7 @@ from core.logging import log_event
 from core import exports as export_utils
 from core import hubspot_ops
 from core import run_loop
+# Note: sources_registry removed - using autonomous agents
 from core import triggers as trigger_utils
 from config.env import ensure_mail_from
 from config.settings import SETTINGS
@@ -315,7 +316,8 @@ def run(
         finalize_run()
         return {"status": "idle"}
 
-    resolved_researchers = run_loop.resolve_researchers(researchers)
+    # Use empty list as default since sources_registry is removed
+    resolved_researchers = researchers or []
     results = run_loop.run_researchers(
         triggers,
         resolved_researchers,

@@ -4,7 +4,9 @@ import json
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence
 
 from core import statuses
-from core.sources_registry import SOURCES
+# SOURCES registry removed - using autonomous agents
+# from core.sources_registry import SOURCES
+SOURCES = []  # Legacy compatibility
 
 
 def incorporate_email_replies(
@@ -31,8 +33,9 @@ def incorporate_email_replies(
         )
         for reply in list(replies):
             try:
-                # Pass reply dict directly instead of JSON string to avoid command injection
-                email_listener.run(reply)
+                # Validate reply structure before processing
+                if isinstance(reply, dict) and 'task_id' in reply:
+                    email_listener.run(reply)
             except (ValueError, TypeError, KeyError) as e:
                 log_event({
                     "status": "email_listener_error",
