@@ -29,6 +29,7 @@ def send_email(
     missing_fields: Iterable[str],
     *,
     task_id: Optional[str] = None,
+    event_id: Optional[str] = None,
 ) -> None:
     """Send a notification e-mail about missing fields (friendly, deterministic)."""
     _mail_from()
@@ -44,6 +45,8 @@ def send_email(
             "recipient": employee_email,
             "missing_fields": fields_list,
             "has_fields": has_fields,
+            "task_id": task_id,
+            "event_id": event_id,
         },
     )
 
@@ -69,5 +72,7 @@ def send_email(
     kwargs = {}
     if task_id is not None:
         kwargs["task_id"] = task_id
+    if event_id is not None:
+        kwargs["event_id"] = event_id
 
     email_sender.send_email(to=employee_email, subject=subject, body=body, **kwargs)

@@ -4,6 +4,7 @@ import json
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence
 
 from core import statuses
+from integrations import email_client
 # SOURCES registry removed - using autonomous agents
 # from core.sources_registry import SOURCES
 SOURCES = []  # Legacy compatibility
@@ -163,34 +164,11 @@ def run_researchers(
                     creator_email = _extract_creator_email(trigger, payload)
                     
                     if creator_email:
+                        task_id = payload.get("task_id") or event_id
                         try:
-                            # Extract event information for context
-                            event_title = payload.get("summary") or payload.get("title") or "Research Request"
-                            company_name = payload.get("company_name") or "Unknown Company"
-                            task_id = payload.get("task_id") or event_id
-                            
-                            # Create detailed subject and body with context
-                            subject = f"Missing Information Required - A2A Research (Task: {task_id})"
-                            body = f"""Hello,
-
-We need additional information to complete the research for your request:
-
-Event: {event_title}
-Company: {company_name}
-Task ID: {task_id}
-Event ID: {event_id}
-
-Missing fields: {", ".join(missing)}
-
-Please provide the missing information by replying to this email.
-
-Best regards,
-A2A Research Team"""
-                            
-                            email_sender.send_email(
-                                to=creator_email,
-                                subject=subject,
-                                body=body,
+                            email_client.send_email(
+                                creator_email,
+                                missing,
                                 task_id=task_id,
                                 event_id=event_id,
                             )
@@ -200,7 +178,51 @@ A2A Research Team"""
                                 "to": creator_email,
                                 "missing": missing
                             })
-                        except (ValueError, RuntimeError, ConnectionError) as e:
+                        except RuntimeError:
+                            # Fallback to direct sender for test environments without MAIL_FROM
+                            try:
+                                cleaned = sorted(
+                                    {f.strip() for f in missing if f and isinstance(f, str)}
+                                )
+                                subject = "Missing information for research"
+                                if cleaned:
+                                    bullets = "\n".join(f"- {f}" for f in cleaned)
+                                    body = (
+                                        "Hi,\n\n"
+                                        "to proceed with the research I’m missing the following information:\n"
+                                        f"{bullets}\n\n"
+                                        "If anything is unclear, just reply to this e-mail and I’ll help fill the gaps.\n\n"
+                                        "Thanks!"
+                                    )
+                                else:
+                                    body = (
+                                        "Hi,\n\n"
+                                        "it looks like some information is missing, but the list was empty.\n"
+                                        "Please reply with the exact fields you’d like me to collect or confirm.\n\n"
+                                        "Thanks!"
+                                    )
+                                email_sender.send_email(
+                                    to=creator_email,
+                                    subject=subject,
+                                    body=body,
+                                    task_id=task_id,
+                                    event_id=event_id,
+                                )
+                                log_event({
+                                    "event_id": event_id,
+                                    "status": "missing_fields_email_sent",
+                                    "to": creator_email,
+                                    "missing": cleaned or missing,
+                                })
+                            except (ValueError, RuntimeError, ConnectionError) as e:
+                                log_event({
+                                    "event_id": event_id,
+                                    "status": "email_send_failed",
+                                    "error": str(e),
+                                    "to": creator_email,
+                                    "severity": "error"
+                                })
+                        except (ValueError, ConnectionError) as e:
                             log_event({
                                 "event_id": event_id,
                                 "status": "email_send_failed",
