@@ -1,5 +1,5 @@
 import pytest
-import pytest
+from pathlib import Path
 from core.trigger_words import contains_trigger, load_trigger_words, suggest_similar
 
 TRIGGERS = ["besuchsvorbereitung", "meeting"]
@@ -51,9 +51,16 @@ def test_customer_meeting_synonym():
 def test_custom_trigger_file(tmp_path, monkeypatch):
     fn = tmp_path / "triggers.txt"
     fn.write_text("foo\nbar baz\n")
-    monkeypatch.setenv("TRIGGER_WORDS_FILE", str(fn))
+    # Ensure path is within project root for security validation
+    project_root = Path(__file__).resolve().parent
+    safe_path = project_root / "test_triggers.txt"
+    safe_path.write_text("foo\nbar baz\n")
+    monkeypatch.setenv("TRIGGER_WORDS_FILE", str(safe_path))
     from core import trigger_words as tw
     tw.load_trigger_words.cache_clear()
     triggers = tw.load_trigger_words()
     assert {"foo", "bar baz", "bar-baz", "barbaz"}.issubset(set(triggers))
     tw.load_trigger_words.cache_clear()
+    # Cleanup
+    if safe_path.exists():
+        safe_path.unlink()
