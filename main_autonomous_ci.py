@@ -18,34 +18,25 @@ async def run_once():
     try:
         log_step("main", "starting_autonomous_ci_mode", {})
         
-        # Fetch events once
-        events = google_calendar_service.fetch_events()
-        log_step("main", "events_fetched", {"count": len(events)})
+        # Use proper trigger detection with trigger words
+        from core.triggers import gather_calendar_triggers
         
-        # Process each event
-        for event in events:
-            trigger_payload = {
-                "event_id": event.get("id"),
-                "summary": event.get("summary"),
-                "description": event.get("description"),
-                "creator": event.get("creator", {}).get("email"),
-                "start": event.get("start", {}).get("dateTime"),
-                "end": event.get("end", {}).get("dateTime"),
-                "attendees": event.get("attendees", [])
-            }
-            
-            # Process trigger
-            correlation_id = autonomous_orchestrator.process_manual_trigger(trigger_payload)
+        triggers = gather_calendar_triggers()
+        log_step("main", "triggers_detected", {"count": len(triggers)})
+        
+        # Process each trigger
+        for trigger in triggers:
+            correlation_id = autonomous_orchestrator.process_manual_trigger(trigger)
             log_step("main", "trigger_processed", {
                 "correlation_id": correlation_id,
-                "event_id": event.get("id")
+                "trigger_source": trigger.get("source")
             })
         
         # Wait a bit for processing
         await asyncio.sleep(5)
         
         log_step("main", "autonomous_ci_completed", {
-            "events_processed": len(events)
+            "triggers_processed": len(triggers)
         })
         
     except Exception as e:
