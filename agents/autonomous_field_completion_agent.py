@@ -40,6 +40,10 @@ class AutonomousFieldCompletionAgent(BaseAgent):
                 
         self.event_bus.subscribe(EventType.FIELD_COMPLETION_REQUESTED, sync_handler)
     
+    async def process_event(self, event: Event) -> Optional[Dict[str, Any]]:
+        """Process field completion request."""
+        return self.process_event_sync(event)
+    
     def process_event_sync(self, event: Event) -> Optional[Dict[str, Any]]:
         """Process field completion request synchronously."""
         # Convert event to trigger format expected by existing agent
