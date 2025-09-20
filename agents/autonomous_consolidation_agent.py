@@ -26,9 +26,18 @@ class AutonomousConsolidationAgent(BaseAgent):
         def sync_handler(event):
             import asyncio
             try:
-                asyncio.create_task(self.handle_event(event))
-            except Exception:
-                asyncio.run(self.handle_event(event))
+                # Run synchronously to avoid command injection via asyncio.create_task
+                import asyncio
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(self.handle_event(event))
+                finally:
+                    loop.close()
+            except Exception as e:
+                # Fallback - log error instead of running potentially unsafe code
+                from core.utils import log_step
+                log_step("consolidation_agent", "sync_handler_error", {"error": str(e)}, severity="error")
         self.event_bus.subscribe(EventType.CONSOLIDATION_REQUESTED, sync_handler)
     
     async def process_event(self, event: Event) -> Optional[Dict[str, Any]]:

@@ -197,8 +197,14 @@ class WorkflowCoordinator:
         
         # Check if we have required fields
         payload = workflow["payload"]
-        if payload.get("company_name") and payload.get("domain"):
-            # Request research
+        missing_fields = []
+        if not payload.get("company_name"):
+            missing_fields.append("company_name")
+        if not payload.get("domain"):
+            missing_fields.append("domain")
+            
+        if not missing_fields:
+            # Complete data - start research immediately
             workflow["status"] = "research"
             self.event_bus.publish(
                 EventType.RESEARCH_REQUESTED,
@@ -212,7 +218,7 @@ class WorkflowCoordinator:
                 {
                     "type": "missing_fields",
                     "payload": payload,
-                    "missing": ["company_name", "domain"]
+                    "missing": missing_fields
                 },
                 correlation_id=correlation_id
             )
@@ -231,11 +237,9 @@ class WorkflowCoordinator:
             workflow["research_results"] = []
         workflow["research_results"].append(event.payload)
         
-        # Check if all research agents have completed
-        research_agents = self.registry.get_agents_by_capability(AgentCapability.INTERNAL_SEARCH)
-        research_agents.extend(self.registry.get_agents_by_capability(AgentCapability.EXTERNAL_SEARCH))
-        
-        if len(workflow["research_results"]) >= len(research_agents):
+        # Start consolidation after first research result (don't wait for all)
+        # This allows faster processing when we have sufficient data
+        if len(workflow["research_results"]) >= 1:
             # Request consolidation
             workflow["status"] = "consolidation"
             self.event_bus.publish(

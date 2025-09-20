@@ -113,7 +113,7 @@ jobs:
           HUBSPOT_PORTAL_ID:       ${{ secrets.HUBSPOT_PORTAL_ID }}
           # Sonstiges
           A2A_TEST_MODE:           "0"
-        run: python -m core.orchestrator
+        run: python main_autonomous_ci.py
 
       - name: Upload exports
         uses: actions/upload-artifact@v4

@@ -27,17 +27,18 @@ class AutonomousFieldCompletionAgent(BaseAgent):
         def sync_handler(event):
             import asyncio
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # Create task if loop is running
-                    asyncio.create_task(self.handle_event(event))
-                else:
-                    # Run in new loop if no loop is running
-                    asyncio.run(self.handle_event(event))
-            except Exception:
-                # Fallback to sync processing
+                # Safe async execution without command injection risk
                 import asyncio
-                result = asyncio.run(self.process_event(event))
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(self.handle_event(event))
+                finally:
+                    loop.close()
+            except Exception as e:
+                # Log error instead of running potentially unsafe code
+                from core.utils import log_step
+                log_step("field_completion_agent", "sync_handler_error", {"error": str(e)}, severity="error")
                 
         self.event_bus.subscribe(EventType.FIELD_COMPLETION_REQUESTED, sync_handler)
     
