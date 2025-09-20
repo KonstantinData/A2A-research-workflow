@@ -109,6 +109,28 @@ def run(trigger: Normalized) -> Normalized:
                 "reason_for_match": "same product line / compatible component",
             }
             neighbours.append(entry)
+
+    if not neighbours and samples:
+        # Fall back to internally gathered samples when the static dataset does
+        # not contain the requested company.  These samples already describe
+        # plausible neighbours, but their schema differs slightly from the
+        # external format.  Normalise the structure so downstream agents see a
+        # consistent payload.
+        for sample in samples:
+            company = sample.get("company_name") or sample.get("name")
+            if not company:
+                continue
+            neighbours.append(
+                {
+                    "company_name": company,
+                    "domain": sample.get("company_domain") or sample.get("domain") or "",
+                    "classification": sample.get("classification") or "n/v",
+                    "reason_for_match": sample.get(
+                        "reason_for_match",
+                        "suggested by internal similarity analysis",
+                    ),
+                }
+            )
     _write_artifact("neighbor_level1_companies.json", neighbours)
     if neighbours:
         _log_workflow(
