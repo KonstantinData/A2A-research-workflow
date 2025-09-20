@@ -3,3 +3,6 @@
 {"workflow_id": "wf-20250920-122807-821ded", "trigger_source": "calendar", "status": "trigger_processed", "severity": "info", "variant": "v2", "correlation_id": "b31a70f9-0337-4447-aef0-4ed559fdf9c5"}
 {"workflow_id": "wf-20250920-122807-821ded", "trigger_source": "calendar", "status": "trigger_processed", "severity": "info", "variant": "v2", "correlation_id": "ae2306ba-87fc-4730-973e-077533cef959"}
 {"workflow_id": "wf-20250920-122807-821ded", "trigger_source": "main", "status": "autonomous_ci_completed", "severity": "info", "variant": "v2", "triggers_processed": 2}
+{"workflow_id": "wf-20250920-133744-d84b57", "trigger_source": "main", "status": "starting_autonomous_ci_mode", "severity": "info", "variant": "v2"}
+{"workflow_id": "wf-20250920-133744-d84b57", "trigger_source": "main", "status": "triggers_detected", "severity": "info", "variant": "v2", "count": 0}
+{"workflow_id": "wf-20250920-133744-d84b57", "trigger_source": "main", "status": "autonomous_ci_completed", "severity": "info", "variant": "v2", "triggers_processed": 0}
