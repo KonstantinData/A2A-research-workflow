@@ -77,10 +77,31 @@ class EventBus:
         for handler in self._subscribers.get(event_type, []):
             try:
                 # Handle both sync and async handlers
-                import asyncio
                 if asyncio.iscoroutinefunction(handler):
-                    # Skip async handlers in sync context - they need proper async execution
-                    continue
+                    try:
+                        loop = asyncio.get_running_loop()
+                    except RuntimeError:
+                        asyncio.run(handler(event))
+                        log_step(
+                            "event_bus",
+                            "async_handler_executed_sync",
+                            {
+                                "event_id": event.id,
+                                "event_type": event_type.value,
+                                "handler": getattr(handler, "__name__", str(handler)),
+                            },
+                        )
+                    else:
+                        loop.create_task(handler(event))
+                        log_step(
+                            "event_bus",
+                            "async_handler_scheduled",
+                            {
+                                "event_id": event.id,
+                                "event_type": event_type.value,
+                                "handler": getattr(handler, "__name__", str(handler)),
+                            },
+                        )
                 else:
                     handler(event)
             except Exception as e:

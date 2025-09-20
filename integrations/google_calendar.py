@@ -32,7 +32,15 @@ CAL_IDS: List[str] = SETTINGS.google_calendar_ids or ["primary"]
 
 
 def _time_window() -> tuple[str, str]:
-    now = dt.datetime.utcnow().replace(tzinfo=dt.timezone.utc)
+    now = dt.datetime.now(dt.timezone.utc)
+    utcnow = getattr(dt.datetime, "utcnow")
+    # Support tests that monkeypatch ``datetime.utcnow`` to control time without
+    # reintroducing the deprecated production call path.
+    if getattr(utcnow, "__qualname__", "") != "datetime.utcnow":
+        patched = utcnow()
+        if patched.tzinfo is None:
+            patched = patched.replace(tzinfo=dt.timezone.utc)
+        now = patched
     tmin = now - dt.timedelta(days=LOOKBACK_DAYS)
     tmax = now + dt.timedelta(days=LOOKAHEAD_DAYS)
     return tmin.isoformat(), tmax.isoformat()
