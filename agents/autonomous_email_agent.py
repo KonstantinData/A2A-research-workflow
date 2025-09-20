@@ -56,45 +56,97 @@ class AutonomousEmailAgent(BaseAgent):
         
         missing_fields = payload.get("missing", [])
         original_payload = payload.get("payload", {})
-        
+
         # Get recipient from original payload
         fallback_recipient = "support@a2a-research.com"
         recipient = (
-            original_payload.get("creator") or
-            original_payload.get("recipient") or
-            fallback_recipient
+            original_payload.get("creator")
+            or original_payload.get("recipient")
+            or fallback_recipient
         )
-        
+
         # Extract context information
-        task_id = payload.get("task_id", "Unknown")
-        event_title = original_payload.get("summary") or original_payload.get("title") or "Research Request"
-        company_name = original_payload.get("company_name", "Unknown Company")
-        event_id = original_payload.get("event_id", "Unknown")
-        
+        raw_task_id = (
+            payload.get("task_id")
+            or original_payload.get("task_id")
+        )
+        raw_event_id = (
+            original_payload.get("event_id")
+            or payload.get("event_id")
+        )
+        event_title = (
+            original_payload.get("summary")
+            or original_payload.get("title")
+            or "Research Request"
+        )
+        company_name = original_payload.get("company_name") or "Unknown Company"
+
+        def _normalise_identifier(value: Any) -> str:
+            if value is None:
+                return ""
+            text = str(value).strip()
+            return text
+
+        task_id_value = _normalise_identifier(raw_task_id)
+        event_id_value = _normalise_identifier(raw_event_id)
+
         # Escape HTML to prevent XSS
-        safe_fields = [html.escape(str(field)) for field in missing_fields]
+        safe_fields = []
+        for field in missing_fields:
+            text = str(field).strip()
+            if not text:
+                continue
+            safe_fields.append(html.escape(text))
         safe_event_title = html.escape(str(event_title))
         safe_company_name = html.escape(str(company_name))
-        
-        subject = f"Missing Information Required - A2A Research (Task: {task_id})"
-        body = f"""Hello,
+        safe_task_id = html.escape(task_id_value) if task_id_value else ""
+        safe_event_id = html.escape(event_id_value) if event_id_value else ""
 
-We need additional information to complete the research for your request:
+        subject_base = "Missing Information Required - A2A Research"
+        subject = (
+            f"{subject_base} (Task: {task_id_value})"
+            if task_id_value
+            else subject_base
+        )
 
-Event: {safe_event_title}
-Company: {safe_company_name}
-Task ID: {task_id}
-Event ID: {event_id}
+        body_lines = [
+            "Hello,",
+            "",
+            "We need additional information to complete the research for your request:",
+            "",
+            f"Event: {safe_event_title}",
+            f"Company: {safe_company_name}",
+            f"Task ID: {safe_task_id or '(not provided)'}",
+            f"Event ID: {safe_event_id or '(not provided)'}",
+            "",
+        ]
 
-Missing fields: {', '.join(safe_fields)}
+        if safe_fields:
+            body_lines.append("Missing fields:")
+            body_lines.extend(f"- {field}" for field in safe_fields)
+        else:
+            body_lines.append("Missing fields: (not specified)")
 
-Please provide the missing information by replying to this email.
+        body_lines.extend(
+            [
+                "",
+                "Please provide the missing information by replying to this email.",
+                "",
+                "Best regards,",
+                "A2A Research Team",
+            ]
+        )
 
-Best regards,
-A2A Research Team"""
-        
+        body = "\n".join(body_lines)
+
+        send_kwargs = {}
+        if task_id_value:
+            send_kwargs["task_id"] = task_id_value
+        if event_id_value:
+            send_kwargs["event_id"] = event_id_value
+
         try:
-            send_email(recipient, subject, body)
+            send_email(recipient, subject, body, **send_kwargs)
             return {"status": "sent", "recipient": recipient}
         except Exception as e:
             from core.utils import log_step
