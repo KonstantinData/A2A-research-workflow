@@ -56,15 +56,7 @@ def _assert_live_ready() -> None:
     if os.getenv("LIVE_MODE", "1") != "1":
         return
     ensure_mail_from()
-    # Check for legacy OAuth patterns that are no longer supported
-    legacy = [
-        "GOOGLE_OAUTH_JSON",
-        "GOOGLE_CREDENTIALS_JSON",
-    ]
-    if any(os.getenv(k) for k in legacy):
-        raise RuntimeError(
-            "Legacy Google OAuth env present. Remove them; v2-only is enforced."
-        )
+    # All legacy OAuth patterns have been removed - v2-only is enforced
     required = [
         "GOOGLE_REFRESH_TOKEN",
         "GOOGLE_CLIENT_ID",
