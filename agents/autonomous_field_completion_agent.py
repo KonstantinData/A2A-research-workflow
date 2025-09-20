@@ -47,12 +47,28 @@ class AutonomousFieldCompletionAgent(BaseAgent):
     def process_event_sync(self, event: Event) -> Optional[Dict[str, Any]]:
         """Process field completion request synchronously."""
         # Convert event to trigger format expected by existing agent
+        payload = event.payload or {}
+        if isinstance(payload, dict) and isinstance(payload.get("payload"), dict):
+            trigger_payload = payload["payload"]
+            source = payload.get("source", "calendar")
+            trigger_creator = payload.get("creator")
+            trigger_recipient = payload.get("recipient")
+        else:
+            trigger_payload = payload if isinstance(payload, dict) else {}
+            source = payload.get("source", "calendar") if isinstance(payload, dict) else "calendar"
+            trigger_creator = payload.get("creator") if isinstance(payload, dict) else None
+            trigger_recipient = payload.get("recipient") if isinstance(payload, dict) else None
+
         trigger = {
-            "payload": event.payload,
-            "source": "calendar"
+            "payload": trigger_payload,
+            "source": source,
         }
-        
+        if trigger_creator is not None:
+            trigger["creator"] = trigger_creator
+        if trigger_recipient is not None:
+            trigger["recipient"] = trigger_recipient
+
         # Run existing field completion logic
         result = field_completion_run(trigger)
-        
+
         return result if result else {}

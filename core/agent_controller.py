@@ -172,16 +172,64 @@ class WorkflowCoordinator:
         correlation_id = event.correlation_id or event.id
         
         # Initialize workflow state
+        trigger_data = event.payload or {}
+
+        if isinstance(trigger_data, dict) and isinstance(
+            trigger_data.get("payload"), dict
+        ):
+            event_payload = dict(trigger_data["payload"])
+        else:
+            event_payload = dict(trigger_data) if isinstance(trigger_data, dict) else {}
+
+        source = (
+            trigger_data.get("source")
+            if isinstance(trigger_data, dict)
+            else event_payload.get("source")
+        ) or "calendar"
+        creator = trigger_data.get("creator") if isinstance(trigger_data, dict) else None
+        recipient = trigger_data.get("recipient") if isinstance(trigger_data, dict) else None
+
+        # Surface creator/recipient details inside the payload for downstream agents
+        def _ensure_email(target: Any) -> Optional[str]:
+            if isinstance(target, str):
+                stripped = target.strip()
+                return stripped or None
+            if isinstance(target, dict):
+                email = target.get("email") or target.get("address")
+                if isinstance(email, str) and email.strip():
+                    return email.strip()
+            return None
+
+        creator_email = _ensure_email(creator) or _ensure_email(event_payload.get("creator"))
+        if creator_email:
+            event_payload.setdefault("creator", creator_email)
+            event_payload.setdefault("creatorEmail", creator_email)
+
+        recipient_email = _ensure_email(recipient) or _ensure_email(
+            event_payload.get("recipient")
+        ) or _ensure_email(event_payload.get("organizer"))
+        if recipient_email:
+            event_payload.setdefault("recipient", recipient_email)
+            event_payload.setdefault("organizerEmail", recipient_email)
+
+        metadata = {
+            "source": source,
+            "creator": creator_email or creator,
+            "recipient": recipient_email or recipient,
+            "trigger": trigger_data,
+        }
+
         self._active_workflows[correlation_id] = {
             "status": "field_completion",
-            "payload": event.payload,
-            "completed_stages": set()
+            "payload": event_payload,
+            "metadata": metadata,
+            "completed_stages": set(),
         }
-        
+
         # Request field completion
         self.event_bus.publish(
             EventType.FIELD_COMPLETION_REQUESTED,
-            event.payload,
+            dict(event_payload),
             correlation_id=correlation_id
         )
     
@@ -194,7 +242,7 @@ class WorkflowCoordinator:
         workflow = self._active_workflows[correlation_id]
         workflow["payload"].update(event.payload)
         workflow["completed_stages"].add("field_completion")
-        
+
         # Check if we have required fields
         payload = workflow["payload"]
         missing_fields = []
@@ -206,19 +254,27 @@ class WorkflowCoordinator:
         if not missing_fields:
             # Complete data - start research immediately
             workflow["status"] = "research"
+            research_payload = dict(payload)
+            research_payload.setdefault("creator", workflow["metadata"].get("creator"))
+            research_payload.setdefault("recipient", workflow["metadata"].get("recipient"))
+            research_payload.setdefault("source", workflow["metadata"].get("source"))
             self.event_bus.publish(
                 EventType.RESEARCH_REQUESTED,
-                payload,
+                research_payload,
                 correlation_id=correlation_id
             )
         else:
             # Request human input via email
+            email_payload = dict(payload)
+            email_payload.setdefault("creator", workflow["metadata"].get("creator"))
+            email_payload.setdefault("recipient", workflow["metadata"].get("recipient"))
             self.event_bus.publish(
                 EventType.EMAIL_REQUESTED,
                 {
                     "type": "missing_fields",
-                    "payload": payload,
-                    "missing": missing_fields
+                    "payload": email_payload,
+                    "missing": missing_fields,
+                    "metadata": workflow.get("metadata", {}),
                 },
                 correlation_id=correlation_id
             )
