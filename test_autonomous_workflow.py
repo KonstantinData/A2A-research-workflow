@@ -22,6 +22,7 @@ def test_autonomous_workflow():
     for agent in agents:
         capabilities = [cap.value for cap in agent.metadata.capabilities]
         print(f"   - {agent.metadata.name}: {capabilities}")
+    assert agents, "No agents are registered with the orchestrator"
     
     # Test manual trigger
     print("\n🚀 Testing manual trigger...")
@@ -31,19 +32,21 @@ def test_autonomous_workflow():
         "creator": "test@example.com",
         "summary": "Meeting with Test GmbH for research"
     })
-    
+
     print(f"✅ Workflow triggered with correlation ID: {correlation_id}")
-    
+    assert correlation_id, "Manual trigger did not return a correlation ID"
+
     # Check workflow status
     status = autonomous_orchestrator.get_workflow_status(correlation_id)
     print(f"✅ Workflow status: {status}")
-    
+    assert status is not None, "Workflow status lookup returned None"
+
     # Check event history
     events = autonomous_orchestrator.event_bus.get_events(correlation_id)
     print(f"✅ {len(events)} events in history")
-    
+    assert events, "No events were recorded for the workflow"
+
     print("\n🎉 Autonomous workflow test completed!")
-    return True
 
 
 if __name__ == "__main__":

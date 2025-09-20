@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 import json
 
@@ -24,7 +24,7 @@ def log_email(
     timestamp: Optional[str] = None,
 ) -> None:
     """Log an e-mail notification event."""
-    ts = timestamp or datetime.utcnow().isoformat()
+    ts = timestamp or datetime.now(timezone.utc).isoformat()
     payload = {
         "timestamp": ts,
         "sender": sender,
