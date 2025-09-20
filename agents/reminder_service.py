@@ -41,7 +41,7 @@ def log_event(record: dict) -> None:
     payload = {
         "event_id": record.get("event_id"),
         "status": record.get("status"),
-        "timestamp": datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "severity": record.get("severity", "info"),
         "workflow_id": wf_id,
         "details": {},

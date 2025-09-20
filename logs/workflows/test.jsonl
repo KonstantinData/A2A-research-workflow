@@ -6,3 +6,7 @@
 {"workflow_id": "wf-20250920-133654-747f62", "trigger_source": "test", "status": "unknown", "severity": "info", "variant": "v2", "last_update": "2025-09-20T13:36:54.326381+00:00", "event_count": 1}
 {"workflow_id": "wf-20250920-133737-4b6327", "trigger_source": "calendar", "status": "trigger_processed", "severity": "info", "variant": "v2", "correlation_id": "366dab36-1478-49d6-b631-4d044fa4d5b0"}
 {"workflow_id": "wf-20250920-133737-4b6327", "trigger_source": "test", "status": "unknown", "severity": "info", "variant": "v2", "last_update": "2025-09-20T13:37:37.191353+00:00", "event_count": 1}
+{"workflow_id": "wf-20250920-133928-90f87c", "trigger_source": "calendar", "status": "trigger_processed", "severity": "info", "variant": "v2", "correlation_id": "287fb611-4688-421b-92d1-96dffacbbae0"}
+{"workflow_id": "wf-20250920-133928-90f87c", "trigger_source": "test", "status": "unknown", "severity": "info", "variant": "v2", "last_update": "2025-09-20T13:39:28.208661+00:00", "event_count": 1}
+{"workflow_id": "wf-20250920-134622-b63b54", "trigger_source": "calendar", "status": "trigger_processed", "severity": "info", "variant": "v2", "correlation_id": "9efc6b7f-571c-4708-8ae6-d8004532a180"}
+{"workflow_id": "wf-20250920-134622-b63b54", "trigger_source": "test", "status": "unknown", "severity": "info", "variant": "v2", "last_update": "2025-09-20T13:46:22.516363+00:00", "event_count": 1}

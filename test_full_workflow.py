@@ -11,8 +11,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from core.autonomous_orchestrator import autonomous_orchestrator
 from core.utils import log_step
+import pytest
 
 
+@pytest.mark.asyncio
 async def test_full_workflow():
     """Test complete autonomous workflow."""
     
@@ -53,15 +55,22 @@ async def test_full_workflow():
         
         pdf_files = list(SETTINGS.exports_dir.glob("*.pdf"))
         csv_files = list(SETTINGS.exports_dir.glob("*.csv"))
+        json_files = list(SETTINGS.exports_dir.glob("*.json"))
         
         print(f"✓ Generated files:")
         print(f"  - PDF files: {len(pdf_files)}")
         print(f"  - CSV files: {len(csv_files)}")
+        print(f"  - JSON files: {len(json_files)}")
         
         if pdf_files:
             print(f"  - Latest PDF: {pdf_files[-1]}")
         if csv_files:
             print(f"  - Latest CSV: {csv_files[-1]}")
+        if json_files:
+            print(f"  - Latest JSON: {json_files[-1]}")
+            # Show JSON content
+            with open(json_files[-1]) as f:
+                print(f"  - JSON content: {f.read()[:200]}...")
         
         print("🎉 Full workflow test completed successfully!")
         return True

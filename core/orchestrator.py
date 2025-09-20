@@ -259,11 +259,14 @@ def run(
     (
         pdf_renderer,
         csv_exporter,
+        json_exporter,
         fallback_pdf,
         fallback_csv,
+        fallback_json,
     ) = export_utils.resolve_exporters(
         pdf_renderer,
         csv_exporter,
+        None,  # json_exporter - use default
         test_mode=TEST_MODE,
     )
 
@@ -374,13 +377,15 @@ def run(
         return consolidated
 
     try:
-        pdf_path, csv_path = export_utils.export_report(
+        pdf_path, csv_path, json_path = export_utils.export_report(
             consolidated,
             first_event_id,
             pdf_renderer,
             csv_exporter,
+            json_exporter,
             fallback_pdf,
             fallback_csv,
+            fallback_json,
             log_event=log_event,
             log_step=log_step,
         )
