@@ -1,6 +1,6 @@
 from pathlib import Path
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -117,32 +117,32 @@ def test_scheduler_run_flow(monkeypatch):
 
     scheduler = ReminderScheduler()
 
-    times = [
-        datetime(2023, 1, 1, 9, 0, tzinfo=timezone.utc),
-        datetime(2023, 1, 1, 10, 0, tzinfo=timezone.utc),
-        datetime(2023, 1, 1, 15, 0, tzinfo=timezone.utc),
-    ]
+    current_time = datetime(2023, 1, 1, 6, 30, tzinfo=timezone.utc)
+    stop_time = datetime(2023, 1, 1, 14, 0, tzinfo=timezone.utc)
 
     def fake_now():
-        if times:
-            return times.pop(0)
-        raise KeyboardInterrupt
+        nonlocal current_time
+        if current_time > stop_time:
+            raise KeyboardInterrupt
+        return current_time
 
-    monkeypatch.setattr(scheduler, "_now", fake_now)
+    def fake_sleep(self, seconds):
+        nonlocal current_time
+        sleep_calls.append(seconds)
+        current_time += timedelta(seconds=seconds)
 
     sleep_calls = []
 
-    def fake_sleep(seconds):
-        sleep_calls.append(seconds)
-
-    monkeypatch.setattr(ReminderScheduler, "_sleep", lambda self, s: fake_sleep(s))
+    monkeypatch.setattr(scheduler, "_now", fake_now)
+    monkeypatch.setattr(ReminderScheduler, "_sleep", fake_sleep)
 
     with pytest.raises(KeyboardInterrupt):
         scheduler.run_forever()
 
     assert reminder_calls == [task["id"]]
     assert escalation_calls == [task["id"]]
-    assert sleep_calls == [3600, 18000]
+    assert sleep_calls[0] == pytest.approx(1800.0)
+    assert all(pytest.approx(3600.0) == call for call in sleep_calls[1:])
     assert tasks.get_task(task["id"])["status"] == "escalated"
 
 

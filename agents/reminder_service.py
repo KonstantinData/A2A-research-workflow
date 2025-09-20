@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, time as dtime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import importlib.util as _ilu
 from pathlib import Path
@@ -93,7 +94,11 @@ def maybe_send_reminder(task: dict) -> None:
 
 
 class ReminderScheduler:
-    """Send daily reminder e-mails for open tasks at 10:00 and escalate at 15:00."""
+    """Dispatch reminders and escalations during business hours in Berlin."""
+
+    _BERLIN_TZ = ZoneInfo("Europe/Berlin")
+    _START_HOUR = 8
+    _END_HOUR = 21
 
     @staticmethod
     def _open_tasks():
@@ -159,24 +164,54 @@ class ReminderScheduler:
             raise
 
     def run_forever(self) -> None:
-        """Run the scheduler loop indefinitely."""
+        """Run the scheduler loop hourly between 08:00 and 21:00 Europe/Berlin."""
+
+        last_run: datetime | None = None
         while True:
-            now = self._now()
-            reminder_at = now.replace(hour=10, minute=0, second=0, microsecond=0)
-            escalation_at = now.replace(hour=15, minute=0, second=0, microsecond=0)
+            now_utc = self._now()
+            now_local = now_utc.astimezone(self._BERLIN_TZ)
 
-            if now < reminder_at:
-                next_run = reminder_at
-                action = self.send_reminders
-            elif now < escalation_at:
-                next_run = escalation_at
-                action = self.escalate_tasks
-            else:
-                next_run = reminder_at + timedelta(days=1)
-                action = self.send_reminders
+            slot_local = now_local.replace(minute=0, second=0, microsecond=0)
+            if now_local > slot_local:
+                slot_local += timedelta(hours=1)
 
-            self._sleep((next_run - now).total_seconds())
-            action()
+            slot_local = self._normalise_slot(slot_local)
+            while last_run and slot_local <= last_run:
+                slot_local = self._normalise_slot(slot_local + timedelta(hours=1))
+
+            target_utc = slot_local.astimezone(timezone.utc)
+            sleep_seconds = max((target_utc - now_utc).total_seconds(), 0.0)
+            self._sleep(sleep_seconds)
+            self._execute_slot(slot_local)
+            last_run = slot_local
+
+    def _normalise_slot(self, candidate: datetime) -> datetime:
+        """Clamp ``candidate`` to the configured Berlin business hours."""
+
+        candidate = candidate.astimezone(self._BERLIN_TZ).replace(
+            minute=0, second=0, microsecond=0
+        )
+
+        if candidate.hour < self._START_HOUR:
+            candidate = candidate.replace(hour=self._START_HOUR)
+        elif candidate.hour > self._END_HOUR:
+            next_day = (candidate + timedelta(days=1)).date()
+            candidate = datetime.combine(
+                next_day,
+                dtime(hour=self._START_HOUR),
+                tzinfo=self._BERLIN_TZ,
+            )
+
+        return candidate
+
+    def _execute_slot(self, slot_local: datetime) -> None:
+        """Trigger the appropriate job for the given local Berlin hour."""
+
+        hour = slot_local.astimezone(self._BERLIN_TZ).hour
+        if hour == 10:
+            self.send_reminders()
+        elif hour == 15:
+            self.escalate_tasks()
 
     def _now(self) -> datetime:
         """Return current datetime, extracted for ease of testing."""
