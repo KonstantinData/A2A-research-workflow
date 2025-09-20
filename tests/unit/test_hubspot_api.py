@@ -195,8 +195,10 @@ def _run_base(monkeypatch, tmp_path, check_result, reply=None):
     def fake_attach(path: Path, cid: str) -> None:
         called["attach"] += 1
 
-    def fake_pdf(data, path):
-        path.write_text("pdf")
+    def fake_pdf(rows, fields, meta=None, out_path=None):
+        target = out_path or (tmp_path / "report.pdf")
+        target.write_text("pdf")
+        return target
 
     def fake_csv(data, path):
         path.write_text("csv")
@@ -240,8 +242,10 @@ def test_run_propagates_check_error(monkeypatch, tmp_path):
     monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "tok")
     monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
 
-    def fake_pdf(data, path):
-        path.write_text("pdf")
+    def fake_pdf(rows, fields, meta=None, out_path=None):
+        target = out_path or (tmp_path / "report.pdf")
+        target.write_text("pdf")
+        return target
 
     def fake_csv(data, path):
         path.write_text("csv")
@@ -275,9 +279,10 @@ def _run_no_upload(monkeypatch, tmp_path, upsert_return, pdf_write):
     def fake_attach(path: Path, cid: str) -> None:
         called["attach"] += 1
 
-    def fake_pdf(data, path):
-        if pdf_write:
-            path.write_text("pdf")
+    def fake_pdf(rows, fields, meta=None, out_path=None):
+        if pdf_write and out_path:
+            out_path.write_text("pdf")
+        return out_path
 
     def fake_csv(data, path):
         path.write_text("csv")

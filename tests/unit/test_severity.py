@@ -36,8 +36,10 @@ def test_upload_failure_logged_critical(monkeypatch, tmp_path):
         },
     }
 
-    def stub_pdf(data, path):
-        path.write_text("pdf")
+    def stub_pdf(rows, fields, meta=None, out_path=None):
+        target = out_path or (tmp_path / "report.pdf")
+        target.write_text("pdf")
+        return target
 
     def stub_csv(data, path):
         path.write_text("csv")

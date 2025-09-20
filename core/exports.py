@@ -102,7 +102,12 @@ def export_report(
     
     meta_dict = dict(consolidated.get("meta", {})) if isinstance(consolidated.get("meta"), dict) else None
 
-    pdf_path = pdf_renderer(rows, fields, meta_dict, pdf_path)
+    rendered_pdf_path = pdf_renderer(rows, fields, meta_dict, pdf_path)
+    if rendered_pdf_path:
+        pdf_path = Path(rendered_pdf_path)
+
+    if not isinstance(pdf_path, Path):
+        raise TypeError("pdf_renderer must return a pathlib.Path or None")
     csv_exporter(rows, csv_path)
 
     try:
