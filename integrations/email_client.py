@@ -47,7 +47,12 @@ def send_email(
         },
     )
 
-    subject = "Missing information for research"
+    subject_base = "Missing Information Required - A2A Research"
+    subject = (
+        f"{subject_base} (Task: {task_id})"
+        if task_id is not None
+        else subject_base
+    )
     # Friendlier copy with bullets when available
     if has_fields:
         bullets = "\n".join(f"- {f}" for f in fields_list)
