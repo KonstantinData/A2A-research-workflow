@@ -164,11 +164,35 @@ def run_researchers(
                     
                     if creator_email:
                         try:
+                            # Extract event information for context
+                            event_title = payload.get("summary") or payload.get("title") or "Research Request"
+                            company_name = payload.get("company_name") or "Unknown Company"
+                            task_id = payload.get("task_id") or event_id
+                            
+                            # Create detailed subject and body with context
+                            subject = f"Missing Information Required - A2A Research (Task: {task_id})"
+                            body = f"""Hello,
+
+We need additional information to complete the research for your request:
+
+Event: {event_title}
+Company: {company_name}
+Task ID: {task_id}
+Event ID: {event_id}
+
+Missing fields: {", ".join(missing)}
+
+Please provide the missing information by replying to this email.
+
+Best regards,
+A2A Research Team"""
+                            
                             email_sender.send_email(
                                 to=creator_email,
-                                subject="Missing information for research",
-                                body="Please reply with: " + ", ".join(missing),
-                                task_id=payload.get("task_id") or event_id,
+                                subject=subject,
+                                body=body,
+                                task_id=task_id,
+                                event_id=event_id,
                             )
                             log_event({
                                 "event_id": event_id,
