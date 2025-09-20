@@ -23,12 +23,20 @@ class AutonomousInternalSearchAgent(BaseAgent):
     
     def _register_handlers(self) -> None:
         """Register event handlers."""
-        def sync_handler(event):
+        def sync_handler(event: Event) -> None:
             import asyncio
+            import threading
+
             try:
-                asyncio.create_task(self.handle_event(event))
-            except Exception:
+                asyncio.get_running_loop()
+            except RuntimeError:
                 asyncio.run(self.handle_event(event))
+            else:
+                thread = threading.Thread(
+                    target=lambda: asyncio.run(self.handle_event(event))
+                )
+                thread.start()
+                thread.join()
         self.event_bus.subscribe(EventType.RESEARCH_REQUESTED, sync_handler)
     
     async def process_event(self, event: Event) -> Optional[Dict[str, Any]]:
@@ -36,7 +44,8 @@ class AutonomousInternalSearchAgent(BaseAgent):
         trigger = {
             "payload": event.payload,
             "source": "calendar",
-            "creator": event.payload.get("creator")
+            "creator": event.payload.get("creator"),
+            "recipient": event.payload.get("recipient"),
         }
         
         result = agent_internal_search.run(trigger)
@@ -62,12 +71,20 @@ class AutonomousExternalSearchAgent(BaseAgent):
     
     def _register_handlers(self) -> None:
         """Register event handlers."""
-        def sync_handler(event):
+        def sync_handler(event: Event) -> None:
             import asyncio
+            import threading
+
             try:
-                asyncio.create_task(self.handle_event(event))
-            except Exception:
+                asyncio.get_running_loop()
+            except RuntimeError:
                 asyncio.run(self.handle_event(event))
+            else:
+                thread = threading.Thread(
+                    target=lambda: asyncio.run(self.handle_event(event))
+                )
+                thread.start()
+                thread.join()
         self.event_bus.subscribe(EventType.RESEARCH_REQUESTED, sync_handler)
     
     async def process_event(self, event: Event) -> Optional[Dict[str, Any]]:
@@ -75,7 +92,8 @@ class AutonomousExternalSearchAgent(BaseAgent):
         trigger = {
             "payload": event.payload,
             "source": "calendar",
-            "creator": event.payload.get("creator")
+            "creator": event.payload.get("creator"),
+            "recipient": event.payload.get("recipient"),
         }
         
         result = agent_external_level1_company_search.run(trigger)
