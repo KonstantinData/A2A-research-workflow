@@ -184,7 +184,12 @@ def run_researchers(
                                 cleaned = sorted(
                                     {f.strip() for f in missing if f and isinstance(f, str)}
                                 )
-                                subject = "Missing information for research"
+                                subject_base = "Missing Information Required - A2A Research"
+                                subject = (
+                                    f"{subject_base} (Task: {task_id})"
+                                    if task_id is not None
+                                    else subject_base
+                                )
                                 if cleaned:
                                     bullets = "\n".join(f"- {f}" for f in cleaned)
                                     body = (
