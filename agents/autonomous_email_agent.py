@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
+from textwrap import dedent
 
 from core.agent_controller import BaseAgent, AgentMetadata, AgentCapability
 from core.event_bus import EventBus, Event, EventType
@@ -76,22 +77,26 @@ class AutonomousEmailAgent(BaseAgent):
         safe_company_name = html.escape(str(company_name))
         
         subject = f"Missing Information Required - A2A Research (Task: {task_id})"
-        body = f"""Hello,
+        body = dedent(
+            f"""
+            Hello,
 
-We need additional information to complete the research for your request:
+            We need additional information to complete the research for your request:
 
-Event: {safe_event_title}
-Company: {safe_company_name}
-Task ID: {task_id}
-Event ID: {event_id}
+            Event: {safe_event_title}
+            Company: {safe_company_name}
+            Task ID: {task_id}
+            Event ID: {event_id}
 
-Missing fields: {', '.join(safe_fields)}
+            Missing fields: {', '.join(safe_fields)}
 
-Please provide the missing information by replying to this email.
+            Please provide the missing information by replying to this email.
 
-Best regards,
-A2A Research Team"""
-        
+            Best regards,
+            A2A Research Team
+            """
+        ).strip()
+
         try:
             send_email(recipient, subject, body)
             return {"status": "sent", "recipient": recipient}
@@ -106,19 +111,43 @@ A2A Research Team"""
         pdf_path = payload.get("pdf_path")
         
         subject = "A2A Research Report Ready"
-        body = """
-        Hello,
-        
-        Your A2A research report has been generated and is attached to this email.
-        
-        Best regards,
-        A2A Research Team
-        """
-        
+
+        report_data = payload.get("data") or {}
+        summary_lines = _build_report_summary(report_data)
+
+        body_parts = [
+            "Hello,",
+            "",
+            "Your A2A research report has been generated and is attached to this email.",
+        ]
+
+        if summary_lines:
+            body_parts.extend(["", "Key details from this run:"])
+            body_parts.extend(summary_lines)
+        else:
+            body_parts.extend(
+                [
+                    "",
+                    "No consolidated company data was available for this run. "
+                    "The attached files therefore only contain placeholders.",
+                ]
+            )
+
         attachments = []
         if pdf_path:
             attachments.append(pdf_path)
-        
+
+        if not attachments:
+            body_parts.extend(
+                [
+                    "",
+                    "No report attachments were generated because there was no data to export.",
+                ]
+            )
+
+        body_parts.extend(["", "Best regards,", "A2A Research Team"])
+        body = "\n".join(body_parts)
+
         try:
             send_email(recipient, subject, body, attachments=attachments)
             return {"status": "sent", "recipient": recipient}
@@ -126,3 +155,41 @@ A2A Research Team"""
             from core.utils import log_step
             log_step("email_agent", "send_error", {"error": str(e)}, severity="error")
             return {"status": "failed", "error": str(e)}
+
+
+def _build_report_summary(report_data: Dict[str, Any]) -> list[str]:
+    """Create human readable bullet points for key report data."""
+
+    if not isinstance(report_data, dict):
+        return []
+
+    preferred_fields = [
+        ("Company", "company_name"),
+        ("Domain", "domain"),
+        ("Industry", "industry"),
+        ("Industry group", "industry_group"),
+        ("Creator", "creator"),
+        ("Recipient", "recipient"),
+    ]
+
+    lines: list[str] = []
+    seen_keys: set[str] = set()
+
+    for label, key in preferred_fields:
+        value = report_data.get(key)
+        if isinstance(value, (str, int, float)) and str(value).strip():
+            lines.append(f"- {label}: {value}")
+            seen_keys.add(key)
+
+    for key, value in report_data.items():
+        if key in seen_keys:
+            continue
+        if not isinstance(value, (str, int, float)):
+            continue
+        value_str = str(value).strip()
+        if not value_str:
+            continue
+        label = key.replace("_", " ").title()
+        lines.append(f"- {label}: {value_str}")
+
+    return lines
