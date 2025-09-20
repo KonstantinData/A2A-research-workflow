@@ -110,6 +110,19 @@ The refresh token is bound to the exact client (ID/secret); mixing clients cause
 5. Consolidate data and generate PDF/CSV outputs.
 6. Optionally enrich HubSpot with core fields and attach the PDF.
 
+### Reminder Scheduler
+
+The reminder service wakes up every hour between **08:00 and 21:00 Europe/Berlin**.
+Only two of those hourly slots execute work:
+
+* **10:00** Berlin time &ndash; send reminder e-mails for all open tasks.
+* **15:00** Berlin time &ndash; escalate tasks that remain unanswered after the morning reminder.
+
+Outside of these dedicated hours the scheduler merely advances to the next
+permitted slot, ensuring overnight periods are skipped entirely. Escalations do
+not alternate with reminders; they rely on their dedicated 15:00 rule so that
+the team always has a predictable response window after the morning reminders.
+
 ### Email Reply Processing
 
 Reminder e-mails include deterministic ``Message-ID`` headers derived from the
