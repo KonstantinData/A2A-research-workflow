@@ -146,13 +146,18 @@ class _Settings:
             self.live_mode = 0  # niemals hart failen (z. B. SMTP) in Tests
 
     def _resolve_path(self, value: str | Path) -> Path:
-        path = Path(value).expanduser().resolve()
-        if not path.is_absolute():
-            path = (self.root_dir / path).resolve()
-        # Validate path is within project boundaries
-        if not str(path).startswith(str(self.root_dir)):
-            raise ValueError(f"Path outside project root: {path}")
-        return path
+        try:
+            path = Path(value).expanduser().resolve()
+            if not path.is_absolute():
+                path = (self.root_dir / path).resolve()
+            # Validate path is within project boundaries to prevent path traversal
+            if not str(path).startswith(str(self.root_dir)):
+                _log.warning("Path traversal attempt blocked: %s", path)
+                raise ValueError(f"Path outside project root: {path}")
+            return path
+        except (OSError, ValueError) as e:
+            _log.error("Invalid path %s: %s", value, e)
+            raise ValueError(f"Invalid path: {value}") from e
 
     @staticmethod
     def _resolve_subpath(base: Path, value: str | Path) -> Path:

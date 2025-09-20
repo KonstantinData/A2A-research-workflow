@@ -37,9 +37,12 @@ class OpenAIExtractor:
     """OpenAI-based field extraction."""
     
     def __init__(self):
+        # Cache API key and model to avoid repeated environment lookups
+        self.api_key = os.getenv("OPENAI_API_KEY")
+        self.model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
         self.client = None
-        if openai and os.getenv("OPENAI_API_KEY"):
-            self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        if openai and self.api_key:
+            self.client = openai.OpenAI(api_key=self.api_key)
     
     def extract(self, text: str, payload: Dict[str, Any]) -> ExtractionResult:
         """Extract fields using OpenAI API."""
@@ -56,7 +59,7 @@ class OpenAIExtractor:
         
         try:
             response = self.client.chat.completions.create(
-                model=os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
+                model=self.model,
                 messages=[
                     {"role": "system", "content": "You are a precise data extraction assistant."},
                     {"role": "user", "content": prompt}

@@ -57,14 +57,21 @@ def _html_from_data(data: Dict[str, Any]) -> str:
         return env.get_template("report.html.j2").render(**data)
 
     # fallback: minimal inline HTML
+    import html
+    
     rows = data.get("rows") or []
     fields = data.get("fields") or []
     meta = data.get("meta") or {}
+    
+    # Escape HTML to prevent injection
+    escaped_fields = [html.escape(str(f)) for f in fields]
     items = "".join(
-        "<tr>" + "".join(f"<td>{r.get(f, '')}</td>" for f in fields) + "</tr>"
+        "<tr>" + "".join(f"<td>{html.escape(str(r.get(f, '')))}</td>" for f in fields) + "</tr>"
         for r in rows
     )
-    head = "".join(f"<th>{f}</th>" for f in fields)
+    head = "".join(f"<th>{f}</th>" for f in escaped_fields)
+    escaped_meta = html.escape(str(meta))
+    
     return (
         "<html><body><h1>Company Dossier</h1>"
         "<table><thead><tr>"
@@ -72,7 +79,7 @@ def _html_from_data(data: Dict[str, Any]) -> str:
         "</tr></thead><tbody>"
         f"{items}"
         "</tbody></table>"
-        f"<pre>{meta}</pre>"
+        f"<pre>{escaped_meta}</pre>"
         "</body></html>"
     )
 

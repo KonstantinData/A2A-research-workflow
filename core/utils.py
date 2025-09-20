@@ -87,7 +87,7 @@ def log_step(source: str, stage: str, data: Dict[str, Any], *, severity: str = "
     try:
         SETTINGS.workflows_dir.mkdir(parents=True, exist_ok=True)
         append_jsonl(SETTINGS.workflows_dir / f"{source}.jsonl", payload)
-    except Exception as e:  # pragma: no cover - logging shouldn't break tests
+    except (OSError, IOError, ValueError) as e:  # pragma: no cover - logging shouldn't break tests
         getLogger(__name__).warning("Logging failed: %s", e)
     else:
         _update_summary(source, stage, severity)
@@ -154,9 +154,17 @@ def finalize_summary() -> None:
     pdf_ok = pdf_path.exists()
     csv_ok = csv_path.exists()
 
+    # Safe file size check with error handling
+    pdf_size = 0
+    if pdf_ok:
+        try:
+            pdf_size = pdf_path.stat().st_size
+        except (OSError, IOError):
+            pdf_size = 0
+    
     payload["artifact_health"] = {
         "pdf_ok": pdf_ok,
-        "pdf_size": (pdf_path.stat().st_size if pdf_ok else 0),
+        "pdf_size": pdf_size,
         "csv_ok": csv_ok,
         "csv_rows": _csv_rows(csv_path) if csv_ok else 0,
         "empty_run": bool(

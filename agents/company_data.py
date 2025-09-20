@@ -85,7 +85,6 @@ class CompanyInfo:
 # ("wz2008"), the Austrian ÖNACE ("onace") and the Swiss NOGA
 # ("noga").  These codes mirror those used in the original data model
 # and serve as a bridge for systems that still consume them.
-_COMPANY_DATA: Dict[str, CompanyInfo] = {}
 # Reverse lookup for O(1) neighbor lookups
 _NAME_TO_INFO: Dict[str, CompanyInfo] = {}
 

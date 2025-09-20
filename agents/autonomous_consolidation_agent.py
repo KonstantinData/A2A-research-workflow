@@ -25,18 +25,12 @@ class AutonomousConsolidationAgent(BaseAgent):
         """Register event handlers."""
         def sync_handler(event: Event) -> None:
             import asyncio
-            import threading
 
             try:
-                asyncio.get_running_loop()
+                loop = asyncio.get_running_loop()
+                loop.create_task(self.handle_event(event))
             except RuntimeError:
                 asyncio.run(self.handle_event(event))
-            else:
-                thread = threading.Thread(
-                    target=lambda: asyncio.run(self.handle_event(event))
-                )
-                thread.start()
-                thread.join()
         self.event_bus.subscribe(EventType.CONSOLIDATION_REQUESTED, sync_handler)
     
     async def process_event(self, event: Event) -> Optional[Dict[str, Any]]:

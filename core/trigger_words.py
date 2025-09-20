@@ -57,13 +57,29 @@ def load_trigger_words() -> List[str]:
     if not path:
         base = Path(__file__).resolve().parent.parent / "config" / "trigger_words.txt"
         path = str(base)
+    else:
+        # Validate path to prevent traversal attacks
+        try:
+            path_obj = Path(path).resolve()
+            project_root = Path(__file__).resolve().parent.parent
+            # Ensure project_root ends with separator for proper path validation
+            project_root_str = str(project_root) + os.sep
+            if not str(path_obj).startswith(project_root_str):
+                logger.warning("Path traversal attempt blocked: %s", path)
+                path = str(project_root / "config" / "trigger_words.txt")
+            else:
+                path = str(path_obj)
+        except (OSError, ValueError) as e:
+            logger.warning("Invalid path %s: %s", path, e)
+            base = Path(__file__).resolve().parent.parent / "config" / "trigger_words.txt"
+            path = str(base)
 
     words: List[str] = []
     if os.path.exists(path):  # pragma: no cover - trivial file IO
         try:
             with open(path, "r", encoding="utf-8") as fh:
                 words = [line.strip() for line in fh if line.strip()]
-        except Exception as exc:  # pragma: no cover - logging only
+        except (OSError, IOError, UnicodeDecodeError) as exc:  # pragma: no cover - logging only
             logger.warning("Failed to read trigger words file %s: %s", path, exc)
 
     if not words:

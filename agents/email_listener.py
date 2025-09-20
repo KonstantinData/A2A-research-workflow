@@ -166,7 +166,7 @@ def process_email(raw_email: str) -> Dict[str, Any]:
 
             try:
                 result = internal_company_run(provided_data)
-            except Exception as e:
+            except (ImportError, AttributeError, ValueError) as e:
                 from core.utils import log_step
                 log_step("email_listener", "internal_company_run_failed", 
                         {"task_id": task_id, "error": str(e)}, severity="error")
@@ -194,7 +194,7 @@ def process_email(raw_email: str) -> Dict[str, Any]:
 
         try:
             result = internal_company_run(parsed)
-        except Exception as e:
+        except (ImportError, AttributeError, ValueError) as e:
             from core.utils import log_step
             log_step("email_listener", "internal_company_run_failed", 
                     {"task_id": task_id, "error": str(e)}, severity="error")
@@ -219,7 +219,7 @@ def poll_pending_replies(interval: int = 600) -> None:
         try:
             for rep in email_reader.fetch_replies():
                 run(json.dumps(rep))
-        except Exception as e:
+        except (ConnectionError, TimeoutError, ValueError) as e:
             from core.utils import log_step
             log_step("email_listener", "fetch_replies_failed", 
                     {"error": str(e)}, severity="error")

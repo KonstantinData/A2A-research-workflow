@@ -7,9 +7,13 @@ from datetime import datetime
 import logging
 import json
 
+from config.settings import SETTINGS
+
 logger = logging.getLogger("notifications")
 if not logger.handlers:
-    handler = logging.FileHandler("notification.log")
+    log_path = SETTINGS.workflows_dir / "notifications.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    handler = logging.FileHandler(str(log_path))
     handler.setFormatter(logging.Formatter("%(message)s"))
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)

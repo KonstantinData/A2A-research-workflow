@@ -27,18 +27,12 @@ class AutonomousFieldCompletionAgent(BaseAgent):
         def sync_handler(event: Event) -> None:
             """Execute the async handler in synchronous contexts."""
             import asyncio
-            import threading
 
             try:
-                asyncio.get_running_loop()
+                loop = asyncio.get_running_loop()
+                loop.create_task(self.handle_event(event))
             except RuntimeError:
                 asyncio.run(self.handle_event(event))
-            else:
-                thread = threading.Thread(
-                    target=lambda: asyncio.run(self.handle_event(event))
-                )
-                thread.start()
-                thread.join()
 
         self.event_bus.subscribe(EventType.FIELD_COMPLETION_REQUESTED, sync_handler)
 
