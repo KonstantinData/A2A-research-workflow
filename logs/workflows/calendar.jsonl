@@ -17,3 +17,5 @@
 {"workflow_id": "wf-20250920-133744-d84b57", "trigger_source": "calendar", "status": "fetch_return", "severity": "info", "variant": "v2", "count": 0}
 {"workflow_id": "wf-20250920-134638-f092f7", "trigger_source": "calendar", "status": "missing_google_oauth_env", "severity": "error", "variant": "v2", "mode": "v2-only"}
 {"workflow_id": "wf-20250920-134638-f092f7", "trigger_source": "calendar", "status": "fetch_return", "severity": "info", "variant": "v2", "count": 0}
+{"workflow_id": "wf-20250920-134918-903582", "trigger_source": "calendar", "status": "missing_google_oauth_env", "severity": "error", "variant": "v2", "mode": "v2-only"}
+{"workflow_id": "wf-20250920-134918-903582", "trigger_source": "calendar", "status": "fetch_return", "severity": "info", "variant": "v2", "count": 0}
