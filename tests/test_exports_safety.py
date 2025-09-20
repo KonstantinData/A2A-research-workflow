@@ -18,7 +18,7 @@ def test_csv_with_header_on_empty(tmp_path):
     csv_path = SETTINGS.exports_dir / "data.csv"
     assert csv_path.exists()
     contents = csv_path.read_text().splitlines()
-    assert contents == [",".join(csv_export.DEFAULT_FIELDS)]
+    assert contents == [";".join(csv_export.DEFAULT_FIELDS)]
 
 
 def test_pdf_created_on_empty(tmp_path, monkeypatch):
