@@ -116,7 +116,11 @@ class AutonomousOrchestrator:
         
         # Determine current status from events
         latest_event = events[-1]
-        
+        for event in reversed(events):
+            if event.type in (EventType.WORKFLOW_COMPLETED, EventType.WORKFLOW_FAILED):
+                latest_event = event
+                break
+
         status_map = {
             EventType.TRIGGER_RECEIVED: "triggered",
             EventType.FIELD_COMPLETION_COMPLETED: "field_completion_done",

@@ -74,8 +74,8 @@ class BaseAgent(ABC):
             })
             
             result = await self.process_event(event)
-            
-            if result:
+
+            if result is not None:
                 # Publish completion event
                 completion_type = self._get_completion_event_type(event.type)
                 if completion_type:
