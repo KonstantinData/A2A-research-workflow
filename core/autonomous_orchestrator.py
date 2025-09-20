@@ -74,27 +74,18 @@ class AutonomousOrchestrator:
     
     async def _monitor_triggers(self) -> None:
         """Monitor for new triggers and publish events."""
+        from core.triggers import gather_calendar_triggers
+        
         while self._running:
             try:
-                # Fetch calendar events
-                events = google_calendar_service.fetch_events()
+                # Use proper trigger detection with trigger words
+                triggers = gather_calendar_triggers()
                 
-                for event in events:
-                    # Convert to trigger format
-                    trigger_payload = {
-                        "event_id": event.get("id"),
-                        "summary": event.get("summary"),
-                        "description": event.get("description"),
-                        "creator": event.get("creator", {}).get("email"),
-                        "start": event.get("start", {}).get("dateTime"),
-                        "end": event.get("end", {}).get("dateTime"),
-                        "attendees": event.get("attendees", [])
-                    }
-                    
+                for trigger in triggers:
                     # Publish trigger event
                     self.event_bus.publish(
                         EventType.TRIGGER_RECEIVED,
-                        trigger_payload,
+                        trigger,
                         source_agent="trigger_monitor"
                     )
                 
