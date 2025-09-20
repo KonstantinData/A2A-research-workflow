@@ -52,6 +52,8 @@ class AutonomousEmailAgent(BaseAgent):
     
     async def _handle_missing_fields_email(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Handle missing fields email request."""
+        import html
+        
         missing_fields = payload.get("missing", [])
         original_payload = payload.get("payload", {})
         
@@ -62,19 +64,33 @@ class AutonomousEmailAgent(BaseAgent):
             "unknown@example.com"
         )
         
-        subject = "Missing Information Required - A2A Research"
-        body = f"""
-        Hello,
+        # Extract context information
+        task_id = payload.get("task_id", "Unknown")
+        event_title = original_payload.get("summary") or original_payload.get("title") or "Research Request"
+        company_name = original_payload.get("company_name", "Unknown Company")
+        event_id = original_payload.get("event_id", "Unknown")
         
-        We need additional information to complete the research for your request:
+        # Escape HTML to prevent XSS
+        safe_fields = [html.escape(str(field)) for field in missing_fields]
+        safe_event_title = html.escape(str(event_title))
+        safe_company_name = html.escape(str(company_name))
         
-        Missing fields: {', '.join(missing_fields)}
-        
-        Please provide the missing information by replying to this email.
-        
-        Best regards,
-        A2A Research Team
-        """
+        subject = f"Missing Information Required - A2A Research (Task: {task_id})"
+        body = f"""Hello,
+
+We need additional information to complete the research for your request:
+
+Event: {safe_event_title}
+Company: {safe_company_name}
+Task ID: {task_id}
+Event ID: {event_id}
+
+Missing fields: {', '.join(safe_fields)}
+
+Please provide the missing information by replying to this email.
+
+Best regards,
+A2A Research Team"""
         
         try:
             send_email(recipient, subject, body)
