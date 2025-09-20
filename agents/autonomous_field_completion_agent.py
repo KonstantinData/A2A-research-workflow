@@ -25,25 +25,23 @@ class AutonomousFieldCompletionAgent(BaseAgent):
         """Register event handlers."""
         # Use sync wrapper for event handling
         def sync_handler(event):
-            import asyncio
             try:
-                # Safe async execution without command injection risk
-                import asyncio
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    loop.run_until_complete(self.handle_event(event))
-                finally:
-                    loop.close()
+                # Run synchronously - no async needed for field completion
+                result = self.process_event_sync(event)
+                if result:
+                    self.event_bus.publish(
+                        EventType.FIELD_COMPLETION_COMPLETED,
+                        result,
+                        source_agent=self.metadata.name
+                    )
             except Exception as e:
-                # Log error instead of running potentially unsafe code
                 from core.utils import log_step
                 log_step("field_completion_agent", "sync_handler_error", {"error": str(e)}, severity="error")
                 
         self.event_bus.subscribe(EventType.FIELD_COMPLETION_REQUESTED, sync_handler)
     
-    async def process_event(self, event: Event) -> Optional[Dict[str, Any]]:
-        """Process field completion request."""
+    def process_event_sync(self, event: Event) -> Optional[Dict[str, Any]]:
+        """Process field completion request synchronously."""
         # Convert event to trigger format expected by existing agent
         trigger = {
             "payload": event.payload,
