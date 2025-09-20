@@ -1,6 +1,6 @@
 from pathlib import Path
 import sys
-from datetime import datetime, time as dtime
+from datetime import datetime, timezone
 
 import pytest
 
@@ -118,9 +118,9 @@ def test_scheduler_run_flow(monkeypatch):
     scheduler = ReminderScheduler()
 
     times = [
-        datetime(2023, 1, 1, 9, 0),
-        datetime(2023, 1, 1, 10, 0),
-        datetime(2023, 1, 1, 15, 0),
+        datetime(2023, 1, 1, 9, 0, tzinfo=timezone.utc),
+        datetime(2023, 1, 1, 10, 0, tzinfo=timezone.utc),
+        datetime(2023, 1, 1, 15, 0, tzinfo=timezone.utc),
     ]
 
     def fake_now():

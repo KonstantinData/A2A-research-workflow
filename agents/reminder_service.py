@@ -162,8 +162,8 @@ class ReminderScheduler:
         """Run the scheduler loop indefinitely."""
         while True:
             now = self._now()
-            reminder_at = datetime.combine(now.date(), dtime(hour=10, minute=0))
-            escalation_at = datetime.combine(now.date(), dtime(hour=15, minute=0))
+            reminder_at = now.replace(hour=10, minute=0, second=0, microsecond=0)
+            escalation_at = now.replace(hour=15, minute=0, second=0, microsecond=0)
 
             if now < reminder_at:
                 next_run = reminder_at
