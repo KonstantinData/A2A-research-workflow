@@ -58,10 +58,11 @@ class AutonomousEmailAgent(BaseAgent):
         original_payload = payload.get("payload", {})
         
         # Get recipient from original payload
+        fallback_recipient = "support@a2a-research.com"
         recipient = (
             original_payload.get("creator") or
             original_payload.get("recipient") or
-            "unknown@example.com"
+            fallback_recipient
         )
         
         # Extract context information
@@ -99,10 +100,12 @@ A2A Research Team"""
             from core.utils import log_step
             log_step("email_agent", "send_error", {"error": str(e)}, severity="error")
             return {"status": "failed", "error": str(e)}
+
     
     async def _handle_report_email(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Handle report delivery email."""
-        recipient = payload.get("recipient", "unknown@example.com")
+        fallback_recipient = "support@a2a-research.com"
+        recipient = payload.get("recipient", fallback_recipient)
         pdf_path = payload.get("pdf_path")
         
         subject = "A2A Research Report Ready"
