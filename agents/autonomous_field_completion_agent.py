@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 
 from core.agent_controller import BaseAgent, AgentMetadata, AgentCapability
 from core.event_bus import EventBus, Event, EventType
+from agents.autonomous_utils import ensure_trigger_structure
 from agents.field_completion_agent import run as field_completion_run
 
 
@@ -43,21 +44,25 @@ class AutonomousFieldCompletionAgent(BaseAgent):
     def _process_event_sync(self, event: Event) -> Optional[Dict[str, Any]]:
         """Process field completion request synchronously."""
         # Convert event to trigger format expected by existing agent
-        trigger = {
-            "payload": event.payload,
-            "source": "calendar"
-        }
+        trigger = ensure_trigger_structure(event.payload)
+        trigger.setdefault("source", "calendar")
 
         # Run existing field completion logic
         result = field_completion_run(trigger) or {}
 
-        payload = event.payload or {}
-        nested_payload = payload.get("payload") if isinstance(payload.get("payload"), dict) else {}
+        payload = trigger.get("payload", {})
+        nested_payload = {}
+        if isinstance(event.payload, dict) and isinstance(event.payload.get("payload"), dict):
+            nested_payload = event.payload["payload"]
 
         for key in ("company_name", "domain", "industry_group", "industry", "creator"):
-            if key not in result and key in payload:
+            if key in result:
+                continue
+            if key in payload:
                 result[key] = payload[key]
-            elif key not in result and key in nested_payload:
+            elif key in trigger:
+                result[key] = trigger[key]
+            elif key in nested_payload:
                 result[key] = nested_payload[key]
 
         return result
