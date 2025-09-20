@@ -7,3 +7,9 @@
 {"workflow_id": "wf-20250918-111159-c90a5e", "trigger_source": "calendar", "status": "event_ingested", "severity": "info", "variant": "v2", "event_id": "0v10dj94ldfn2lb9lmuoqof99q", "calendar_id": "primary"}
 {"workflow_id": "wf-20250918-111159-c90a5e", "trigger_source": "calendar", "status": "event_ingested", "severity": "info", "variant": "v2", "event_id": "4umvanrapmir5vltdjhv5tm4kn", "calendar_id": "primary"}
 {"workflow_id": "wf-20250918-111159-c90a5e", "trigger_source": "calendar", "status": "fetch_ok", "severity": "info", "variant": "v2", "calendars": ["primary"], "count": 3}
+{"workflow_id": "wf-20250920-122807-821ded", "trigger_source": "calendar", "status": "event_ingested", "severity": "info", "variant": "v2", "event_id": "7ht8dotjn8ebrkn7kbvfc9mqv4", "calendar_id": "primary"}
+{"workflow_id": "wf-20250920-122807-821ded", "trigger_source": "calendar", "status": "event_ingested", "severity": "info", "variant": "v2", "event_id": "5rao5e7kcjl2i2kol7o8hvtrsh", "calendar_id": "primary"}
+{"workflow_id": "wf-20250920-122807-821ded", "trigger_source": "calendar", "status": "fetch_ok", "severity": "info", "variant": "v2", "calendars": ["primary"], "count": 2}
+{"workflow_id": "wf-20250920-122807-821ded", "trigger_source": "calendar", "status": "fetch_return", "severity": "info", "variant": "v2", "count": 2}
+{"workflow_id": "wf-20250920-122807-821ded", "trigger_source": "calendar", "status": "trigger_detected", "severity": "info", "variant": "v2", "event": {"id": "7ht8dotjn8ebrkn7kbvfc9mqv4", "summary": "meeting vorbereitung - Mahle "}}
+{"workflow_id": "wf-20250920-122807-821ded", "trigger_source": "calendar", "status": "trigger_detected", "severity": "info", "variant": "v2", "event": {"id": "5rao5e7kcjl2i2kol7o8hvtrsh", "summary": "business client condata"}}

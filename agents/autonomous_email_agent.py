@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 
 from core.agent_controller import BaseAgent, AgentMetadata, AgentCapability
 from core.event_bus import EventBus, Event, EventType
-from integrations import email_sender
+from integrations.email_sender import send_email
 
 
 class AutonomousEmailAgent(BaseAgent):
@@ -17,7 +17,7 @@ class AutonomousEmailAgent(BaseAgent):
             name="email_agent",
             capabilities={AgentCapability.EMAIL_COMMUNICATION},
             priority=6,
-            max_concurrent=3
+            max_concurrent=2
         )
         super().__init__(metadata, event_bus)
     
@@ -34,45 +34,71 @@ class AutonomousEmailAgent(BaseAgent):
     async def process_event(self, event: Event) -> Optional[Dict[str, Any]]:
         """Process email request."""
         email_type = event.payload.get("type")
-        payload = event.payload.get("payload", {})
         
         if email_type == "missing_fields":
-            return await self._handle_missing_fields_email(payload, event.payload.get("missing", []))
+            return await self._handle_missing_fields_email(event.payload)
         elif email_type == "report":
-            return await self._handle_report_email(payload, event.payload.get("attachments", []))
+            return await self._handle_report_email(event.payload)
         
-        return {}
+        return None
     
-    async def _handle_missing_fields_email(self, payload: Dict[str, Any], missing: list) -> Dict[str, Any]:
-        """Send missing fields request email."""
-        creator_email = payload.get("creator") or payload.get("creatorEmail")
-        if not creator_email:
-            return {"error": "No creator email found"}
+    async def _handle_missing_fields_email(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle missing fields email request."""
+        missing_fields = payload.get("missing", [])
+        original_payload = payload.get("payload", {})
+        
+        # Get recipient from original payload
+        recipient = (
+            original_payload.get("creator") or
+            original_payload.get("recipient") or
+            "unknown@example.com"
+        )
+        
+        subject = "Missing Information Required - A2A Research"
+        body = f"""
+        Hello,
+        
+        We need additional information to complete the research for your request:
+        
+        Missing fields: {', '.join(missing_fields)}
+        
+        Please provide the missing information by replying to this email.
+        
+        Best regards,
+        A2A Research Team
+        """
         
         try:
-            email_sender.send_email(
-                to=creator_email,
-                subject="Missing information for research",
-                body=f"Please provide: {', '.join(missing)}",
-                task_id=payload.get("event_id")
-            )
-            return {"sent": True, "to": creator_email}
+            send_email(recipient, subject, body)
+            return {"status": "sent", "recipient": recipient}
         except Exception as e:
-            return {"error": str(e)}
+            from core.utils import log_step
+            log_step("email_agent", "send_error", {"error": str(e)}, severity="error")
+            return {"status": "failed", "error": str(e)}
     
-    async def _handle_report_email(self, payload: Dict[str, Any], attachments: list) -> Dict[str, Any]:
-        """Send report email."""
-        recipient = payload.get("creator") or payload.get("recipient")
-        if not recipient:
-            return {"error": "No recipient found"}
+    async def _handle_report_email(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle report delivery email."""
+        recipient = payload.get("recipient", "unknown@example.com")
+        pdf_path = payload.get("pdf_path")
+        
+        subject = "A2A Research Report Ready"
+        body = """
+        Hello,
+        
+        Your A2A research report has been generated and is attached to this email.
+        
+        Best regards,
+        A2A Research Team
+        """
+        
+        attachments = []
+        if pdf_path:
+            attachments.append(pdf_path)
         
         try:
-            email_sender.send_email(
-                to=recipient,
-                subject="Your A2A research report",
-                body="Please find the attached report.",
-                attachments=attachments
-            )
-            return {"sent": True, "to": recipient}
+            send_email(recipient, subject, body, attachments=attachments)
+            return {"status": "sent", "recipient": recipient}
         except Exception as e:
-            return {"error": str(e)}
+            from core.utils import log_step
+            log_step("email_agent", "send_error", {"error": str(e)}, severity="error")
+            return {"status": "failed", "error": str(e)}

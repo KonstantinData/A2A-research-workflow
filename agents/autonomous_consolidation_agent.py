@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 
 from core.agent_controller import BaseAgent, AgentMetadata, AgentCapability
 from core.event_bus import EventBus, Event, EventType
-from core import consolidate
+from core.consolidate import consolidate_results
 
 
 class AutonomousConsolidationAgent(BaseAgent):
@@ -26,28 +26,17 @@ class AutonomousConsolidationAgent(BaseAgent):
         def sync_handler(event):
             import asyncio
             try:
-                # Run synchronously to avoid command injection via asyncio.create_task
-                import asyncio
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    loop.run_until_complete(self.handle_event(event))
-                finally:
-                    loop.close()
-            except Exception as e:
-                # Fallback - log error instead of running potentially unsafe code
-                from core.utils import log_step
-                log_step("consolidation_agent", "sync_handler_error", {"error": str(e)}, severity="error")
+                asyncio.create_task(self.handle_event(event))
+            except Exception:
+                asyncio.run(self.handle_event(event))
         self.event_bus.subscribe(EventType.CONSOLIDATION_REQUESTED, sync_handler)
     
     async def process_event(self, event: Event) -> Optional[Dict[str, Any]]:
         """Process consolidation request."""
         results = event.payload.get("results", [])
+        original_payload = event.payload.get("original_payload", {})
         
-        if not results:
-            return {}
-        
-        # Use existing consolidation logic
-        consolidated = consolidate.consolidate(results)
+        # Consolidate all research results
+        consolidated = consolidate_results(results, original_payload)
         
         return consolidated

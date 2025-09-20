@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
-from pathlib import Path
 
 from core.agent_controller import BaseAgent, AgentMetadata, AgentCapability
 from core.event_bus import EventBus, Event, EventType
-from output import pdf_render, csv_export
+from output.pdf_render import render_pdf
+from output.csv_export import export_csv
 from config.settings import SETTINGS
 
 
@@ -19,7 +19,7 @@ class AutonomousReportAgent(BaseAgent):
             name="report_agent",
             capabilities={AgentCapability.REPORT_GENERATION},
             priority=5,
-            max_concurrent=2
+            max_concurrent=1
         )
         super().__init__(metadata, event_bus)
     
@@ -35,31 +35,30 @@ class AutonomousReportAgent(BaseAgent):
     
     async def process_event(self, event: Event) -> Optional[Dict[str, Any]]:
         """Process report generation request."""
-        consolidated = event.payload
+        consolidated_data = event.payload
         
-        # Ensure output directory exists
-        SETTINGS.exports_dir.mkdir(parents=True, exist_ok=True)
-        
-        pdf_path = SETTINGS.exports_dir / "report.pdf"
-        csv_path = SETTINGS.exports_dir / "data.csv"
+        # Generate PDF and CSV reports
+        pdf_path = None
+        csv_path = None
         
         try:
             # Generate PDF
-            rows = consolidated.get("rows", [])
-            fields = consolidated.get("fields", [])
-            meta = consolidated.get("meta")
-            
-            if rows and fields:
-                pdf_render.render_pdf(rows, fields, meta, pdf_path)
+            pdf_path = render_pdf(
+                rows=[consolidated_data],
+                fields=list(consolidated_data.keys()),
+                meta={"title": "A2A Research Report"}
+            )
             
             # Generate CSV
-            if rows:
-                csv_export.export_csv(rows, csv_path)
-            
-            return {
-                "pdf_path": str(pdf_path) if pdf_path.exists() else None,
-                "csv_path": str(csv_path) if csv_path.exists() else None
-            }
+            csv_path = export_csv([consolidated_data])
             
         except Exception as e:
-            return {"error": str(e)}
+            from core.utils import log_step
+            log_step("report_agent", "generation_error", {"error": str(e)}, severity="error")
+            return None
+        
+        return {
+            "pdf_path": pdf_path,
+            "csv_path": csv_path,
+            "data": consolidated_data
+        }

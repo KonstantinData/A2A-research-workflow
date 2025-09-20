@@ -41,5 +41,16 @@ def consolidate(results: Iterable[Normalized]) -> Dict[str, Any]:
     return combined
 
 
-__all__ = ["consolidate"]
+def consolidate_results(results: list, original_payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Consolidate research results with original payload."""
+    # Merge original payload with research results
+    all_data = [original_payload] + results
+    
+    # Use existing consolidate function
+    consolidated = consolidate(all_data)
+    
+    return consolidated
+
+
+__all__ = ["consolidate", "consolidate_results"]
 

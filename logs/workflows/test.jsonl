@@ -1,0 +1,4 @@
+{"workflow_id": "wf-20250920-122758-41eb5d", "trigger_source": "calendar", "status": "trigger_processed", "severity": "info", "variant": "v2", "correlation_id": "2542142f-9b7a-486e-86cc-f82f8df89287"}
+{"workflow_id": "wf-20250920-122758-41eb5d", "trigger_source": "test", "status": "unknown", "severity": "info", "variant": "v2", "last_update": "2025-09-20T12:27:58.577655+00:00", "event_count": 1}
+{"workflow_id": "wf-20250920-122902-665432", "trigger_source": "calendar", "status": "trigger_processed", "severity": "info", "variant": "v2", "correlation_id": "415e3e3a-ddff-411b-8e20-8c1347a126ba"}
+{"workflow_id": "wf-20250920-122902-665432", "trigger_source": "test", "status": "unknown", "severity": "info", "variant": "v2", "last_update": "2025-09-20T12:29:02.691237+00:00", "event_count": 1}
