@@ -1,6 +1,11 @@
 from __future__ import annotations
-import asyncio, signal
-from typing import Sequence, Optional
+
+import asyncio
+import signal
+from typing import Optional, Sequence
+
+from config.settings import SETTINGS
+
 from app.core.orchestrator import Orchestrator
 from app.core.event_store import EventStore, EventUpdate
 from app.core.events import Event
@@ -33,13 +38,35 @@ async def _handle_report_ready(ev: Event) -> None:
     log_step("orchestrator", "artifacts_written",
              {"event_id": ev.event_id, "pdf": str(pdf_path), "csv": str(csv_path)})
 
+async def _drain_pending_events(orch: Orchestrator) -> None:
+    """Process pending events until the queue is empty and then return."""
+
+    while True:
+        processed = await orch.run_once()
+        if processed == 0:
+            break
+
+
 async def _main() -> None:
     handlers = {
         "EmailSendRequested": _handle_email_send_requested,
         "ReportReady": _handle_report_ready,
         # "UserReplyReceived" handled by Orchestrator fallback
     }
-    orch = Orchestrator(handlers, store=EventStore, batch_size=25, max_attempts=5, backoff=default_backoff)
+    orch = Orchestrator(
+        handlers,
+        store=EventStore,
+        batch_size=25,
+        max_attempts=5,
+        backoff=default_backoff,
+    )
+
+    if SETTINGS.live_mode <= 0:
+        log_step("worker", "drain_mode", {"live": False})
+        await _drain_pending_events(orch)
+        log_step("worker", "stopped", {})
+        return
+
     stop = asyncio.Event()
 
     def _graceful(*_):
