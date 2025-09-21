@@ -25,7 +25,7 @@ import time
 import re
 
 from core import tasks as tasks_db
-from integrations import email_reader
+from app.integrations import email_reader
 
 # ---------------------------------------------------------------------------
 # Helpers

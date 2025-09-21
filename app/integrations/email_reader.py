@@ -10,9 +10,12 @@ from typing import Dict, List, Optional
 
 from app.core.logging import log_step
 
+from integrations import email_reader as _legacy_email_reader
+
 from app.core.event_bus import EventBus
-from app.core.events import Event
+from app.core.events import Event, EventUpdate
 from app.core.status import EventStatus
+from app.core.event_store import EventStore, EventStoreError
 
 _SUBJECT_REF = re.compile(r"\[ref:(?P<id>[A-Z0-9\-]+)\]", re.IGNORECASE)
 _BODY_REF = re.compile(r"Reference:\s*(?P<id>[A-Z0-9\-]+)", re.IGNORECASE)
@@ -140,4 +143,40 @@ class EmailReader:
         return self._event_bus.publish(event)
 
 
-__all__ = ["EmailReader"]
+def record_outbound_message(
+    message_id: str,
+    *,
+    task_id: str | None = None,
+    event_id: str | None = None,
+) -> None:
+    """Persist correlation metadata for an outbound message."""
+
+    normalized = _normalise_message_id(message_id)
+    if normalized:
+        target_id = (event_id or task_id or "").strip()
+        if target_id:
+            try:
+                EventStore.update(target_id, EventUpdate(correlation_id=normalized))
+            except EventStoreError as exc:
+                log_step(
+                    "email_reader",
+                    "correlation_record_failed",
+                    {"event_id": target_id, "message_id": normalized, "error": str(exc)},
+                    severity="warning",
+                )
+
+    _legacy_email_reader.record_outbound_message(
+        message_id, task_id=task_id, event_id=event_id
+    )
+
+
+fetch_replies = _legacy_email_reader.fetch_replies
+poll_replies = _legacy_email_reader.poll_replies
+
+
+__all__ = [
+    "EmailReader",
+    "record_outbound_message",
+    "fetch_replies",
+    "poll_replies",
+]

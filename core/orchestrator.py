@@ -33,7 +33,7 @@ from core import statuses
 
 # Expose integrations so tests can monkeypatch them
 from integrations import email_sender as email_sender  # noqa: F401
-from integrations import email_reader as email_reader  # noqa: F401
+from app.integrations import email_reader as email_reader  # noqa: F401
 
 # Research agents
 from agents import reminder_service, email_listener, field_completion_agent, recovery_agent
