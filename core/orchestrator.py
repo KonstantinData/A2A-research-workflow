@@ -489,4 +489,4 @@ def main(argv: List[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit("This legacy orchestrator is deprecated. Use: python -m app.app.worker")
