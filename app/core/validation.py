@@ -2,21 +2,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping
+from typing import Mapping, Tuple
 
 from .status import EventStatus
 
 
 _ALLOWED_TRANSITIONS: Mapping[EventStatus, frozenset[EventStatus]] = {
     EventStatus.PENDING: frozenset({EventStatus.IN_PROGRESS}),
-    EventStatus.IN_PROGRESS: frozenset(
-        {
-            EventStatus.COMPLETED,
-            EventStatus.WAITING_USER,
-            EventStatus.FAILED,
-        }
-    ),
-    EventStatus.WAITING_USER: frozenset({EventStatus.PENDING, EventStatus.IN_PROGRESS}),
+    EventStatus.IN_PROGRESS: frozenset({
+        EventStatus.COMPLETED,
+        EventStatus.WAITING_USER,
+        EventStatus.FAILED,
+    }),
+    EventStatus.WAITING_USER: frozenset({
+        EventStatus.PENDING,
+        EventStatus.IN_PROGRESS,
+        EventStatus.FAILED,
+    }),
     EventStatus.COMPLETED: frozenset(),
     EventStatus.FAILED: frozenset(),
     EventStatus.CANCELED: frozenset(),
@@ -29,12 +31,13 @@ class TransitionValidationError(ValueError):
 
     from_status: EventStatus
     to_status: EventStatus
-    allowed: tuple[EventStatus, ...]
+    allowed: Tuple[EventStatus, ...]
 
     def __post_init__(self) -> None:
         message = (
-            f"Illegal transition from {self.from_status.value} to {self.to_status.value}. "
-            f"Allowed: {', '.join(status.value for status in self.allowed) or '∅'}"
+            f"Illegal transition from {self.from_status.value!r} "
+            f"to {self.to_status.value!r}; allowed: "
+            f"{', '.join(status.value for status in self.allowed)}"
         )
         super().__init__(message)
 
@@ -49,7 +52,7 @@ class TransitionValidationError(ValueError):
         }
 
 
-def ensure_transition(current: EventStatus, new: EventStatus) -> None:
+def validate_transition(current: EventStatus, new: EventStatus) -> None:
     """Validate the transition from ``current`` to ``new``.
 
     Raises:
@@ -60,8 +63,7 @@ def ensure_transition(current: EventStatus, new: EventStatus) -> None:
     if new == current:
         return
 
-    allowed: set[EventStatus]
-    allowed = set(_ALLOWED_TRANSITIONS.get(current, frozenset()))
+    allowed: set[EventStatus] = set(_ALLOWED_TRANSITIONS.get(current, frozenset()))
     allowed.add(EventStatus.CANCELED)
 
     if new not in allowed:
@@ -70,3 +72,9 @@ def ensure_transition(current: EventStatus, new: EventStatus) -> None:
             new,
             tuple(sorted(allowed, key=lambda status: status.value)),
         )
+
+
+def ensure_transition(current: EventStatus, new: EventStatus) -> None:
+    """Backwards compatible wrapper for :func:`validate_transition`."""
+
+    validate_transition(current, new)
