@@ -12,6 +12,7 @@ from typing import Iterable, Optional
 from .events import Event, EventUpdate
 from .status import EventStatus
 from . import validation
+from .schema import validate_event_payload
 
 
 class EventStoreError(RuntimeError):
@@ -189,6 +190,9 @@ def update(event_id: str, patch: EventUpdate) -> Event:
         if not row:
             raise EventNotFoundError(f"Event {event_id} not found")
         current = _row_to_event(row)
+
+        if patch.payload is not None:
+            validate_event_payload(current.type, patch.payload)
 
         new_status = patch.status or current.status
         _ensure_transition(current.status, new_status)
