@@ -4,26 +4,19 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import uuid
 from collections import defaultdict
 from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Awaitable, Callable, DefaultDict, List, Optional
 
-from core.utils import log_step
-
+from .id_factory import new_event_id
+from .logging import log_step, pop_event_context, push_event_context
 from .event_store import EventStore, EventStoreError
 from .events import Event
 from .status import EventStatus
 
 
 Subscriber = Callable[[Event], Awaitable[None] | None]
-
-
-def _generate_event_id() -> str:
-    """Generate a unique identifier that is safe for e-mail subjects."""
-
-    return str(uuid.uuid4()).upper()
 
 
 class EventBus:
@@ -42,7 +35,7 @@ class EventBus:
         """Persist *event* and synchronously notify subscribers."""
 
         now = datetime.now(timezone.utc)
-        event_id = event.event_id or _generate_event_id()
+        event_id = event.event_id or new_event_id()
         persisted = replace(
             event,
             event_id=event_id,
@@ -51,6 +44,11 @@ class EventBus:
             updated_at=now,
         )
 
+        token = push_event_context(
+            persisted.event_id,
+            status=persisted.status,
+            correlation_id=persisted.correlation_id,
+        )
         try:
             self._store.create_event(persisted)
         except EventStoreError as exc:
@@ -61,21 +59,33 @@ class EventBus:
                 severity="error",
             )
             raise
+        else:
+            log_step(
+                "event_bus",
+                "event_published",
+                {
+                    "event_id": event_id,
+                    "type": persisted.type,
+                    "status": persisted.status.value,
+                    "correlation_id": persisted.correlation_id,
+                },
+            )
 
-        log_step(
-            "event_bus",
-            "event_published",
-            {"event_id": event_id, "type": persisted.type},
-        )
-
-        self._deliver(persisted)
-        return persisted
+            self._deliver(persisted)
+            return persisted
+        finally:
+            pop_event_context(token)
 
     def _deliver(self, event: Event) -> None:
         """Dispatch *event* to registered subscribers."""
 
         for handler in list(self._subscribers.get(event.type, [])):
             try:
+                token = push_event_context(
+                    event.event_id,
+                    status=event.status,
+                    correlation_id=event.correlation_id,
+                )
                 result = handler(event)
                 if inspect.isawaitable(result):
                     self._schedule(result)
@@ -83,9 +93,15 @@ class EventBus:
                 log_step(
                     "event_bus",
                     "handler_failed",
-                    {"event_id": event.event_id, "type": event.type, "error": str(exc)},
+                    {
+                        "event_id": event.event_id,
+                        "type": event.type,
+                        "error": str(exc),
+                    },
                     severity="error",
                 )
+            finally:
+                pop_event_context(token)
 
     @staticmethod
     def _schedule(awaitable: Awaitable[object]) -> None:

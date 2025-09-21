@@ -9,7 +9,12 @@ from typing import Any, Awaitable, Callable, Dict, Iterable, Mapping, MutableMap
 
 from config.settings import SETTINGS
 
-from core.utils import log_step
+from .logging import (
+    log_step,
+    pop_event_context,
+    push_event_context,
+    update_event_context,
+)
 
 from .event_store import (
     ConcurrencyError,
@@ -214,112 +219,132 @@ class Orchestrator:
         return processed
 
     def _claim_event(self, event: Event) -> Optional[Event]:
-        try:
-            claimed = self._store.update(
-                event.event_id,
-                EventUpdate(status=EventStatus.IN_PROGRESS),
-            )
-        except ConcurrencyError:
-            log_step(
-                "orchestrator",
-                "claim_conflict",
-                {"event_id": event.event_id, "type": event.type},
-                severity="warning",
-            )
-            return None
-        except InvalidStatusTransition as exc:
-            log_step(
-                "orchestrator",
-                "claim_invalid_transition",
-                {"event_id": event.event_id, **exc.details},
-                severity="error",
-            )
-            return None
-        except EventStoreError as exc:
-            log_step(
-                "orchestrator",
-                "claim_failed",
-                {
-                    "event_id": event.event_id,
-                    "type": event.type,
-                    "error": self._format_error(exc),
-                },
-                severity="error",
-            )
-            return None
-        log_step(
-            "orchestrator",
-            "event_claimed",
-            {"event_id": claimed.event_id, "type": claimed.type},
+        token = push_event_context(
+            event.event_id,
+            status=event.status,
+            correlation_id=event.correlation_id,
         )
-        return claimed
-
-    async def _process_event(self, event: Event) -> None:
-        handler = self._handlers.get(event.type)
-        if not handler:
-            log_step(
-                "orchestrator",
-                "handler_missing",
-                {"event_id": event.event_id, "type": event.type},
-                severity="error",
-            )
-            self._fail_event(event, reason="handler_missing", message=f"No handler registered for {event.type}")
-            return
-
-        attempt = max(0, int(event.retries))
-        while attempt < self._max_attempts:
+        try:
             try:
-                outcome = handler(event)
-                if inspect.isawaitable(outcome):
-                    outcome = await outcome
-            except UserInputRequired as exc:
-                result = HandlerResult(
-                    status=EventStatus.WAITING_USER,
-                    payload=exc.payload or event.payload,
-                    user_notification=exc.notification,
-                )
-                await self._finalize_event(event, result)
-                return
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                attempt += 1
-                event = self._store.update(
+                claimed = self._store.update(
                     event.event_id,
-                    EventUpdate(
-                        retries=attempt,
-                        last_error=self._format_error(exc),
-                    ),
+                    EventUpdate(status=EventStatus.IN_PROGRESS),
                 )
+            except ConcurrencyError:
                 log_step(
                     "orchestrator",
-                    "handler_error",
+                    "claim_conflict",
+                    {"event_id": event.event_id, "type": event.type},
+                    severity="warning",
+                )
+                return None
+            except InvalidStatusTransition as exc:
+                log_step(
+                    "orchestrator",
+                    "claim_invalid_transition",
+                    {"event_id": event.event_id, **exc.details},
+                    severity="error",
+                )
+                return None
+            except EventStoreError as exc:
+                log_step(
+                    "orchestrator",
+                    "claim_failed",
                     {
                         "event_id": event.event_id,
                         "type": event.type,
-                        "attempt": attempt,
-                        "max_attempts": self._max_attempts,
                         "error": self._format_error(exc),
                     },
                     severity="error",
                 )
-                if attempt >= self._max_attempts:
-                    self._fail_event(event, reason="max_retries", message=str(exc))
+                return None
+
+            update_event_context(status=claimed.status, correlation_id=claimed.correlation_id)
+            log_step(
+                "orchestrator",
+                "event_claimed",
+                {"event_id": claimed.event_id, "type": claimed.type},
+            )
+            return claimed
+        finally:
+            pop_event_context(token)
+
+    async def _process_event(self, event: Event) -> None:
+        token = push_event_context(
+            event.event_id,
+            status=event.status,
+            correlation_id=event.correlation_id,
+        )
+        try:
+            handler = self._handlers.get(event.type)
+            if not handler:
+                log_step(
+                    "orchestrator",
+                    "handler_missing",
+                    {"event_id": event.event_id, "type": event.type},
+                    severity="error",
+                )
+                self._fail_event(event, reason="handler_missing", message=f"No handler registered for {event.type}")
+                return
+
+            attempt = max(0, int(event.retries))
+            while attempt < self._max_attempts:
+                try:
+                    outcome = handler(event)
+                    if inspect.isawaitable(outcome):
+                        outcome = await outcome
+                except UserInputRequired as exc:
+                    result = HandlerResult(
+                        status=EventStatus.WAITING_USER,
+                        payload=exc.payload or event.payload,
+                        user_notification=exc.notification,
+                    )
+                    await self._finalize_event(event, result)
                     return
-                delay = max(0.0, float(self._backoff(attempt)))
-                if delay:
-                    await asyncio.sleep(delay)
-                continue
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    attempt += 1
+                    event = self._store.update(
+                        event.event_id,
+                        EventUpdate(
+                            retries=attempt,
+                            last_error=self._format_error(exc),
+                        ),
+                    )
+                    update_event_context(status=event.status, correlation_id=event.correlation_id)
+                    log_step(
+                        "orchestrator",
+                        "handler_error",
+                        {
+                            "event_id": event.event_id,
+                            "type": event.type,
+                            "attempt": attempt,
+                            "max_attempts": self._max_attempts,
+                            "error": self._format_error(exc),
+                        },
+                        severity="error",
+                    )
+                    if attempt >= self._max_attempts:
+                        self._fail_event(event, reason="max_retries", message=str(exc))
+                        return
+                    delay = max(0.0, float(self._backoff(attempt)))
+                    if delay:
+                        await asyncio.sleep(delay)
+                    continue
 
-            result = self._coerce_result(outcome)
-            await self._finalize_event(event, result)
-            return
+                result = self._coerce_result(outcome)
+                await self._finalize_event(event, result)
+                return
 
-        self._fail_event(event, reason="max_retries", message="retry limit reached")
+            self._fail_event(event, reason="max_retries", message="retry limit reached")
+        finally:
+            pop_event_context(token)
 
     async def _finalize_event(self, event: Event, result: HandlerResult) -> None:
         clear_error = result.status in {EventStatus.COMPLETED, EventStatus.WAITING_USER}
         updated = self._store.update(event.event_id, result.as_update(clear_error=clear_error))
+        update_event_context(status=updated.status, correlation_id=updated.correlation_id)
 
         if result.status == EventStatus.COMPLETED:
             log_step(
@@ -350,26 +375,35 @@ class Orchestrator:
             )
 
     def _fail_event(self, event: Event, *, reason: str, message: str) -> None:
-        try:
-            failed = self._store.update(
-                event.event_id,
-                EventUpdate(
-                    status=EventStatus.FAILED,
-                    last_error=message,
-                ),
-            )
-        except EventStoreError:
-            return
-        log_step(
-            "orchestrator",
-            "event_failed",
-            {
-                "event_id": failed.event_id,
-                "type": failed.type,
-                "reason": reason,
-            },
-            severity="error",
+        token = push_event_context(
+            event.event_id,
+            status=event.status,
+            correlation_id=event.correlation_id,
         )
+        try:
+            try:
+                failed = self._store.update(
+                    event.event_id,
+                    EventUpdate(
+                        status=EventStatus.FAILED,
+                        last_error=message,
+                    ),
+                )
+            except EventStoreError:
+                return
+            update_event_context(status=failed.status, correlation_id=failed.correlation_id)
+            log_step(
+                "orchestrator",
+                "event_failed",
+                {
+                    "event_id": failed.event_id,
+                    "type": failed.type,
+                    "reason": reason,
+                },
+                severity="error",
+            )
+        finally:
+            pop_event_context(token)
 
     async def _publish(self, event_type: str, payload: Dict[str, Any]) -> None:
         if not self._publisher:
@@ -391,53 +425,62 @@ class Orchestrator:
             )
 
     async def _handle_user_reply_received(self, event: Event) -> HandlerResult:
-        payload = event.payload or {}
-        referenced_id = str(payload.get("event_id") or "").strip()
-        if not referenced_id:
-            return HandlerResult(status=EventStatus.COMPLETED)
-
-        store_get = getattr(self._store, "get", None)
-        current = store_get(referenced_id) if callable(store_get) else None
-        if not current:
-            log_step(
-                "orchestrator",
-                "user_reply_unknown_event",
-                {"referenced_event_id": referenced_id},
-                severity="warning",
-            )
-            return HandlerResult(status=EventStatus.COMPLETED)
-
-        if current.status != EventStatus.WAITING_USER:
-            return HandlerResult(status=EventStatus.COMPLETED)
-
-        update = EventUpdate(
-            status=EventStatus.PENDING,
-            correlation_id=payload.get("message_id"),
+        token = push_event_context(
+            event.event_id,
+            status=event.status,
+            correlation_id=event.correlation_id,
         )
-
         try:
-            self._store.update(referenced_id, update)
-        except (ConcurrencyError, InvalidStatusTransition, EventStoreError) as exc:
-            log_step(
-                "orchestrator",
-                "user_reply_update_failed",
-                {
-                    "referenced_event_id": referenced_id,
-                    "error": self._format_error(exc),
-                },
-                severity="warning",
-            )
-        else:
-            log_step(
-                "orchestrator",
-                "user_reply_received",
-                {
-                    "referenced_event_id": referenced_id,
-                    "message_id": payload.get("message_id"),
-                },
+            payload = event.payload or {}
+            referenced_id = str(payload.get("event_id") or "").strip()
+            if not referenced_id:
+                return HandlerResult(status=EventStatus.COMPLETED)
+
+            store_get = getattr(self._store, "get", None)
+            current = store_get(referenced_id) if callable(store_get) else None
+            if not current:
+                log_step(
+                    "orchestrator",
+                    "user_reply_unknown_event",
+                    {"referenced_event_id": referenced_id},
+                    severity="warning",
+                )
+                return HandlerResult(status=EventStatus.COMPLETED)
+
+            if current.status != EventStatus.WAITING_USER:
+                return HandlerResult(status=EventStatus.COMPLETED)
+
+            update = EventUpdate(
+                status=EventStatus.PENDING,
+                correlation_id=payload.get("message_id"),
             )
 
-        return HandlerResult(status=EventStatus.COMPLETED)
+            try:
+                updated = self._store.update(referenced_id, update)
+            except (ConcurrencyError, InvalidStatusTransition, EventStoreError) as exc:
+                log_step(
+                    "orchestrator",
+                    "user_reply_update_failed",
+                    {
+                        "referenced_event_id": referenced_id,
+                        "error": self._format_error(exc),
+                    },
+                    severity="warning",
+                )
+            else:
+                update_event_context(status=updated.status, correlation_id=updated.correlation_id)
+                log_step(
+                    "orchestrator",
+                    "user_reply_received",
+                    {
+                        "referenced_event_id": referenced_id,
+                        "message_id": payload.get("message_id"),
+                    },
+                )
+
+            return HandlerResult(status=EventStatus.COMPLETED)
+        finally:
+            pop_event_context(token)
 
     def _coerce_result(self, result: Any) -> HandlerResult:
         if isinstance(result, HandlerResult):
