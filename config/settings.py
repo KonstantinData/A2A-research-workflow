@@ -151,6 +151,12 @@ class _Settings:
             self.cal_lookahead_days = 14
             self.live_mode = 0  # niemals hart failen (z. B. SMTP) in Tests
 
+        if self.live_mode == 1 and self.allow_static_company_data:
+            _log.warning(
+                "Disabling ALLOW_STATIC_COMPANY_DATA in LIVE mode for safety"
+            )
+            self.allow_static_company_data = False
+
     def _resolve_path(self, value: str | Path) -> Path:
         try:
             path = Path(value).expanduser().resolve()

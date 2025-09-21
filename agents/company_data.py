@@ -64,6 +64,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
+from config.settings import SETTINGS
+
+
+def _static_data_disabled() -> bool:
+    return not SETTINGS.allow_static_company_data
+
 
 @dataclass
 class CompanyInfo:
@@ -190,6 +196,9 @@ def lookup_company(name: str) -> Optional[CompanyInfo]:
         Populated :class:`CompanyInfo` instance if found, otherwise
         ``None``.
     """
+    if _static_data_disabled():
+        return None
+
     key = (name or "").strip().lower()
     return _COMPANY_DATA.get(key)
 
@@ -201,6 +210,9 @@ def all_company_names() -> List[str]:
     not recognised.  The returned list contains the canonical names as
     defined in the mapping.
     """
+    if _static_data_disabled():
+        return []
+
     return [info.company_name for info in _COMPANY_DATA.values()]
 
 
@@ -210,6 +222,9 @@ def neighbours_for(name: str) -> List[CompanyInfo]:
     The result contains the full :class:`CompanyInfo` objects for each
     neighbour.  When the company is unknown an empty list is returned.
     """
+    if _static_data_disabled():
+        return []
+
     info = lookup_company(name)
     if not info:
         return []
@@ -234,6 +249,9 @@ def customers_for(name: str) -> List[str]:
     names are returned to reduce the need for joining against the full
     dataset.
     """
+    if _static_data_disabled():
+        return []
+
     info = lookup_company(name)
     if info:
         return list(info.customers)

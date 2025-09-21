@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Set
 from enum import Enum
 
 from core.event_bus import EventBus, Event, EventType, event_bus
+from core import tasks
 from core.utils import log_step
 
 
@@ -213,14 +214,67 @@ class WorkflowCoordinator:
             )
         else:
             # Request human input via email
+            event_payload = {
+                "type": "missing_fields",
+                "payload": payload,
+                "missing": missing_fields,
+            }
+
+            def _extract_email(value: Any) -> str:
+                if isinstance(value, str):
+                    return value
+                if isinstance(value, dict):
+                    email_val = value.get("email")
+                    if isinstance(email_val, str):
+                        return email_val
+                return ""
+
+            candidate_email = ""
+            for key in (
+                "creator_email",
+                "creatorEmail",
+                "creator",
+                "recipient",
+                "organizer",
+                "organizerEmail",
+            ):
+                candidate_email = _extract_email(payload.get(key))
+                if candidate_email:
+                    break
+
+            trigger_ref = (
+                payload.get("event_id")
+                or payload.get("summary")
+                or payload.get("title")
+                or "missing_fields"
+            )
+
+            try:
+                task_record = tasks.create_task(
+                    trigger=str(trigger_ref),
+                    missing_fields=missing_fields,
+                    employee_email=candidate_email or "",
+                )
+            except Exception as exc:
+                log_step(
+                    "workflow_coordinator",
+                    "task_creation_failed",
+                    {
+                        "correlation_id": correlation_id,
+                        "error": str(exc),
+                    },
+                    severity="error",
+                )
+            else:
+                task_id = task_record.get("id")
+                if task_id:
+                    event_payload["task_id"] = task_id
+                    payload["task_id"] = task_id
+
             self.event_bus.publish(
                 EventType.EMAIL_REQUESTED,
-                {
-                    "type": "missing_fields",
-                    "payload": payload,
-                    "missing": missing_fields
-                },
-                correlation_id=correlation_id
+                event_payload,
+                correlation_id=correlation_id,
             )
     
     def _handle_research_completion(self, event: Event) -> None:
