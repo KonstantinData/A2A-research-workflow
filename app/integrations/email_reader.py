@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from email.message import Message
 from typing import Dict, List, Optional
 
-from core.utils import log_step
+from app.core.logging import log_step
 
 from app.core.event_bus import EventBus
 from app.core.events import Event

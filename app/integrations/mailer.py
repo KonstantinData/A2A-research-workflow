@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Mapping, Optional, Sequence
 
-from core.utils import log_step
+from app.core.logging import log_step
 
 from app.core.event_store import EventStore, EventStoreError
 from app.core.events import EventUpdate
