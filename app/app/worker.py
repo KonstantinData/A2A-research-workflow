@@ -50,7 +50,31 @@ async def _main() -> None:
         loop.add_signal_handler(sig, _graceful)
 
     log_step("worker", "starting", {})
-    await orch.run(stop_event=stop)
+
+    stop_task = asyncio.create_task(stop.wait())
+    orchestrator_task = asyncio.create_task(orch.start())
+
+    try:
+        done, _ = await asyncio.wait(
+            {stop_task, orchestrator_task},
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+
+        if stop_task in done:
+            orch.stop()
+            await orchestrator_task
+        else:
+            stop.set()
+            await stop_task
+            exc = orchestrator_task.exception()
+            if exc is not None:
+                raise exc
+    finally:
+        for task in (stop_task, orchestrator_task):
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(stop_task, orchestrator_task, return_exceptions=True)
+
     log_step("worker", "stopped", {})
 
 if __name__ == "__main__":
