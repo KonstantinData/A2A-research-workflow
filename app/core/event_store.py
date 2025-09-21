@@ -10,7 +10,8 @@ import sqlite3
 from typing import Iterable, Optional
 
 from .events import Event, EventUpdate
-from .status import EventStatus, is_terminal
+from .status import EventStatus
+from . import validation
 
 
 class EventStoreError(RuntimeError):
@@ -28,6 +29,29 @@ class ConcurrencyError(EventStoreError):
 class InvalidStatusTransition(EventStoreError):
     """Raised when an illegal status transition is attempted."""
 
+    def __init__(
+        self,
+        current: EventStatus,
+        new: EventStatus,
+        allowed: Iterable[EventStatus],
+    ) -> None:
+        allowed_statuses = tuple(
+            sorted({status for status in allowed}, key=lambda status: status.value)
+        )
+        self.current = current
+        self.new = new
+        self.allowed = allowed_statuses
+        self.details = {
+            "from": current.value,
+            "to": new.value,
+            "allowed": [status.value for status in allowed_statuses],
+        }
+        message = (
+            f"Cannot transition event from {current.value} to {new.value}. "
+            f"Allowed: {', '.join(self.details['allowed']) or '∅'}"
+        )
+        super().__init__(message)
+
 
 _DEFAULT_DB_PATH = Path(os.getenv("TASKS_DB_PATH", Path.cwd() / "data" / "tasks.db"))
 _db_url = os.getenv("TASKS_DB_URL")
@@ -35,30 +59,6 @@ if _db_url:
     _DB_PATH = Path(_db_url.replace("sqlite:///", "", 1))
 else:
     _DB_PATH = Path(os.getenv("TASKS_DB_PATH", _DEFAULT_DB_PATH))
-
-
-_ALLOWED_STATUS_TRANSITIONS = {
-    EventStatus.PENDING: {
-        EventStatus.IN_PROGRESS,
-        EventStatus.CANCELED,
-        EventStatus.FAILED,
-    },
-    EventStatus.IN_PROGRESS: {
-        EventStatus.WAITING_USER,
-        EventStatus.COMPLETED,
-        EventStatus.FAILED,
-        EventStatus.CANCELED,
-    },
-    EventStatus.WAITING_USER: {
-        EventStatus.IN_PROGRESS,
-        EventStatus.CANCELED,
-        EventStatus.COMPLETED,
-    },
-    EventStatus.FAILED: {
-        EventStatus.IN_PROGRESS,
-        EventStatus.CANCELED,
-    },
-}
 
 
 def _connect() -> sqlite3.Connection:
@@ -138,11 +138,10 @@ def _row_to_event(row: sqlite3.Row) -> Event:
 def _ensure_transition(current: EventStatus, new: EventStatus) -> None:
     if new == current:
         return
-    allowed = _ALLOWED_STATUS_TRANSITIONS.get(current, set())
-    if new not in allowed or (is_terminal(current) and new != current):
-        raise InvalidStatusTransition(
-            f"Cannot transition event from {current.value} to {new.value}"
-        )
+    try:
+        validation.ensure_transition(current, new)
+    except validation.TransitionValidationError as exc:  # pragma: no cover - defensive
+        raise InvalidStatusTransition(exc.from_status, exc.to_status, exc.allowed) from exc
 
 
 def create_event(event: Event) -> None:
@@ -261,6 +260,23 @@ def list_by_status(status: EventStatus, limit: int) -> list[Event]:
 
 def list_pending(limit: int) -> list[Event]:
     return list_by_status(EventStatus.PENDING, limit)
+
+
+class EventStore:
+    """Thin façade over the module-level store helpers.
+
+    The orchestrator interacts with an ``EventStore`` instance so unit tests can
+    supply lightweight fakes while production code continues to use the SQLite
+    helpers defined in this module.
+    """
+
+    @staticmethod
+    def list_pending(limit: int) -> list[Event]:
+        return list_pending(limit)
+
+    @staticmethod
+    def update(event_id: str, patch: EventUpdate) -> Event:
+        return update(event_id, patch)
 
 
 def upsert_label(event_id: str, label: str) -> None:
