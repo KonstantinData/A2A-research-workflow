@@ -1,14 +1,29 @@
-version: '3'
+version: '3.8'
 services:
-  app:
+  worker:
     build: .
     environment:
       - OUTPUT_DIR=/app/output
-      - TASKS_DB_URL=sqlite:///app/data/tasks.db
+      - EVENT_DB_URL=sqlite:////app/data/events.db
     env_file:
       - .env
     volumes:
       - ./output:/app/output
       - ./logs:/app/logs
       - ./data:/app/data
-    command: python -m core.orchestrator
+    command: python -m app.app.worker
+
+  api:
+    build: .
+    depends_on: [worker]
+    environment:
+      - OUTPUT_DIR=/app/output
+      - EVENT_DB_URL=sqlite:////app/data/events.db
+    env_file:
+      - .env
+    volumes:
+      - ./output:/app/output
+      - ./logs:/app/logs
+      - ./data:/app/data
+    command: uvicorn api.workflow_api:app --host 0.0.0.0 --port 8000
+    ports: ["8000:8000"]

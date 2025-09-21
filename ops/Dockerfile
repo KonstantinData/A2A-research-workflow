@@ -25,4 +25,5 @@ RUN chown -R appuser:appuser /app
 USER appuser
 
 VOLUME ["/app/output", "/app/logs", "/app/data"]
-ENTRYPOINT ["python", "-m", "core.orchestrator"]
+# No hardcoded entrypoint; commands defined per service in docker-compose
+CMD ["python", "-m", "app.app.worker"]
