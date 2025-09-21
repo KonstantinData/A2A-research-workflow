@@ -1,119 +1,145 @@
-"""Tests for orchestrator guard behaviour and normal run."""
+"""Unit tests for the async ``app.core.orchestrator``."""
+from __future__ import annotations
 
-from pathlib import Path
-import sys
+from dataclasses import replace
+from datetime import datetime, timezone
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-try:  # pragma: no cover - import guard for legacy module
-    from core import orchestrator
-except ImportError:  # pragma: no cover - legacy module removed
-    pytestmark = pytest.mark.skip(
-        reason="Legacy core.orchestrator module removed; use app.core.orchestrator"
-    )
-else:
-    from agents import field_completion_agent, reminder_service
-    from config.settings import SETTINGS
+from app.core.events import Event, EventUpdate
+from app.core.orchestrator import HandlerResult, Orchestrator
+from app.core.status import EventStatus
 
 
-def _dummy_trigger():
-    return {
-        "source": "calendar",
-        "creator": "alice@example.com",
-        "recipient": "alice@example.com",
-        "payload": {},
-    }
+class InMemoryStore:
+    """Simple in-memory event store for orchestrator tests."""
+
+    def __init__(self, events: list[Event] | None = None) -> None:
+        self._events: dict[str, Event] = {
+            event.event_id: event for event in events or []
+        }
+
+    def list_pending(self, limit: int) -> list[Event]:
+        pending = [
+            event
+            for event in self._events.values()
+            if event.status is EventStatus.PENDING
+        ]
+        pending.sort(key=lambda event: event.created_at)
+        return pending[:limit]
+
+    def get(self, event_id: str) -> Event | None:
+        return self._events.get(event_id)
+
+    def update(self, event_id: str, patch: EventUpdate) -> Event:
+        current = self._events[event_id]
+        updated = replace(
+            current,
+            status=patch.status if patch.status is not None else current.status,
+            payload=patch.payload if patch.payload is not None else current.payload,
+            labels=list(patch.labels)
+            if patch.labels is not None
+            else list(current.labels),
+            retries=patch.retries if patch.retries is not None else current.retries,
+            last_error=patch.last_error
+            if patch.last_error is not None
+            else current.last_error,
+            correlation_id=
+            patch.correlation_id
+            if patch.correlation_id is not None
+            else current.correlation_id,
+            updated_at=datetime.now(timezone.utc),
+        )
+        self._events[event_id] = updated
+        return updated
 
 
-def _write_stub_pdf(out_path: Path | str | None, content: str = "pdf") -> Path:
-    target = Path(out_path) if out_path else SETTINGS.exports_dir / "report.pdf"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(content)
-    return target
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
 
 
-def test_run_exits_when_no_triggers(monkeypatch, tmp_path):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(orchestrator, "gather_triggers", lambda *a, **k: [])
-    monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
-    res = orchestrator.run()
-    assert res == {"status": "idle"}
-
-    log_dir = SETTINGS.workflows_dir
-    files = sorted(log_dir.glob("wf-*.jsonl"))
-    assert files, "log file not written"
-    content = files[0].read_text()
-    assert '"status": "no_triggers"' in content
-    out_dir = SETTINGS.exports_dir
-    assert (out_dir / "report.pdf").exists()
-    assert (out_dir / "data.csv").exists()
-
-
-def test_run_processes_with_triggers(monkeypatch, tmp_path):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
-    monkeypatch.setenv("A2A_TEST_MODE", "1")
-
-    called = {"pdf": 0, "csv": 0}
-
-    def fake_pdf(rows, fields, meta=None, out_path=None):
-        called["pdf"] += 1
-        return _write_stub_pdf(out_path)
-
-    def fake_csv(data, path):
-        called["csv"] += 1
-        path.write_text("csv")
-
-    orchestrator.run(
-        triggers=[_dummy_trigger()],
-        researchers=[],
-        consolidate_fn=lambda x: {},
-        pdf_renderer=fake_pdf,
-        csv_exporter=fake_csv,
-        hubspot_upsert=lambda d: None,
-        hubspot_attach=lambda p, c: None,
-        hubspot_check_existing=lambda cid: None,
+def _event(event_id: str, *, status: EventStatus = EventStatus.PENDING) -> Event:
+    now = datetime.now(timezone.utc)
+    return Event(
+        event_id=event_id,
+        type="DemoEvent",
+        created_at=now,
+        updated_at=now,
+        status=status,
+        payload={"id": event_id},
     )
 
-    out_dir = SETTINGS.exports_dir
-    assert (out_dir / "report.pdf").exists()
-    assert (out_dir / "data.csv").exists()
-    assert called == {"pdf": 1, "csv": 1}
+
+@pytest.mark.anyio("asyncio")
+async def test_run_once_returns_zero_when_no_pending_events():
+    store = InMemoryStore()
+    orchestrator = Orchestrator(handlers={}, store=store)
+
+    processed = await orchestrator.run_once()
+
+    assert processed == 0
 
 
-def test_run_processes_event_missing_fields(monkeypatch, tmp_path):
-    monkeypatch.chdir(tmp_path)
-    events = [{"id": "1", "event_id": "e1", "summary": "Research meeting"}]
-    monkeypatch.setattr(orchestrator, "fetch_events", lambda: events)
+@pytest.mark.anyio("asyncio")
+async def test_handler_success_marks_event_completed(monkeypatch):
+    event = _event("evt-1")
+    store = InMemoryStore([event])
 
-    monkeypatch.setattr(orchestrator, "_calendar_fetch_logged", lambda wf_id: None)
+    status_updates: list[tuple[str, EventStatus]] = []
+    original_update = store.update
 
-    monkeypatch.setattr(orchestrator.email_sender, "send_email", lambda *a, **k: None)
-    monkeypatch.setattr(reminder_service, "check_and_notify", lambda t: None)
-    monkeypatch.setattr(field_completion_agent, "run", lambda t: {"company_name": "ACME", "domain": "acme.com"})
-    monkeypatch.setenv("A2A_TEST_MODE", "1")
+    def tracking_update(event_id: str, patch: EventUpdate) -> Event:
+        updated = original_update(event_id, patch)
+        status_updates.append((event_id, updated.status))
+        return updated
 
-    triggers = orchestrator.gather_triggers()
-    assert len(triggers) == 1
+    monkeypatch.setattr(store, "update", tracking_update)
 
-    orchestrator.run(
-        triggers=triggers,
-        researchers=[],
-        consolidate_fn=lambda r: {},
-        pdf_renderer=lambda rows, fields, meta=None, out_path=None: _write_stub_pdf(out_path),
-        csv_exporter=lambda data, path: path.write_text("csv"),
-        hubspot_upsert=lambda d: None,
-        hubspot_attach=lambda p, c: None,
-        hubspot_check_existing=lambda cid: None,
+    def handler(evt: Event) -> HandlerResult:
+        assert evt.event_id == "evt-1"
+        return HandlerResult(status=EventStatus.COMPLETED, payload={"processed": True})
+
+    orchestrator = Orchestrator(handlers={"DemoEvent": handler}, store=store)
+
+    processed = await orchestrator.run_once()
+
+    assert processed == 1
+    stored = store.get("evt-1")
+    assert stored is not None
+    assert stored.status is EventStatus.COMPLETED
+    assert stored.payload["processed"] is True
+    assert stored.last_error is None
+    # status transitions: claim -> IN_PROGRESS, finalize -> COMPLETED
+    assert any(status is EventStatus.IN_PROGRESS for _, status in status_updates)
+    assert status_updates[-1][1] is EventStatus.COMPLETED
+
+
+@pytest.mark.anyio("asyncio")
+async def test_handler_failure_respects_retry_budget(monkeypatch):
+    event = _event("evt-2")
+    store = InMemoryStore([event])
+
+    attempt_tracker = {"count": 0}
+
+    def failing_handler(evt: Event):
+        attempt_tracker["count"] += 1
+        raise RuntimeError("boom")
+
+    # avoid sleeping between retries
+    orchestrator = Orchestrator(
+        handlers={"DemoEvent": failing_handler},
+        store=store,
+        max_attempts=2,
+        backoff=lambda attempt: 0,
     )
 
-    logs = "".join(p.read_text() for p in SETTINGS.workflows_dir.glob("*.jsonl"))
-    assert '"status": "enriched_by_ai"' in logs
+    processed = await orchestrator.run_once()
 
-
-
-
-
-
+    assert processed == 1  # event fully processed despite failure
+    stored = store.get("evt-2")
+    assert stored is not None
+    assert stored.status is EventStatus.FAILED
+    assert stored.retries == 2
+    assert "boom" in (stored.last_error or "")
+    assert attempt_tracker["count"] == 2
