@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ReportReadyEvent",
+  "allOf": [
+    {
+      "$ref": "./EventBase.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "ReportReady"
+        },
+        "payload": {
+          "type": "object",
+          "description": "Payload containing report metadata."
+        }
+      }
+    }
+  ]
+}

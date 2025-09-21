@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EmailSendRequestedEvent",
+  "allOf": [
+    {
+      "$ref": "./EventBase.schema.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "EmailSendRequested"
+        },
+        "payload": {
+          "type": "object",
+          "description": "Payload containing email sending parameters."
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Event",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "Unique identifier for the event."
+    },
+    "type": {
+      "type": "string",
+      "description": "Event type discriminator."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp for when the event was created."
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp for the last update to the event."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "in_progress",
+        "waiting_user",
+        "completed",
+        "failed",
+        "canceled"
+      ],
+      "description": "Current lifecycle status for the event."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Arbitrary event payload data."
+    },
+    "labels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Optional labels that annotate the event."
+    },
+    "correlation_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Optional identifier used to correlate related events."
+    },
+    "retries": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of retry attempts performed for the event."
+    },
+    "last_error": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Last error message captured for the event, if any."
+    }
+  },
+  "required": [
+    "event_id",
+    "type",
+    "created_at",
+    "updated_at",
+    "status",
+    "payload",
+    "labels"
+  ]
+}
