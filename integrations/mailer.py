@@ -7,6 +7,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+from typing import Mapping
 from pathlib import Path
 import smtplib
 import ssl
@@ -28,7 +29,14 @@ def _validate_recipient(recipient: str, allowed_domain: str | None) -> str:
     return recipient
 
 
-def _create_message(mail_from: str, to: str, subject: str, body: str, message_id: str | None) -> MIMEMultipart:
+def _create_message(
+    mail_from: str,
+    to: str,
+    subject: str,
+    body: str,
+    message_id: str | None,
+    headers: Mapping[str, str] | None = None,
+) -> MIMEMultipart:
     """Create base email message."""
     msg = MIMEMultipart()
     msg.attach(MIMEText(body, "plain", "utf-8"))
@@ -37,6 +45,10 @@ def _create_message(mail_from: str, to: str, subject: str, body: str, message_id
     msg["Subject"] = subject
     if message_id:
         msg["Message-ID"] = message_id
+    for key, value in (headers or {}).items():
+        if not value:
+            continue
+        msg[key] = str(value)
     return msg
 
 
@@ -90,10 +102,11 @@ def send_email(
     attachments: list[str] | None = None,
     allowed_domain: str | None = None,
     message_id: str | None = None,
+    headers: Mapping[str, str] | None = None,
 ) -> None:
     """Send an e-mail via SMTP using the selected security mode."""
     recipient = _validate_recipient(to, allowed_domain)
-    msg = _create_message(mail_from, recipient, subject, body, message_id)
+    msg = _create_message(mail_from, recipient, subject, body, message_id, headers)
     _add_attachments(msg, attachments)
     _send_via_smtp(host, port, user, password, mail_from, recipient, msg, secure)
 

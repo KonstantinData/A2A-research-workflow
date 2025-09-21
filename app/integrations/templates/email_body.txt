@@ -1,0 +1,9 @@
+Hello,
+
+Please find the attached report (PDF) and data (CSV).
+If anything looks off, just reply to this email.
+
+Reference: {event_id}
+
+Thanks,
+A2A Bot
