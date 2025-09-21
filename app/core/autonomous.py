@@ -31,7 +31,7 @@ from config.settings import SETTINGS
 
 @dataclass
 class _AgentDescriptor:
-    """Placeholder describing a legacy autonomous agent."""
+    """Compatibility structure describing a legacy autonomous agent."""
 
     name: str
     capabilities: List[str]
