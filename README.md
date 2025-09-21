@@ -55,6 +55,33 @@ directories (see `tests/conftest.py`).  All modules reference it instead
 of hard-coded strings, ensuring consistent behaviour across containers
 and environments.
 
+### Event store configuration
+
+The event ingestion API writes workflow activity to a SQLAlchemy-backed
+database. Configure the target database via the following environment
+variables before starting the services:
+
+| Environment variable | Description |
+| --- | --- |
+| `EVENT_DB_URL` | SQLAlchemy URL for the event store (defaults to the legacy `TASKS_DB_URL`). |
+| `EVENT_DB_PATH` | Filesystem path used when building a SQLite URL (defaults to `TASKS_DB_PATH`). |
+
+When both variables are unset the application falls back to the bundled
+SQLite database defined in `ops/docker-compose.yml`.
+
+### Event API routes
+
+The FastAPI service exposes read-only endpoints for inspecting ingested
+events. All routes live under the `/events` prefix:
+
+| Route | Description |
+| --- | --- |
+| `GET /events/recent` | Return the newest events ordered by creation time. |
+| `GET /events/by-correlation/{id}` | Retrieve all events associated with a correlation identifier. |
+| `GET /events/{id}` | Fetch a single event by its unique identifier. |
+| `GET /events/{id}/status` | Return the latest status payload linked to the event. |
+| `GET /events/{id}/labels` | List any labels attached to the event. |
+
 ## Structured logging
 
 All integrations emit diagnostics through `core.utils.log_step(source, stage, details, severity=...)`.
