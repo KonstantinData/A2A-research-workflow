@@ -25,7 +25,7 @@ except ImportError:
             self.status_code = status_code
             self.detail = detail
 
-from core.autonomous_orchestrator import autonomous_orchestrator
+from app.core.autonomous import autonomous_orchestrator
 from core.event_bus import event_bus
 
 
@@ -93,19 +93,36 @@ async def get_workflow_status(correlation_id: str):
 @app.get("/agents")
 async def list_agents():
     """List all registered agents."""
-    agents = autonomous_orchestrator.agent_registry.list_agents()
-    
-    return {
-        "agents": [
-            {
-                "name": agent.metadata.name,
-                "capabilities": [cap.value for cap in agent.metadata.capabilities],
-                "enabled": agent.metadata.enabled,
-                "running_tasks": len(agent._running_tasks)
-            }
-            for agent in agents
-        ]
-    }
+    registry = getattr(autonomous_orchestrator, "agent_registry", None)
+    if not registry:
+        return {"agents": []}
+
+    agents = []
+    for agent in registry.list_agents():
+        # ``AutonomousWorkflow`` exposes simple descriptors to preserve the
+        # legacy API contract without depending on concrete agent classes.
+        if hasattr(agent, "metadata"):
+            metadata = agent.metadata
+            capabilities = [getattr(cap, "value", str(cap)) for cap in getattr(metadata, "capabilities", [])]
+            agents.append(
+                {
+                    "name": getattr(metadata, "name", "unknown"),
+                    "capabilities": capabilities,
+                    "enabled": getattr(metadata, "enabled", True),
+                    "running_tasks": len(getattr(agent, "_running_tasks", [])),
+                }
+            )
+        else:
+            agents.append(
+                {
+                    "name": getattr(agent, "name", "unknown"),
+                    "capabilities": list(getattr(agent, "capabilities", [])),
+                    "enabled": getattr(agent, "enabled", True),
+                    "running_tasks": getattr(agent, "running_tasks", 0),
+                }
+            )
+
+    return {"agents": agents}
 
 
 @app.get("/events")

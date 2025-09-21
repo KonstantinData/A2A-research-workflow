@@ -8,7 +8,7 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from core.autonomous_orchestrator import autonomous_orchestrator
+from app.core.autonomous import autonomous_orchestrator
 from core.services import google_calendar_service
 from core.utils import log_step
 

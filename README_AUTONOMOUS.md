@@ -34,7 +34,7 @@ python api/workflow_api.py
 
 ### Manueller Trigger
 ```python
-from core.autonomous_orchestrator import autonomous_orchestrator
+from app.core.autonomous import autonomous_orchestrator
 
 # Workflow starten
 correlation_id = autonomous_orchestrator.process_manual_trigger({

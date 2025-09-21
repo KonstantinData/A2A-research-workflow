@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import pytest
 
 from config.settings import SETTINGS
-from core.autonomous_orchestrator import autonomous_orchestrator
+from app.core.autonomous import autonomous_orchestrator
 from core.event_bus import EventType
 
 # Reflect the test configuration in the settings singleton

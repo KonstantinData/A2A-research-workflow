@@ -8,7 +8,7 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from core.autonomous_orchestrator import autonomous_orchestrator
+from app.core.autonomous import autonomous_orchestrator
 from core.utils import log_step
 
 
@@ -45,7 +45,10 @@ def test_autonomous_workflow():
         print(f"✓ Autonomous workflow test completed successfully")
         print(f"  Correlation ID: {correlation_id}")
         print(f"  Status: {status}")
-        
+
+        assert status["status"] == "pending"
+        assert status["event_count"] == 1
+
         return True
         
     except Exception as e:
