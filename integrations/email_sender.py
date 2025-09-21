@@ -20,7 +20,7 @@ import re
 from config.env import ensure_mail_from
 from .mailer import send_email as _send_email  # tatsächlicher SMTP/Provider-Client
 from core.utils import log_step
-from integrations import email_reader
+from app.integrations import email_reader
 from config.settings import SETTINGS
 from app.core.policy.retry import MAX_ATTEMPTS, backoff_seconds
 
