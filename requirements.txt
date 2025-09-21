@@ -15,7 +15,8 @@ requests
 # YAML parsing and testing
 pyyaml
 pytest
-redis
+jsonschema>=4.23
+# redis (unused) removed
 
 jinja2>=3.1
 
