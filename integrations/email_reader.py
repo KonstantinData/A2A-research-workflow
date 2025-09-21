@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Tuple
 from core import parser
 from core.utils import log_step
 from config.settings import SETTINGS
+from app.core.policy.retry import MAX_ATTEMPTS, backoff_seconds
 
 
 def _state_path() -> Path:
@@ -228,9 +229,43 @@ def fetch_replies() -> List[Dict[str, Any]]:
     state_changed = False
 
     results: List[Dict[str, Any]] = []
-    imap = imaplib.IMAP4_SSL(host, port)
-    imap.login(user, pwd)
-    imap.select(folder)
+    imap = None
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            imap = imaplib.IMAP4_SSL(host, port)
+            imap.login(user, pwd)
+            imap.select(folder)
+            break
+        except (imaplib.IMAP4.error, OSError) as exc:
+            if imap is not None:
+                try:
+                    imap.logout()
+                except Exception:
+                    pass
+                imap = None
+            if attempt >= MAX_ATTEMPTS:
+                log_step(
+                    "email_reader",
+                    "imap_connect_failed",
+                    {"host": host, "folder": folder, "error": str(exc)},
+                    severity="error",
+                )
+                return []
+            delay = backoff_seconds(attempt)
+            log_step(
+                "email_reader",
+                "imap_retry",
+                {
+                    "host": host,
+                    "folder": folder,
+                    "attempt": attempt,
+                    "backoff_seconds": round(delay, 2),
+                },
+                severity="warning",
+            )
+            time.sleep(delay)
+    if imap is None:
+        return []
     typ, data = imap.search(None, "UNSEEN")
     ids = data[0].split() if typ == "OK" else []
     for msg_id in ids:

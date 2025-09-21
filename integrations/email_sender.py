@@ -22,6 +22,7 @@ from .mailer import send_email as _send_email  # tatsächlicher SMTP/Provider-Cl
 from core.utils import log_step
 from integrations import email_reader
 from config.settings import SETTINGS
+from app.core.policy.retry import MAX_ATTEMPTS, backoff_seconds
 
 
 def _validate_recipient(to: str) -> str | None:
@@ -265,7 +266,6 @@ def send_email(
     if body_extra:
         body = f"{body}\n\n{body_extra.strip()}"
 
-    delays = [5, 15, 45]
     last_exc: Exception | None = None
     message_id = _generate_message_id(event_id or task_id)
     deliver_kwargs = {}
@@ -274,7 +274,7 @@ def send_email(
     if headers and _supports_keyword_argument(_deliver, "headers"):
         deliver_kwargs["headers"] = headers
 
-    for attempt in range(3):
+    for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
             _deliver(
                 validated_to,
@@ -292,9 +292,7 @@ def send_email(
             return
         except Exception as e:  # pragma: no cover - network errors
             last_exc = e
-            if attempt < 2:
-                time.sleep(delays[attempt])
-            else:
+            if attempt >= MAX_ATTEMPTS:
                 log_step(
                     "orchestrator",
                     "report_not_sent",
@@ -303,9 +301,24 @@ def send_email(
                         "subject": subject,
                         "error": str(e),
                         "task_id": task_id,
+                        "attempt": attempt,
                     },
                     severity="critical",
                 )
+                break
+            delay = backoff_seconds(attempt)
+            log_step(
+                "mailer",
+                "send_retry",
+                {
+                    "to": validated_to,
+                    "subject": subject,
+                    "attempt": attempt,
+                    "backoff_seconds": round(delay, 2),
+                },
+                severity="warning",
+            )
+            time.sleep(delay)
     if last_exc:
         raise last_exc
     return message_id

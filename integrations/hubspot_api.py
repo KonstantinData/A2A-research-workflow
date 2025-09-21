@@ -12,6 +12,7 @@ import requests
 
 from core.utils import log_step
 from core.circuit_breaker import with_circuit_breaker
+from app.core.policy.retry import MAX_ATTEMPTS, backoff_seconds
 
 DEFAULT_TIMEOUT = 30
 HS_BASE = "https://api.hubapi.com"
@@ -21,13 +22,13 @@ HS_BASE = "https://api.hubapi.com"
 def _request_with_retry(method: str, url: str, **kwargs: Any) -> requests.Response:
     """Perform a HubSpot API request with retry/backoff for transient failures."""
 
-    max_retries = 3
     attempt = 0
-    while True:
+    while attempt < MAX_ATTEMPTS:
         try:
             response = requests.request(method, url, **kwargs)
         except requests.RequestException as exc:
-            if attempt >= max_retries:
+            attempt += 1
+            if attempt >= MAX_ATTEMPTS:
                 log_step(
                     "hubspot",
                     "request_exception",
@@ -39,26 +40,26 @@ def _request_with_retry(method: str, url: str, **kwargs: Any) -> requests.Respon
                     severity="error",
                 )
                 raise
-            sleep_for = 0.5 * (2**attempt) + random.uniform(0, 0.1)
+            delay = backoff_seconds(attempt)
             log_step(
                 "hubspot",
                 "request_retry",
                 {
                     "method": method,
                     "url": url,
-                    "attempt": attempt + 1,
+                    "attempt": attempt,
                     "error": str(exc),
-                    "backoff_seconds": round(sleep_for, 2),
+                    "backoff_seconds": round(delay, 2),
                 },
                 severity="warning",
             )
-            time.sleep(sleep_for)
-            attempt += 1
+            time.sleep(delay)
             continue
         else:
+            attempt += 1
             if response.status_code != 429 and not 500 <= response.status_code < 600:
                 return response
-            if attempt >= max_retries:
+            if attempt >= MAX_ATTEMPTS:
                 log_step(
                     "hubspot",
                     "request_failed",
@@ -70,21 +71,20 @@ def _request_with_retry(method: str, url: str, **kwargs: Any) -> requests.Respon
                     severity="error",
                 )
                 return response
-            sleep_for = 0.5 * (2**attempt) + random.uniform(0, 0.1)
+            delay = backoff_seconds(attempt)
             log_step(
                 "hubspot",
                 "request_retry",
                 {
                     "method": method,
                     "url": url,
-                    "attempt": attempt + 1,
+                    "attempt": attempt,
                     "status": response.status_code,
-                    "backoff_seconds": round(sleep_for, 2),
+                    "backoff_seconds": round(delay, 2),
                 },
                 severity="warning",
             )
-            time.sleep(sleep_for)
-            attempt += 1
+            time.sleep(delay)
 
 # The static company data is used as a lightweight substitute for a real
 # CRM or HubSpot look‑up.  In the live system these helpers would

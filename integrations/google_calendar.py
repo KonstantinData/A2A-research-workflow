@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os, re
+import time
 import datetime as dt
 from typing import Any, Dict, List
 
@@ -13,6 +14,7 @@ from .google_oauth import (
     refresh_access_token,
     OAuthError,
 )
+from app.core.policy.retry import MAX_ATTEMPTS, backoff_seconds
 
 try:
     from google.oauth2.credentials import Credentials
@@ -145,41 +147,75 @@ def fetch_events() -> List[Normalized]:
         # Use test-facing CAL_IDS (can be monkeypatched)
         cal_ids: List[str] = CAL_IDS or ["primary"]
 
-        try:
-            service.calendarList().get(calendarId=cal_ids[0]).execute()
-        except Exception as e:
-            code, hint = classify_oauth_error(e)
-            cid_tail = (os.getenv("GOOGLE_CLIENT_ID") or "")[-8:]
-            log_step(
-                "calendar",
-                "fetch_error",
-                {
-                    "error": str(e),
-                    "code": code,
-                    "hint": hint,
-                    "client_id_tail": cid_tail,
-                },
-                severity="error",
-            )
-            return []
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            try:
+                service.calendarList().get(calendarId=cal_ids[0]).execute()
+                break
+            except Exception as e:
+                if attempt >= MAX_ATTEMPTS:
+                    code, hint = classify_oauth_error(e)
+                    cid_tail = (os.getenv("GOOGLE_CLIENT_ID") or "")[-8:]
+                    log_step(
+                        "calendar",
+                        "fetch_error",
+                        {
+                            "error": str(e),
+                            "code": code,
+                            "hint": hint,
+                            "client_id_tail": cid_tail,
+                        },
+                        severity="error",
+                    )
+                    return []
+                delay = backoff_seconds(attempt)
+                log_step(
+                    "calendar",
+                    "calendar_list_retry",
+                    {
+                        "calendar_id": cal_ids[0],
+                        "attempt": attempt,
+                        "backoff_seconds": round(delay, 2),
+                    },
+                    severity="warning",
+                )
+                time.sleep(delay)
 
         tmin, tmax = _time_window()
         for cal_id in cal_ids:
             token = None
             while True:
-                resp = (
-                    service.events()
-                    .list(
-                        calendarId=cal_id,
-                        timeMin=tmin,
-                        timeMax=tmax,
-                        singleEvents=True,
-                        orderBy="startTime",
-                        maxResults=2500,
-                        pageToken=token,
-                    )
-                    .execute()
-                )
+                for attempt in range(1, MAX_ATTEMPTS + 1):
+                    try:
+                        resp = (
+                            service.events()
+                            .list(
+                                calendarId=cal_id,
+                                timeMin=tmin,
+                                timeMax=tmax,
+                                singleEvents=True,
+                                orderBy="startTime",
+                                maxResults=2500,
+                                pageToken=token,
+                            )
+                            .execute()
+                        )
+                        break
+                    except Exception as exc:
+                        if attempt >= MAX_ATTEMPTS:
+                            raise
+                        delay = backoff_seconds(attempt)
+                        log_step(
+                            "calendar",
+                            "events_retry",
+                            {
+                                "calendar_id": cal_id,
+                                "attempt": attempt,
+                                "backoff_seconds": round(delay, 2),
+                                "error": str(exc),
+                            },
+                            severity="warning",
+                        )
+                        time.sleep(delay)
                 for item in resp.get("items", []):
                     norm = _normalize(item, cal_id)
                     log_step(

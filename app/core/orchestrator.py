@@ -24,6 +24,7 @@ from .event_store import (
 )
 from .events import Event, EventUpdate
 from .status import EventStatus
+from .policy.retry import MAX_ATTEMPTS, backoff as default_backoff
 
 
 class _SettingsProxy:
@@ -108,17 +109,7 @@ class EventStoreProtocol(Protocol):
 
 
 Publisher = Callable[[str, Dict[str, Any]], Awaitable[None] | None]
-BackoffPolicy = Callable[[int], float]
-
-
-def _default_backoff(attempt: int) -> float:
-    """Return the backoff interval for ``attempt`` (1-indexed)."""
-
-    base = 1.0
-    cap = 60.0
-    if attempt <= 1:
-        return base
-    return min(cap, base * (2 ** (attempt - 1)))
+BackoffPolicy = Callable[[int], Awaitable[float] | float]
 
 
 class Orchestrator:
@@ -131,7 +122,7 @@ class Orchestrator:
         store: Optional[EventStoreProtocol] = None,
         publisher: Optional[Publisher] = None,
         batch_size: int = 10,
-        max_attempts: int = 3,
+        max_attempts: int = MAX_ATTEMPTS,
         idle_sleep: float = 1.0,
         backoff: Optional[BackoffPolicy] = None,
     ) -> None:
@@ -143,8 +134,16 @@ class Orchestrator:
         self._batch_size = max(1, int(batch_size))
         self._max_attempts = max(1, int(max_attempts))
         self._idle_sleep = max(0.0, float(idle_sleep))
-        self._backoff = backoff or _default_backoff
+        self._backoff = backoff or default_backoff
         self._running = False
+
+    async def _compute_backoff(self, attempt: int) -> float:
+        """Resolve the configured backoff policy for ``attempt``."""
+
+        delay = self._backoff(attempt)
+        if inspect.isawaitable(delay):
+            delay = await delay
+        return float(delay)
 
     @property
     def running(self) -> bool:
@@ -328,7 +327,7 @@ class Orchestrator:
                     if attempt >= self._max_attempts:
                         self._fail_event(event, reason="max_retries", message=str(exc))
                         return
-                    delay = max(0.0, float(self._backoff(attempt)))
+                    delay = max(0.0, await self._compute_backoff(attempt))
                     if delay:
                         await asyncio.sleep(delay)
                     continue
