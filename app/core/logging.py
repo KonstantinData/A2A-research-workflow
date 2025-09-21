@@ -1,26 +1,21 @@
-"""Application specific logging helpers with event-aware context."""
-
+"""Structured logging helpers for the autonomous workflow."""
 from __future__ import annotations
 
 import inspect
-from contextlib import contextmanager
+import json
+import sys
 from contextvars import ContextVar, Token
+from datetime import datetime, timezone
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, Protocol
+from typing import Any, Callable, Dict, Optional
 
-from core.utils import log_step as _base_log_step
+from config.settings import SETTINGS
 
 from .status import EventStatus
-
-
-class _SupportsEvent(Protocol):
-    event_id: str
-    status: EventStatus | str
-    correlation_id: Optional[str]
-
-
 _EventContext = Dict[str, str]
-_event_context: ContextVar[Optional[_EventContext]] = ContextVar("event_context", default=None)
+_event_context: ContextVar[Optional[_EventContext]] = ContextVar(
+    "event_context", default=None
+)
 
 
 def _normalize_event_id(value: Optional[str]) -> Optional[str]:
@@ -46,12 +41,45 @@ def _normalize_correlation(value: Optional[str]) -> Optional[str]:
     return text or None
 
 
-def _build_context(
+def _current_context() -> _EventContext:
+    return dict(_event_context.get() or {})
+
+
+def _emit(level: str, base: Dict[str, Any]) -> None:
+    level_normalized = level.lower()
+    context = _current_context()
+
+    record: Dict[str, Any] = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "level": level_normalized,
+        "msg": str(base.pop("msg", base.get("op", ""))),
+        "component": base.pop("component", "app"),
+        "subsystem": base.pop("subsystem", None),
+        "event_id": base.pop("event_id", None) or context.get("event_id"),
+        "correlation_id": base.pop("correlation_id", None)
+        or context.get("correlation_id"),
+        "causation_id": base.pop("causation_id", None),
+        "aggregate_id": base.pop("aggregate_id", None),
+        "op": base.pop("op", None),
+        "span_id": base.pop("span_id", None),
+        "trace_id": base.pop("trace_id", None),
+        "env": SETTINGS.env,
+        "version": SETTINGS.service_version,
+    }
+    status = base.pop("status", None) or context.get("status")
+    if status:
+        record["status"] = status
+
+    record.update(base)
+    sys.stdout.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def push_event_context(
     event_id: Optional[str],
     *,
     status: Optional[EventStatus | str] = None,
     correlation_id: Optional[str] = None,
-) -> _EventContext:
+) -> Optional[Token[Optional[_EventContext]]]:
     context: _EventContext = {}
     normalized_id = _normalize_event_id(event_id)
     if normalized_id:
@@ -62,28 +90,14 @@ def _build_context(
     normalized_corr = _normalize_correlation(correlation_id)
     if normalized_corr:
         context["correlation_id"] = normalized_corr
-    return context
-
-
-def push_event_context(
-    event_id: Optional[str],
-    *,
-    status: Optional[EventStatus | str] = None,
-    correlation_id: Optional[str] = None,
-) -> Optional[Token[Optional[_EventContext]]]:
-    """Push a new event logging context onto the stack."""
-
-    context_update = _build_context(event_id, status=status, correlation_id=correlation_id)
-    if not context_update:
+    if not context:
         return None
-    current = _event_context.get() or {}
-    combined = {**current, **context_update}
+    current = _current_context()
+    combined = {**current, **context}
     return _event_context.set(combined)
 
 
 def pop_event_context(token: Optional[Token[Optional[_EventContext]]]) -> None:
-    """Restore the previous logging context."""
-
     if token is None:
         return
     _event_context.reset(token)
@@ -94,8 +108,6 @@ def update_event_context(
     status: Optional[EventStatus | str] = None,
     correlation_id: Optional[str] = None,
 ) -> None:
-    """Update the active logging context in-place."""
-
     context = _event_context.get()
     if not context:
         return
@@ -107,23 +119,28 @@ def update_event_context(
         context["correlation_id"] = normalized_corr
 
 
-def log_step(source: str, stage: str, data: Dict[str, Any], *, severity: str = "info") -> None:
-    """Proxy ``core.utils.log_step`` adding the active event context to payloads."""
-
+def log_step(
+    source: str,
+    stage: str,
+    data: Dict[str, Any],
+    *,
+    severity: str = "info",
+) -> None:
     payload = dict(data)
-    context = _event_context.get() or {}
-    if "stage" not in payload:
-        payload["stage"] = stage
-    context_status = context.get("status")
-    if context_status and "status" not in payload:
-        payload["status"] = context_status
-    context_event_id = context.get("event_id")
-    if context_event_id and "event_id" not in payload:
-        payload["event_id"] = context_event_id
-    context_correlation = context.get("correlation_id")
-    if context_correlation and "correlation_id" not in payload:
-        payload["correlation_id"] = context_correlation
-    _base_log_step(source, stage, payload, severity=severity)
+    payload.setdefault("component", source)
+    payload.setdefault("op", stage)
+    payload.setdefault("msg", payload.get("message", stage))
+    payload.pop("message", None)
+
+    context = _current_context()
+    if "event_id" not in payload and "event_id" in context:
+        payload["event_id"] = context["event_id"]
+    if "correlation_id" not in payload and "correlation_id" in context:
+        payload["correlation_id"] = context["correlation_id"]
+    if "status" not in payload and "status" in context:
+        payload["status"] = context["status"]
+
+    _emit(severity, payload)
 
 
 def _resolve_from_args(
@@ -151,8 +168,6 @@ def with_event_context(
     status: Optional[EventStatus | str | Callable[..., EventStatus | str]] = None,
     correlation_id: Optional[str | Callable[..., Optional[str]]] = None,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Decorator factory that enriches log records emitted within the wrapped call."""
-
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         if inspect.iscoroutinefunction(func):
 
@@ -205,31 +220,10 @@ def with_event_context(
     return decorator
 
 
-@contextmanager
-def event_logging_context(
-    event: _SupportsEvent | None,
-) -> Any:
-    """Context manager variant for cases where decorators are impractical."""
-
-    if event is None:
-        token = None
-    else:
-        token = push_event_context(
-            event.event_id,
-            status=event.status,
-            correlation_id=event.correlation_id,
-        )
-    try:
-        yield
-    finally:
-        pop_event_context(token)
-
-
 __all__ = [
-    "event_logging_context",
     "log_step",
-    "pop_event_context",
     "push_event_context",
+    "pop_event_context",
     "update_event_context",
     "with_event_context",
 ]

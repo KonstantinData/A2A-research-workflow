@@ -18,6 +18,8 @@ except ImportError as e:
     import logging
     logging.getLogger(__name__).warning("Failed to load dotenv: %s", e)
 
+from config.settings import Settings
+
 
 def connect_imap(host: str, port: int, secure: str) -> imaplib.IMAP4:
     mode = (secure or "").lower()
@@ -113,45 +115,50 @@ def _imap_since_clause(days: int) -> List[bytes]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="IMAP inbound email health-check")
+    settings = Settings()
     parser.add_argument(
         "--folder",
-        default=os.getenv("IMAP_FOLDER", "INBOX"),
+        default=settings.imap_folder or "INBOX",
         help="IMAP folder to open",
     )
     parser.add_argument(
         "--search",
-        default=os.getenv("IMAP_SEARCH", "UNSEEN"),
+        default=settings.imap_search or "UNSEEN",
         help="IMAP search query (e.g., UNSEEN or ALL)",
     )
     parser.add_argument(
         "--limit",
         type=int,
-        default=int(os.getenv("IMAP_TEST_LIMIT", "5")),
+        default=settings.imap_test_limit or 5,
         help="Max messages to sample from the end",
     )
     parser.add_argument(
         "--since-days",
         type=int,
-        default=int(os.getenv("IMAP_SINCE_DAYS", "0")),
+        default=settings.imap_since_days,
         help="Add SINCE <date> to the search (0 disables)",
     )
     parser.add_argument(
         "--use-uid",
-        action=(
-            "store_true"
-            if os.getenv("IMAP_USE_UID", "1") not in ("0", "false", "False")
-            else "store_false"
-        ),
-        help="Use UID SEARCH/FETCH (default on; set IMAP_USE_UID=0 to disable)",
+        dest="use_uid",
+        action="store_true",
+        default=settings.imap_use_uid,
+        help="Use UID SEARCH/FETCH",
+    )
+    parser.add_argument(
+        "--no-use-uid",
+        dest="use_uid",
+        action="store_false",
+        help="Disable UID SEARCH/FETCH",
     )
     parser.add_argument("--debug", action="store_true", help="Enable IMAP debug output")
     args = parser.parse_args()
 
-    host = os.getenv("IMAP_HOST", "")
-    port = int(os.getenv("IMAP_PORT", "0") or "0")
-    user = os.getenv("IMAP_USER", "")
-    pwd = os.getenv("IMAP_PASS", "")
-    secure = os.getenv("IMAP_SECURE", "ssl" if (port or 0) in (0, 993) else "starttls")
+    host = settings.imap_host or ""
+    port = int(settings.imap_port or 0)
+    user = settings.imap_user or ""
+    pwd = settings.imap_pass or ""
+    secure = settings.imap_secure or ("ssl" if (port or 0) in (0, 993) else "starttls")
 
     if not host or not user or not pwd:
         print(

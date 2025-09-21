@@ -2,7 +2,6 @@
 """Minimal HubSpot CRM integration (best-effort)."""
 from __future__ import annotations
 
-import os
 import random
 import time
 from pathlib import Path
@@ -13,6 +12,7 @@ import requests
 from core.utils import log_step
 from core.circuit_breaker import with_circuit_breaker
 from app.core.policy.retry import MAX_ATTEMPTS, backoff_seconds
+from config.settings import SETTINGS
 
 DEFAULT_TIMEOUT = 30
 HS_BASE = "https://api.hubapi.com"
@@ -106,14 +106,14 @@ except Exception:
 
 
 def _token() -> Optional[str]:
-    return os.getenv("HUBSPOT_ACCESS_TOKEN")
+    return SETTINGS.hubspot_access_token
 
 
 def upsert_company(data: Dict[str, Any]) -> Optional[str]:
     """Create or update a company in HubSpot."""
     token = _token()
     if not token:
-        live_mode = os.getenv("LIVE_MODE", "1") == "1"
+        live_mode = SETTINGS.live_mode == 1
         log_step(
             "hubspot",
             "missing_access_token",
@@ -227,7 +227,7 @@ def check_existing_report(company_id: str) -> Optional[Dict[str, Any]]:
     """Return latest report (id, name, createdAt) for ``company_id`` if present."""
     token = _token()
     if not token:
-        live_mode = os.getenv("LIVE_MODE", "1") == "1"
+        live_mode = SETTINGS.live_mode == 1
         log_step(
             "hubspot",
             "missing_access_token",
@@ -279,7 +279,7 @@ def check_existing_report(company_id: str) -> Optional[Dict[str, Any]]:
 def attach_pdf(pdf_path: Path, company_id: str) -> Optional[Dict[str, Any]]:
     token = _token()
     if not token:
-        live_mode = os.getenv("LIVE_MODE", "1") == "1"
+        live_mode = SETTINGS.live_mode == 1
         log_step(
             "hubspot",
             "missing_access_token",
@@ -466,7 +466,7 @@ def list_company_reports(company_id: str) -> List[Dict[str, Any]]:
     
     token = _token()
     if not token:
-        if os.getenv("LIVE_MODE", "1") == "1":
+        if SETTINGS.live_mode == 1:
             raise RuntimeError("HUBSPOT_ACCESS_TOKEN missing in LIVE mode")
         return []
 
@@ -513,7 +513,7 @@ def find_similar_companies(
     """
     token = _token()
     if not token:
-        if os.getenv("LIVE_MODE", "1") == "1":
+        if SETTINGS.live_mode == 1:
             raise RuntimeError("HUBSPOT_ACCESS_TOKEN missing in LIVE mode")
         return []
 

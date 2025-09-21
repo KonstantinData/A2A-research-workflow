@@ -1,7 +1,6 @@
 """Google OAuth: requires GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REFRESH_TOKEN."""
 from __future__ import annotations
 
-import os
 from typing import Optional, List, Tuple
 
 import time
@@ -27,10 +26,10 @@ class OAuthError(Exception):
 def build_user_credentials(scopes: List[str]) -> Optional["Credentials"]:
     if Credentials is None:
         return None
-    client_id = os.getenv("GOOGLE_CLIENT_ID")
-    client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
-    refresh_token = os.getenv("GOOGLE_REFRESH_TOKEN")
-    token_uri = os.getenv("GOOGLE_TOKEN_URI", DEFAULT_TOKEN_URI)
+    client_id = SETTINGS.google_client_id
+    client_secret = SETTINGS.google_client_secret
+    refresh_token = SETTINGS.google_refresh_token
+    token_uri = SETTINGS.google_token_uri or DEFAULT_TOKEN_URI
     if not (client_id and client_secret and refresh_token):
         log_step("google_oauth", "credentials_missing", 
                 {"client_id_set": bool(client_id), "client_secret_set": bool(client_secret), 

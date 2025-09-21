@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import importlib
 import json
-import os
 import shutil
 
 from integrations import email_sender
@@ -62,7 +61,7 @@ def handle_failure(event_id: str | None, error: Exception) -> None:
             return
 
         try:
-            admin = os.getenv("ADMIN_EMAIL", "admin@example.com")
+            admin = SETTINGS.admin_email or "admin@example.com"
             email_sender.send_email(
                 to=admin,
                 subject="Workflow requires attention",

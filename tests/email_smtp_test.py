@@ -1,4 +1,3 @@
-import os
 import sys
 import ssl
 import json
@@ -16,6 +15,8 @@ try:
     load_dotenv(find_dotenv(usecwd=True))
 except Exception:
     pass
+
+from config.settings import Settings
 
 
 def build_message(sender: str, recipient: str) -> EmailMessage:
@@ -89,13 +90,14 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    host = os.getenv("SMTP_HOST", "")
-    port = int(os.getenv("SMTP_PORT", "0") or "0")
-    secure = os.getenv("SMTP_SECURE", "starttls")
-    user = os.getenv("SMTP_USER")
-    pwd = os.getenv("SMTP_PASS")
-    sender = os.getenv("MAIL_FROM") or (user or "")
-    recipient = args.to or os.getenv("TEST_EMAIL_TO") or DEFAULT_TEST_RECIPIENT
+    settings = Settings()
+    host = settings.smtp_host or ""
+    port = int(settings.smtp_port or 0)
+    secure = settings.smtp_secure or "starttls"
+    user = settings.smtp_user or ""
+    pwd = settings.smtp_pass or ""
+    sender = settings.mail_from or user or ""
+    recipient = args.to or settings.test_email_to or DEFAULT_TEST_RECIPIENT
 
     # Derive port if not provided
     if port <= 0:

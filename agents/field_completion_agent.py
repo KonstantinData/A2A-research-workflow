@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Protocol, Tuple
 
 from core.utils import log_step
+from config.settings import SETTINGS
 
 try:
     import openai
@@ -38,8 +38,8 @@ class OpenAIExtractor:
     
     def __init__(self):
         # Cache API key and model to avoid repeated environment lookups
-        self.api_key = os.getenv("OPENAI_API_KEY")
-        self.model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+        self.api_key = SETTINGS.openai_api_key
+        self.model = SETTINGS.openai_model or "gpt-3.5-turbo"
         self.client = None
         if openai and self.api_key:
             self.client = openai.OpenAI(api_key=self.api_key)
@@ -227,7 +227,7 @@ class RegexExtractor:
         
         # Get own domain from environment to exclude it
         own_domain = None
-        mail_from = os.getenv("MAIL_FROM") or os.getenv("SMTP_USER") or ""
+        mail_from = SETTINGS.mail_from or SETTINGS.smtp_user or ""
         if "@" in mail_from:
             own_domain = mail_from.split("@")[1].lower()
         

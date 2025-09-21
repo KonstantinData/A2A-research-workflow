@@ -1,4 +1,3 @@
-import os
 import sys
 import re
 import json
@@ -23,6 +22,7 @@ except Exception:
 from integrations.google_oauth import build_user_credentials  # type: ignore
 from googleapiclient.discovery import build  # type: ignore
 from core.trigger_words import load_trigger_words
+from config.settings import SETTINGS
 
 CAL_SCOPE = "https://www.googleapis.com/auth/calendar.readonly"
 
@@ -103,14 +103,14 @@ def main() -> int:
     parser.add_argument(
         "--lookback",
         type=int,
-        default=int(os.getenv("CAL_LOOKBACK_DAYS", "2")),
-        help="Lookback days (default from CAL_LOOKBACK_DAYS or 2).",
+        default=SETTINGS.cal_lookback_days or 2,
+        help="Lookback days (default from settings).",
     )
     parser.add_argument(
         "--lookahead",
         type=int,
-        default=int(os.getenv("CAL_LOOKAHEAD_DAYS", "30")),
-        help="Lookahead days (default from CAL_LOOKAHEAD_DAYS or 30).",
+        default=SETTINGS.cal_lookahead_days or 30,
+        help="Lookahead days (default from settings).",
     )
     parser.add_argument(
         "--max-hits", type=int, default=50, help="Max hits to include in output."
@@ -122,11 +122,11 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    cal_ids = _parse_calendar_ids(args.cal_ids or os.getenv("GOOGLE_CALENDAR_IDS"))
-    words = _split_words(args.words or os.getenv("TRIGGER_WORDS"))
+    cal_ids = _parse_calendar_ids(args.cal_ids or ",".join(SETTINGS.google_calendar_ids))
+    words = _split_words(args.words or SETTINGS.trigger_words_override)
     if not words:
         words = load_trigger_words()
-    raw_regex = args.regex or os.getenv("TRIGGER_REGEX")
+    raw_regex = args.regex or SETTINGS.trigger_regex
     pattern = _build_pattern(words, raw_regex)
 
     creds = build_user_credentials([CAL_SCOPE])

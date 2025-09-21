@@ -7,7 +7,6 @@ an employee. SMTP delivery is delegated to integrations.email_sender.
 from __future__ import annotations
 
 from typing import Iterable, Optional
-import os
 
 from config.env import ensure_mail_from
 from core.utils import log_step
@@ -17,8 +16,7 @@ from . import email_sender
 
 def _mail_from() -> str:
     """Require MAIL_FROM via environment (set by Actions secrets/variables)."""
-    ensure_mail_from()
-    mail_from = os.environ.get("MAIL_FROM")
+    mail_from = ensure_mail_from()
     if not mail_from:
         raise RuntimeError("MAIL_FROM not configured")
     return mail_from

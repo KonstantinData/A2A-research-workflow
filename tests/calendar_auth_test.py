@@ -1,8 +1,9 @@
 # tests/calendar_auth_test.py
 
-import os
 import pytest
 from dotenv import load_dotenv
+
+from config.settings import Settings
 
 # Only import Google libs if we actually run live checks
 try:
@@ -22,14 +23,16 @@ SCOPES = [
 
 ]
 
-REQUIRED = [
-    "GOOGLE_CLIENT_ID",
-    "GOOGLE_CLIENT_SECRET",
-    "GOOGLE_REFRESH_TOKEN",
-    "GOOGLE_TOKEN_URI",
-]
+SETTINGS_OBJ = Settings()
 
-missing = [k for k in REQUIRED if not os.getenv(k)]
+REQUIRED = {
+    "GOOGLE_CLIENT_ID": SETTINGS_OBJ.google_client_id,
+    "GOOGLE_CLIENT_SECRET": SETTINGS_OBJ.google_client_secret,
+    "GOOGLE_REFRESH_TOKEN": SETTINGS_OBJ.google_refresh_token,
+    "GOOGLE_TOKEN_URI": SETTINGS_OBJ.google_token_uri,
+}
+
+missing = [name for name, value in REQUIRED.items() if not (value or "").strip()]
 if missing:
     pytest.skip(
         f"Skipping calendar auth test due to missing env: {', '.join(missing)}",
@@ -38,10 +41,9 @@ if missing:
 
 
 def test_required_env_present_and_sane():
-    for key in REQUIRED:
-        val = os.getenv(key)
-        assert isinstance(val, str) and val.strip(), f"{key} is missing or empty"
-    uri = os.getenv("GOOGLE_TOKEN_URI", "")
+    for key, value in REQUIRED.items():
+        assert isinstance(value, str) and value.strip(), f"{key} is missing or empty"
+    uri = SETTINGS_OBJ.google_token_uri or ""
     assert uri.startswith(
         ("http://", "https://")
     ), "GOOGLE_TOKEN_URI must start with http/https"
@@ -56,17 +58,17 @@ def test_refresh_and_list_calendars_when_enabled():
     Runs a real refresh + Calendar API call only when explicitly enabled.
     Set RUN_LIVE_GOOGLE_TESTS=1 to execute; otherwise the test is skipped.
     """
-    if os.getenv("RUN_LIVE_GOOGLE_TESTS", "0") != "1":
+    if not SETTINGS_OBJ.run_live_google_tests:
         pytest.skip("Set RUN_LIVE_GOOGLE_TESTS=1 to run live Google API checks")
     if not _GOOGLE_LIBS_OK:
         pytest.skip("Google client libraries not available in this environment")
 
     creds = Credentials(
         None,
-        refresh_token=os.getenv("GOOGLE_REFRESH_TOKEN"),
-        client_id=os.getenv("GOOGLE_CLIENT_ID"),
-        client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-        token_uri=os.getenv("GOOGLE_TOKEN_URI"),
+        refresh_token=SETTINGS_OBJ.google_refresh_token,
+        client_id=SETTINGS_OBJ.google_client_id,
+        client_secret=SETTINGS_OBJ.google_client_secret,
+        token_uri=SETTINGS_OBJ.google_token_uri,
         scopes=SCOPES,
     )
 

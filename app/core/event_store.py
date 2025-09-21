@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 import sqlite3
-from typing import Iterable, Optional
+from typing import Any, Iterable, Optional
 from dataclasses import replace
 from datetime import datetime, timezone
 from urllib.parse import urlparse
+
+from config.settings import SETTINGS
 
 from .events import Event, EventUpdate
 from .status import EventStatus
@@ -79,14 +80,14 @@ def _path_from_url(url: str) -> Path:
 
 
 def _resolve_db_path() -> Path:
-    url = os.getenv("EVENT_DB_URL") or os.getenv("TASKS_DB_URL")
-    if url:
-        return _path_from_url(url)
-
-    env_path = os.getenv("EVENT_DB_PATH") or os.getenv("TASKS_DB_PATH")
-    if env_path:
-        return Path(env_path).expanduser()
-
+    if SETTINGS.event_db_url:
+        return _path_from_url(SETTINGS.event_db_url)
+    if SETTINGS.tasks_db_url:
+        return _path_from_url(SETTINGS.tasks_db_url)
+    if SETTINGS.event_db_path:
+        return SETTINGS.event_db_path
+    if SETTINGS.tasks_db_path:
+        return SETTINGS.tasks_db_path
     return _default_db_path()
 
 
@@ -297,6 +298,26 @@ def list_pending(limit: int) -> list[Event]:
     return list_by_status(EventStatus.PENDING, limit)
 
 
+def list_events(
+    *,
+    limit: int = 50,
+    offset: int = 0,
+    correlation_id: Optional[str] = None,
+) -> list[Event]:
+    limit = max(0, int(limit))
+    offset = max(0, int(offset))
+    query = "SELECT * FROM events"
+    params: list[Any] = []
+    if correlation_id:
+        query += " WHERE correlation_id = ?"
+        params.append(correlation_id)
+    query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
+    with _connect() as conn:
+        rows = conn.execute(query, params).fetchall()
+    return [_row_to_event(row) for row in rows]
+
+
 class EventStore:
     """Thin façade over the module-level store helpers.
 
@@ -312,6 +333,12 @@ class EventStore:
     @staticmethod
     def list_pending(limit: int) -> list[Event]:
         return list_pending(limit)
+
+    @staticmethod
+    def list_events(
+        *, limit: int = 50, offset: int = 0, correlation_id: Optional[str] = None
+    ) -> list[Event]:
+        return list_events(limit=limit, offset=offset, correlation_id=correlation_id)
 
     @staticmethod
     def get(event_id: str) -> Optional[Event]:

@@ -7,11 +7,12 @@ from functools import lru_cache
 from typing import Iterable, List, Optional, Tuple
 
 from core.utils import normalize_text as _normalize_text
+from config.settings import SETTINGS
 
 try:  # Optional OpenAI integration
     import openai as _openai  # type: ignore
 
-    if not os.getenv("OPENAI_API_KEY"):
+    if not SETTINGS.openai_api_key:
         # Without an API key the library would fail on first use; keep it None so
         # tests run in offline environments.
         _openai = None  # type: ignore
@@ -53,34 +54,29 @@ def normalize_text(text: str) -> str:
 @lru_cache(maxsize=1)
 def load_trigger_words() -> List[str]:
     """Load trigger words from ``config/trigger_words.txt`` and expand variants."""
-    path = os.getenv("TRIGGER_WORDS_FILE")
-    if not path:
-        base = Path(__file__).resolve().parent.parent / "config" / "trigger_words.txt"
-        path = str(base)
+    path_obj: Path
+    if SETTINGS.trigger_words_path is None:
+        path_obj = Path(__file__).resolve().parent.parent / "config" / "trigger_words.txt"
     else:
-        # Validate path to prevent traversal attacks
         try:
-            path_obj = Path(path).resolve()
+            path_obj = SETTINGS.trigger_words_path.resolve()
+        except (OSError, ValueError) as exc:
+            logger.warning("Invalid trigger words path %s: %s", SETTINGS.trigger_words_path, exc)
+            path_obj = Path(__file__).resolve().parent.parent / "config" / "trigger_words.txt"
+        else:
             project_root = Path(__file__).resolve().parent.parent
-            # Ensure project_root ends with separator for proper path validation
             project_root_str = str(project_root) + os.sep
             if not str(path_obj).startswith(project_root_str):
-                logger.warning("Path traversal attempt blocked: %s", path)
-                path = str(project_root / "config" / "trigger_words.txt")
-            else:
-                path = str(path_obj)
-        except (OSError, ValueError) as e:
-            logger.warning("Invalid path %s: %s", path, e)
-            base = Path(__file__).resolve().parent.parent / "config" / "trigger_words.txt"
-            path = str(base)
+                logger.warning("Path traversal attempt blocked: %s", path_obj)
+                path_obj = project_root / "config" / "trigger_words.txt"
 
     words: List[str] = []
-    if os.path.exists(path):  # pragma: no cover - trivial file IO
+    if path_obj.exists():  # pragma: no cover - trivial file IO
         try:
-            with open(path, "r", encoding="utf-8") as fh:
+            with path_obj.open("r", encoding="utf-8") as fh:
                 words = [line.strip() for line in fh if line.strip()]
         except (OSError, IOError, UnicodeDecodeError) as exc:  # pragma: no cover - logging only
-            logger.warning("Failed to read trigger words file %s: %s", path, exc)
+            logger.warning("Failed to read trigger words file %s: %s", path_obj, exc)
 
     if not words:
         words = TRIGGERS

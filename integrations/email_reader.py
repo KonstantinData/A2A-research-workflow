@@ -4,7 +4,6 @@ from __future__ import annotations
 import email
 import imaplib
 import json
-import os
 import re
 import time
 from email.header import decode_header
@@ -199,11 +198,11 @@ def _update_correlation_index(
 
 def fetch_replies() -> List[Dict[str, Any]]:
     """Fetch unread replies and extract fields."""
-    host = os.getenv("IMAP_HOST")
-    port = int(os.getenv("IMAP_PORT", "993"))
-    user = os.getenv("IMAP_USER")
-    pwd = os.getenv("IMAP_PASS")
-    folder = os.getenv("IMAP_FOLDER", "INBOX")
+    host = SETTINGS.imap_host
+    port = int(SETTINGS.imap_port or 993)
+    user = SETTINGS.imap_user
+    pwd = SETTINGS.imap_pass
+    folder = SETTINGS.imap_folder or "INBOX"
     if not all([host, user, pwd]):
         log_step(
             "email_reader",

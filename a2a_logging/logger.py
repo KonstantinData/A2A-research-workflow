@@ -12,12 +12,13 @@ from __future__ import annotations
 from typing import Optional, Dict, Any
 import json
 import uuid
-import os
 import sys
 
 # Import the standard library logging module under a different name to avoid
 # confusing it with this package.
 import logging as _py_logging
+
+from config.settings import SETTINGS
 
 
 class JSONFormatter(_py_logging.Formatter):
@@ -69,8 +70,8 @@ def get_logger(
                 flt.stage = stage or flt.stage
         return logger
 
-    run_id = run_id or os.getenv("RUN_ID") or str(uuid.uuid4())
-    stage = stage or os.getenv("STAGE")
+    run_id = run_id or SETTINGS.run_id or str(uuid.uuid4())
+    stage = stage or SETTINGS.stage or None
 
     handler = _py_logging.StreamHandler(stream=sys.stdout)
     handler.setFormatter(JSONFormatter())

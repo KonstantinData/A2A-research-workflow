@@ -2,27 +2,19 @@
 
 from __future__ import annotations
 
-import logging
-import os
-
-_logger = logging.getLogger(__name__)
-_warned_smtp_from = False
+from config.settings import SETTINGS
 
 
-def ensure_mail_from() -> None:
-    """Ensure ``MAIL_FROM`` is populated, falling back to ``SMTP_FROM`` if needed."""
-    global _warned_smtp_from
+def ensure_mail_from() -> str:
+    """Return the configured sender address or raise an explicit error."""
 
-    mail_from = os.getenv("MAIL_FROM")
-    if mail_from and mail_from.strip():
-        return
+    if SETTINGS.mail_from:
+        return SETTINGS.mail_from
 
-    smtp_from = os.getenv("SMTP_FROM")
-    if smtp_from and smtp_from.strip():
-        os.environ["MAIL_FROM"] = smtp_from
-        if not _warned_smtp_from:
-            _logger.warning(
-                "Environment variable SMTP_FROM is deprecated; please use MAIL_FROM instead."
-            )
-            _warned_smtp_from = True
+    if SETTINGS.smtp_user:
+        return SETTINGS.smtp_user
+
+    raise RuntimeError(
+        "MAIL_FROM (alias SMTP_FROM) must be configured for outbound e-mail."
+    )
 

@@ -9,9 +9,10 @@ created on GitHub (if the necessary configuration is available).
 from __future__ import annotations
 
 from typing import Optional, Iterable
-import os
 
 import requests
+
+from config.settings import SETTINGS
 
 
 class A2AError(Exception):
@@ -88,8 +89,8 @@ def create_github_issue(
     could not be created (e.g. missing configuration).
     """
 
-    repo = repo or os.getenv("GITHUB_REPOSITORY")
-    token = token or os.getenv("GITHUB_TOKEN")
+    repo = repo or SETTINGS.github_repository
+    token = token or SETTINGS.github_token
     if not repo or not token:
         return None
 
