@@ -1,13 +1,14 @@
 """SQLite-backed event store with optimistic concurrency control."""
 from __future__ import annotations
 
-from dataclasses import replace
-from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
 import sqlite3
 from typing import Iterable, Optional
+from dataclasses import replace
+from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 from .events import Event, EventUpdate
 from .status import EventStatus
@@ -54,12 +55,42 @@ class InvalidStatusTransition(EventStoreError):
         super().__init__(message)
 
 
-_DEFAULT_DB_PATH = Path(os.getenv("TASKS_DB_PATH", Path.cwd() / "data" / "tasks.db"))
-_db_url = os.getenv("TASKS_DB_URL")
-if _db_url:
-    _DB_PATH = Path(_db_url.replace("sqlite:///", "", 1))
-else:
-    _DB_PATH = Path(os.getenv("TASKS_DB_PATH", _DEFAULT_DB_PATH))
+def _default_db_path() -> Path:
+    base = Path.cwd() / "data"
+    events_path = base / "events.db"
+    legacy_path = base / "tasks.db"
+    if not events_path.exists() and legacy_path.exists():
+        return legacy_path
+    return events_path
+
+
+def _path_from_url(url: str) -> Path:
+    parsed = urlparse(url)
+    if parsed.scheme and parsed.scheme != "sqlite":
+        raise ValueError(f"Unsupported database URL scheme: {parsed.scheme}")
+    netloc = parsed.netloc or ""
+    path = parsed.path or ""
+    if netloc and not path.startswith("/"):
+        path = f"/{path}"
+    raw_path = f"{netloc}{path}" or path
+    if not raw_path:
+        return _default_db_path()
+    return Path(raw_path)
+
+
+def _resolve_db_path() -> Path:
+    url = os.getenv("EVENT_DB_URL") or os.getenv("TASKS_DB_URL")
+    if url:
+        return _path_from_url(url)
+
+    env_path = os.getenv("EVENT_DB_PATH") or os.getenv("TASKS_DB_PATH")
+    if env_path:
+        return Path(env_path).expanduser()
+
+    return _default_db_path()
+
+
+_DB_PATH = _resolve_db_path()
 
 
 def _connect() -> sqlite3.Connection:

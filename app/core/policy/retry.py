@@ -25,10 +25,23 @@ async def backoff(retries: int) -> float:
     return _compute_delay(retries)
 
 
+async def default_backoff(retries: int) -> float:
+    """Backward-compatible alias for the default async backoff policy."""
+
+    return await backoff(retries)
+
+
 def backoff_seconds(retries: int) -> float:
     """Synchronous helper returning the delay for ``retries`` attempts."""
 
     return _compute_delay(retries)
 
 
-__all__ = ["MAX_ATTEMPTS", "BASE_DELAY_S", "JITTER_S", "backoff", "backoff_seconds"]
+__all__ = [
+    "MAX_ATTEMPTS",
+    "BASE_DELAY_S",
+    "JITTER_S",
+    "backoff",
+    "default_backoff",
+    "backoff_seconds",
+]
