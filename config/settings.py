@@ -84,8 +84,14 @@ class _Settings:
     test_mode: bool = field(default_factory=lambda: _bool_env("A2A_TEST_MODE", False))
     # Erzwingt HubSpot-Live-Daten (1) statt statischer Dummydaten (0)
     require_hubspot: int = field(default_factory=lambda: _int_env("REQUIRE_HUBSPOT", 0))
-    # Optional: E-Mail-Allowlist-Domain zum Schutz vor Fehlversand
-    smtp_allowlist_domain: str = field(
+    # --- SMTP / Mail ---
+    smtp_host: str = field(default_factory=lambda: os.getenv("SMTP_HOST", ""))
+    smtp_port: int = field(default_factory=lambda: int(os.getenv("SMTP_PORT", "587")))
+    smtp_user: str = field(default_factory=lambda: os.getenv("SMTP_USER", ""))
+    smtp_pass: str = field(default_factory=lambda: os.getenv("SMTP_PASS", ""))
+    smtp_secure: str = field(default_factory=lambda: os.getenv("SMTP_SECURE", "ssl"))
+    mail_from: str = field(default_factory=lambda: os.getenv("MAIL_FROM", ""))
+    allowlist_email_domain: str = field(
         default_factory=lambda: os.getenv("ALLOWLIST_EMAIL_DOMAIN", "")
     )
 
@@ -165,6 +171,12 @@ class _Settings:
         if sub_path.is_absolute():
             return sub_path
         return base / sub_path
+
+    @property
+    def smtp_allowlist_domain(self) -> str:
+        """Backward compatibility shim for deprecated attribute name."""
+
+        return self.allowlist_email_domain
 
 
 SETTINGS = _Settings()
