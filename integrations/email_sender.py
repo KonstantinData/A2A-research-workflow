@@ -46,7 +46,10 @@ def _validate_recipient(to: str) -> str | None:
         return None
     
     cleaned_to = to.strip()
-    allow_env = os.getenv("ALLOWLIST_EMAIL_DOMAIN", "").strip()
+    allow_env = (
+        getattr(SETTINGS, "allowlist_email_domain", None)
+        or os.getenv("ALLOWLIST_EMAIL_DOMAIN", "")
+    ).strip()
     allowed_domain = allow_env.lstrip("@").lower()
 
     if not cleaned_to:
@@ -69,7 +72,18 @@ def _validate_recipient(to: str) -> str | None:
             return None
         recipient_domain = cleaned_to.rsplit("@", 1)[-1].lower()
         # Allow sender's own domain for internal notifications
-        sender_domain = os.getenv("MAIL_FROM", "").rsplit("@", 1)[-1].lower() if "@" in os.getenv("MAIL_FROM", "") else ""
+        sender_address = (
+            getattr(SETTINGS, "mail_from", None)
+            or getattr(SETTINGS, "smtp_user", None)
+            or os.getenv("MAIL_FROM", "")
+            or os.getenv("SMTP_USER", "")
+            or ""
+        )
+        sender_domain = (
+            sender_address.rsplit("@", 1)[-1].lower()
+            if "@" in sender_address
+            else ""
+        )
         if recipient_domain != allowed_domain and recipient_domain != sender_domain:
             log_step(
                 "mailer",
@@ -144,21 +158,35 @@ def _deliver(
     headers: Optional[Mapping[str, str]] = None,
 ) -> None:
     """Send message using environment configured SMTP credentials."""
-    host = os.environ.get("SMTP_HOST")
+    host = getattr(SETTINGS, "smtp_host", None) or os.environ.get("SMTP_HOST")
     try:
-        port = int(os.environ.get("SMTP_PORT", 587))
-    except ValueError:
+        port_value = (
+            getattr(SETTINGS, "smtp_port", None) or os.environ.get("SMTP_PORT") or 587
+        )
+        port = int(port_value)
+    except (TypeError, ValueError):
         port = 587
-    user = os.environ.get("SMTP_USER")
-    password = os.environ.get("SMTP_PASS")
+    user = getattr(SETTINGS, "smtp_user", None) or os.environ.get("SMTP_USER")
+    password = getattr(SETTINGS, "smtp_pass", None) or os.environ.get("SMTP_PASS")
     ensure_mail_from()
-    mail_from = os.environ.get("MAIL_FROM") or user
-    secure = os.environ.get("SMTP_SECURE", "ssl").lower()
+    mail_from = (
+        getattr(SETTINGS, "mail_from", None)
+        or os.environ.get("MAIL_FROM")
+        or user
+    )
+    secure = str(
+        getattr(SETTINGS, "smtp_secure", None)
+        or os.environ.get("SMTP_SECURE")
+        or "ssl"
+    ).lower()
     if not host or not user or not password:
         if SETTINGS.live_mode == 1:
             raise RuntimeError("SMTP not configured; cannot send emails in LIVE mode")
         return
-    allow_env = os.getenv("ALLOWLIST_EMAIL_DOMAIN", "").strip()
+    allow_env = (
+        getattr(SETTINGS, "allowlist_email_domain", None)
+        or os.getenv("ALLOWLIST_EMAIL_DOMAIN", "")
+    ).strip()
     allowed_domain = allow_env.lstrip("@").lower() or None
 
     validated_to = to.strip()
