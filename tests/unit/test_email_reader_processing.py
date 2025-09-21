@@ -34,6 +34,10 @@ def test_fetch_replies_uses_headers_and_deduplicates(tmp_path, monkeypatch):
     monkeypatch.setenv("IMAP_PORT", "993")
     monkeypatch.setenv("IMAP_USER", "user")
     monkeypatch.setenv("IMAP_PASS", "pass")
+    monkeypatch.setattr(email_reader.SETTINGS, "imap_host", "imap.example.com", raising=False)
+    monkeypatch.setattr(email_reader.SETTINGS, "imap_port", 993, raising=False)
+    monkeypatch.setattr(email_reader.SETTINGS, "imap_user", "user", raising=False)
+    monkeypatch.setattr(email_reader.SETTINGS, "imap_pass", "pass", raising=False)
 
     monkeypatch.setattr(email_reader.SETTINGS, "workflows_dir", tmp_path)
 

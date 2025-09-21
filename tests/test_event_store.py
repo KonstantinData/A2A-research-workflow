@@ -9,6 +9,7 @@ import pytest
 
 from app.core.events import Event, EventUpdate
 from app.core.status import EventStatus
+from config.settings import SETTINGS
 
 
 @pytest.fixture()
@@ -17,6 +18,10 @@ def fresh_store(tmp_path, monkeypatch):
 
     db_path = tmp_path / "events.db"
     monkeypatch.setenv("TASKS_DB_PATH", str(db_path))
+    monkeypatch.setattr(SETTINGS, "tasks_db_path", db_path, raising=False)
+    monkeypatch.setattr(SETTINGS, "event_db_path", db_path, raising=False)
+    monkeypatch.setattr(SETTINGS, "event_db_url", "", raising=False)
+    monkeypatch.setattr(SETTINGS, "tasks_db_url", "", raising=False)
 
     from app.core import event_store as event_store_module
 

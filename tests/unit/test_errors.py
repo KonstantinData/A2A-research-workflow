@@ -38,6 +38,8 @@ def test_hard_fail_creates_github_issue(monkeypatch):
 
     monkeypatch.setenv("GITHUB_REPOSITORY", "example/repo")
     monkeypatch.setenv("GITHUB_TOKEN", "secret")
+    monkeypatch.setattr(errors.SETTINGS, "github_repository", "example/repo", raising=False)
+    monkeypatch.setattr(errors.SETTINGS, "github_token", "secret", raising=False)
     monkeypatch.setattr(errors.requests, "Session", lambda: FakeSession())
 
     err = errors.HardFailError("Boom")
@@ -80,6 +82,8 @@ def test_issue_deduplicates_and_comments(monkeypatch):
 
     monkeypatch.setenv("GITHUB_REPOSITORY", "example/repo")
     monkeypatch.setenv("GITHUB_TOKEN", "secret")
+    monkeypatch.setattr(errors.SETTINGS, "github_repository", "example/repo", raising=False)
+    monkeypatch.setattr(errors.SETTINGS, "github_token", "secret", raising=False)
     monkeypatch.setattr(errors.requests, "Session", lambda: FakeSession())
 
     url = errors.create_github_issue("Boom", "desc", run_url="http://run")
@@ -116,6 +120,8 @@ def test_issue_labels_applied(monkeypatch):
 
     monkeypatch.setenv("GITHUB_REPOSITORY", "example/repo")
     monkeypatch.setenv("GITHUB_TOKEN", "secret")
+    monkeypatch.setattr(errors.SETTINGS, "github_repository", "example/repo", raising=False)
+    monkeypatch.setattr(errors.SETTINGS, "github_token", "secret", raising=False)
     monkeypatch.setattr(errors.requests, "Session", lambda: FakeSession())
 
     url = errors.create_github_issue(
