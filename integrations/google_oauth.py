@@ -4,10 +4,13 @@ from __future__ import annotations
 import os
 from typing import Optional, List, Tuple
 
+import time
+
 import requests
 
 from config.settings import SETTINGS
 from core.utils import log_step
+from app.core.policy.retry import MAX_ATTEMPTS, backoff_seconds
 
 try:
     from google.oauth2.credentials import Credentials  # type: ignore
@@ -67,7 +70,67 @@ def refresh_access_token() -> str:
         "grant_type": "refresh_token",
     }
     token_uri = getattr(SETTINGS, "google_token_uri", DEFAULT_TOKEN_URI)
-    r = requests.post(token_uri, data=payload, timeout=30)
+    response = None
+    last_exc: Exception | None = None
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            response = requests.post(token_uri, data=payload, timeout=30)
+        except requests.RequestException as exc:
+            last_exc = exc
+            if attempt >= MAX_ATTEMPTS:
+                log_step(
+                    "oauth",
+                    "google_token_request_failed",
+                    {"error": str(exc), "attempt": attempt},
+                    severity="error",
+                )
+                raise
+            delay = backoff_seconds(attempt)
+            log_step(
+                "oauth",
+                "google_token_retry",
+                {
+                    "attempt": attempt,
+                    "error": str(exc),
+                    "backoff_seconds": round(delay, 2),
+                },
+                severity="warning",
+            )
+            time.sleep(delay)
+            continue
+        if response.status_code >= 500:
+            if attempt >= MAX_ATTEMPTS:
+                log_step(
+                    "oauth",
+                    "google_token_request_failed",
+                    {
+                        "status": response.status_code,
+                        "attempt": attempt,
+                        "error": response.text[:200],
+                    },
+                    severity="error",
+                )
+                response.raise_for_status()
+            else:
+                delay = backoff_seconds(attempt)
+                log_step(
+                    "oauth",
+                    "google_token_retry",
+                    {
+                        "attempt": attempt,
+                        "status": response.status_code,
+                        "backoff_seconds": round(delay, 2),
+                    },
+                    severity="warning",
+                )
+                time.sleep(delay)
+                continue
+        break
+    if response is None:
+        if last_exc:
+            raise last_exc
+        raise OAuthError("Failed to refresh Google token")
+    r = response
     if r.status_code == 400 and "invalid_grant" in r.text:
         log_step(
             "oauth", "google_invalid_grant", {"message": r.text}, severity="error"
