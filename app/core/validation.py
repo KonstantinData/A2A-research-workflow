@@ -15,9 +15,9 @@ _ALLOWED_TRANSITIONS: Mapping[EventStatus, frozenset[EventStatus]] = {
         EventStatus.FAILED,
     }),
     EventStatus.WAITING_USER: frozenset({
+        EventStatus.PENDING,
         EventStatus.IN_PROGRESS,
         EventStatus.FAILED,
-        EventStatus.COMPLETED,
     }),
     EventStatus.COMPLETED: frozenset(),
     EventStatus.FAILED: frozenset(),
