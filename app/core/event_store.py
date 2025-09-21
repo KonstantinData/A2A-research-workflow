@@ -1,0 +1,298 @@
+"""SQLite-backed event store with optimistic concurrency control."""
+from __future__ import annotations
+
+from dataclasses import replace
+from datetime import datetime, timezone
+import json
+import os
+from pathlib import Path
+import sqlite3
+from typing import Iterable, Optional
+
+from .events import Event, EventUpdate
+from .status import EventStatus, is_terminal
+
+
+class EventStoreError(RuntimeError):
+    """Base error for event store operations."""
+
+
+class EventNotFoundError(EventStoreError):
+    """Raised when an event could not be located."""
+
+
+class ConcurrencyError(EventStoreError):
+    """Raised when an update fails due to optimistic concurrency."""
+
+
+class InvalidStatusTransition(EventStoreError):
+    """Raised when an illegal status transition is attempted."""
+
+
+_DEFAULT_DB_PATH = Path(os.getenv("TASKS_DB_PATH", Path.cwd() / "data" / "tasks.db"))
+_db_url = os.getenv("TASKS_DB_URL")
+if _db_url:
+    _DB_PATH = Path(_db_url.replace("sqlite:///", "", 1))
+else:
+    _DB_PATH = Path(os.getenv("TASKS_DB_PATH", _DEFAULT_DB_PATH))
+
+
+_ALLOWED_STATUS_TRANSITIONS = {
+    EventStatus.PENDING: {
+        EventStatus.IN_PROGRESS,
+        EventStatus.CANCELED,
+        EventStatus.FAILED,
+    },
+    EventStatus.IN_PROGRESS: {
+        EventStatus.WAITING_USER,
+        EventStatus.COMPLETED,
+        EventStatus.FAILED,
+        EventStatus.CANCELED,
+    },
+    EventStatus.WAITING_USER: {
+        EventStatus.IN_PROGRESS,
+        EventStatus.CANCELED,
+        EventStatus.COMPLETED,
+    },
+    EventStatus.FAILED: {
+        EventStatus.IN_PROGRESS,
+        EventStatus.CANCELED,
+    },
+}
+
+
+def _connect() -> sqlite3.Connection:
+    _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS events (
+            event_id TEXT PRIMARY KEY,
+            type TEXT NOT NULL,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            payload TEXT,
+            labels TEXT,
+            correlation_id TEXT,
+            retries INTEGER NOT NULL DEFAULT 0,
+            last_error TEXT
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_events_status
+            ON events(status, updated_at DESC)
+        """
+    )
+    return conn
+
+
+def _serialize_payload(payload: Optional[dict]) -> str:
+    return json.dumps(payload or {})
+
+
+def _serialize_labels(labels: Optional[Iterable[str]]) -> str:
+    return json.dumps(list(labels or []))
+
+
+def _deserialize_payload(raw: Optional[str]) -> dict:
+    if not raw:
+        return {}
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise EventStoreError("Stored payload is not valid JSON") from exc
+    return value if isinstance(value, dict) else {}
+
+
+def _deserialize_labels(raw: Optional[str]) -> list[str]:
+    if not raw:
+        return []
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise EventStoreError("Stored labels are not valid JSON") from exc
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    return []
+
+
+def _row_to_event(row: sqlite3.Row) -> Event:
+    return Event(
+        event_id=row["event_id"],
+        type=row["type"],
+        status=EventStatus(row["status"]),
+        created_at=datetime.fromisoformat(row["created_at"]),
+        updated_at=datetime.fromisoformat(row["updated_at"]),
+        payload=_deserialize_payload(row["payload"]),
+        labels=_deserialize_labels(row["labels"]),
+        correlation_id=row["correlation_id"],
+        retries=row["retries"] or 0,
+        last_error=row["last_error"],
+    )
+
+
+def _ensure_transition(current: EventStatus, new: EventStatus) -> None:
+    if new == current:
+        return
+    allowed = _ALLOWED_STATUS_TRANSITIONS.get(current, set())
+    if new not in allowed or (is_terminal(current) and new != current):
+        raise InvalidStatusTransition(
+            f"Cannot transition event from {current.value} to {new.value}"
+        )
+
+
+def create_event(event: Event) -> None:
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO events (
+                event_id, type, status, created_at, updated_at, payload,
+                labels, correlation_id, retries, last_error
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                event.event_id,
+                event.type,
+                event.status.value,
+                event.created_at.isoformat(),
+                event.updated_at.isoformat(),
+                _serialize_payload(event.payload),
+                _serialize_labels(event.labels),
+                event.correlation_id,
+                event.retries,
+                event.last_error,
+            ),
+        )
+
+
+def get(event_id: str) -> Optional[Event]:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM events WHERE event_id = ?",
+            (event_id,),
+        ).fetchone()
+    if not row:
+        return None
+    return _row_to_event(row)
+
+
+def update(event_id: str, patch: EventUpdate) -> Event:
+    with _connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT * FROM events WHERE event_id = ?",
+            (event_id,),
+        ).fetchone()
+        if not row:
+            raise EventNotFoundError(f"Event {event_id} not found")
+        current = _row_to_event(row)
+
+        new_status = patch.status or current.status
+        _ensure_transition(current.status, new_status)
+
+        new_payload = patch.payload if patch.payload is not None else current.payload
+        new_labels = patch.labels if patch.labels is not None else current.labels
+        new_retries = patch.retries if patch.retries is not None else current.retries
+        new_last_error = patch.last_error if patch.last_error is not None else current.last_error
+        new_correlation_id = (
+            patch.correlation_id
+            if patch.correlation_id is not None
+            else current.correlation_id
+        )
+        updated_at = datetime.now(timezone.utc)
+
+        cursor = conn.execute(
+            """
+            UPDATE events
+               SET status = ?,
+                   payload = ?,
+                   labels = ?,
+                   retries = ?,
+                   last_error = ?,
+                   correlation_id = ?,
+                   updated_at = ?
+             WHERE event_id = ? AND updated_at = ?
+            """,
+            (
+                new_status.value,
+                _serialize_payload(new_payload),
+                _serialize_labels(new_labels),
+                new_retries,
+                new_last_error,
+                new_correlation_id,
+                updated_at.isoformat(),
+                event_id,
+                current.updated_at.isoformat(),
+            ),
+        )
+        if cursor.rowcount == 0:
+            raise ConcurrencyError(f"Event {event_id} was updated concurrently")
+        return replace(
+            current,
+            status=new_status,
+            payload=new_payload,
+            labels=list(new_labels),
+            retries=new_retries,
+            last_error=new_last_error,
+            correlation_id=new_correlation_id,
+            updated_at=updated_at,
+        )
+
+
+def list_by_status(status: EventStatus, limit: int) -> list[Event]:
+    if limit <= 0:
+        return []
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM events
+             WHERE status = ?
+             ORDER BY updated_at DESC
+             LIMIT ?
+            """,
+            (status.value, limit),
+        ).fetchall()
+    return [_row_to_event(row) for row in rows]
+
+
+def list_pending(limit: int) -> list[Event]:
+    return list_by_status(EventStatus.PENDING, limit)
+
+
+def upsert_label(event_id: str, label: str) -> None:
+    with _connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT labels, updated_at FROM events WHERE event_id = ?",
+            (event_id,),
+        ).fetchone()
+        if not row:
+            raise EventNotFoundError(f"Event {event_id} not found")
+
+        labels = _deserialize_labels(row["labels"])
+        if label in labels:
+            return
+        labels.append(label)
+        updated_at = datetime.now(timezone.utc)
+
+        cursor = conn.execute(
+            """
+            UPDATE events
+               SET labels = ?,
+                   updated_at = ?
+             WHERE event_id = ? AND updated_at = ?
+            """,
+            (
+                _serialize_labels(labels),
+                updated_at.isoformat(),
+                event_id,
+                row["updated_at"],
+            ),
+        )
+        if cursor.rowcount == 0:
+            raise ConcurrencyError(f"Event {event_id} was updated concurrently")
+
