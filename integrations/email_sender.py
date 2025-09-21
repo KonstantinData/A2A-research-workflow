@@ -11,7 +11,7 @@ from __future__ import annotations
 import inspect
 from datetime import datetime
 from email.utils import make_msgid
-from typing import Optional, Sequence
+from typing import Mapping, Optional, Sequence
 import os
 import time
 from pathlib import Path
@@ -140,6 +140,7 @@ def _deliver(
     attachments: Optional[Sequence[str]] = None,
     *,
     message_id: Optional[str] = None,
+    headers: Optional[Mapping[str, str]] = None,
 ) -> None:
     """Send message using environment configured SMTP credentials."""
     host = os.environ.get("SMTP_HOST")
@@ -174,6 +175,7 @@ def _deliver(
         attachments=list(attachments or []),
         allowed_domain=allowed_domain,
         message_id=message_id,
+        headers=headers,
     )
 
 
@@ -186,7 +188,8 @@ def send(
     attachments: Optional[Sequence[str]] = None,
     task_id: Optional[str] = None,
     event_id: Optional[str] = None,
-) -> None:
+    headers: Optional[Mapping[str, str]] = None,
+) -> Optional[str]:
     """
     Generische Send-Funktion, die Tests monkeypatchen.
     """
@@ -194,11 +197,13 @@ def send(
     if not validated_to:
         return
 
-    message_id = _generate_message_id(task_id)
+    message_id = _generate_message_id(event_id or task_id)
 
     deliver_kwargs = {}
     if message_id and _supports_keyword_argument(_deliver, "message_id"):
         deliver_kwargs["message_id"] = message_id
+    if headers and _supports_keyword_argument(_deliver, "headers"):
+        deliver_kwargs["headers"] = headers
 
     try:
         _deliver(validated_to, subject, body, attachments, **deliver_kwargs)
@@ -217,6 +222,7 @@ def send(
             severity="critical",
         )
         raise
+    return message_id
 
 
 def send_email(
@@ -228,7 +234,8 @@ def send_email(
     attachments: Optional[Sequence[str]] = None,
     task_id: Optional[str] = None,
     event_id: Optional[str] = None,
-) -> None:
+    headers: Optional[Mapping[str, str]] = None,
+) -> Optional[str]:
     """Wrapper around the low level mailer with logging and retries.
 
     ``task_id`` or ``event_id`` may be supplied for correlation so that
@@ -260,10 +267,12 @@ def send_email(
 
     delays = [5, 15, 45]
     last_exc: Exception | None = None
-    message_id = _generate_message_id(task_id)
+    message_id = _generate_message_id(event_id or task_id)
     deliver_kwargs = {}
     if message_id and _supports_keyword_argument(_deliver, "message_id"):
         deliver_kwargs["message_id"] = message_id
+    if headers and _supports_keyword_argument(_deliver, "headers"):
+        deliver_kwargs["headers"] = headers
 
     for attempt in range(3):
         try:
@@ -299,6 +308,7 @@ def send_email(
                 )
     if last_exc:
         raise last_exc
+    return message_id
 
 
 def request_missing_fields(

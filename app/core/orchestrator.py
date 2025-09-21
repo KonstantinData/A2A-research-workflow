@@ -95,6 +95,9 @@ class EventStoreProtocol(Protocol):
     def list_pending(self, limit: int) -> list[Event]:
         ...
 
+    def get(self, event_id: str) -> Optional[Event]:
+        ...
+
     def update(self, event_id: str, patch: EventUpdate) -> Event:
         ...
 
@@ -129,6 +132,8 @@ class Orchestrator:
     ) -> None:
         self._store: EventStoreProtocol = store or EventStore()
         self._handlers: MutableMapping[str, EventHandler] = dict(handlers or {})
+        if "UserReplyReceived" not in self._handlers:
+            self._handlers["UserReplyReceived"] = self._handle_user_reply_received
         self._publisher = publisher
         self._batch_size = max(1, int(batch_size))
         self._max_attempts = max(1, int(max_attempts))
@@ -384,6 +389,55 @@ class Orchestrator:
                 },
                 severity="error",
             )
+
+    async def _handle_user_reply_received(self, event: Event) -> HandlerResult:
+        payload = event.payload or {}
+        referenced_id = str(payload.get("event_id") or "").strip()
+        if not referenced_id:
+            return HandlerResult(status=EventStatus.COMPLETED)
+
+        store_get = getattr(self._store, "get", None)
+        current = store_get(referenced_id) if callable(store_get) else None
+        if not current:
+            log_step(
+                "orchestrator",
+                "user_reply_unknown_event",
+                {"referenced_event_id": referenced_id},
+                severity="warning",
+            )
+            return HandlerResult(status=EventStatus.COMPLETED)
+
+        if current.status != EventStatus.WAITING_USER:
+            return HandlerResult(status=EventStatus.COMPLETED)
+
+        update = EventUpdate(
+            status=EventStatus.PENDING,
+            correlation_id=payload.get("message_id"),
+        )
+
+        try:
+            self._store.update(referenced_id, update)
+        except (ConcurrencyError, InvalidStatusTransition, EventStoreError) as exc:
+            log_step(
+                "orchestrator",
+                "user_reply_update_failed",
+                {
+                    "referenced_event_id": referenced_id,
+                    "error": self._format_error(exc),
+                },
+                severity="warning",
+            )
+        else:
+            log_step(
+                "orchestrator",
+                "user_reply_received",
+                {
+                    "referenced_event_id": referenced_id,
+                    "message_id": payload.get("message_id"),
+                },
+            )
+
+        return HandlerResult(status=EventStatus.COMPLETED)
 
     def _coerce_result(self, result: Any) -> HandlerResult:
         if isinstance(result, HandlerResult):

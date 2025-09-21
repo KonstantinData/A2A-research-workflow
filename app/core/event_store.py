@@ -271,8 +271,16 @@ class EventStore:
     """
 
     @staticmethod
+    def create_event(event: Event) -> None:
+        create_event(event)
+
+    @staticmethod
     def list_pending(limit: int) -> list[Event]:
         return list_pending(limit)
+
+    @staticmethod
+    def get(event_id: str) -> Optional[Event]:
+        return get(event_id)
 
     @staticmethod
     def update(event_id: str, patch: EventUpdate) -> Event:
