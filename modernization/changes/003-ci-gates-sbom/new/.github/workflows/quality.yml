@@ -39,10 +39,45 @@ jobs:
 
       - name: Generate CycloneDX SBOM
         run: |
+          set -euo pipefail
+          help_text="$(cyclonedx-py requirements --help)"
+          export CYC_HELP="$help_text"
+          mapfile -t flags < <(python - <<'PY'
+import os
+import re
+import sys
+
+text = os.environ["CYC_HELP"]
+
+
+def pick(options):
+    pattern_template = r"(^|\s){option}([,\s]|$)"
+    for option in options:
+        pattern = pattern_template.format(option=re.escape(option))
+        if re.search(pattern, text):
+            return option
+    print(f"Unable to detect any of {options}", file=sys.stderr)
+    sys.exit(1)
+
+
+print(pick(["--input-file", "--requirements-file", "--requirements", "-i", "-r"]))
+print(pick(["--output-file", "--output", "-o"]))
+print(pick(["--output-format", "--format", "-f", "-F"]))
+PY
+          ) || {
+            echo "::error::Failed to detect cyclonedx-py CLI flags" >&2
+            printf '%s\n' "$help_text" >&2
+            exit 1
+          }
+          req_flag="${flags[0]}"
+          out_flag="${flags[1]}"
+          fmt_flag="${flags[2]}"
+          unset CYC_HELP
+
           cyclonedx-py requirements \
-            -r requirements.txt \
-            -o sbom.json \
-            -F json
+            "$req_flag" requirements.txt \
+            "$out_flag" sbom.json \
+            "$fmt_flag" json
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
