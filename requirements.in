@@ -10,5 +10,6 @@ jsonschema
 jinja2
 reportlab
 python-dotenv
+pytest
 fastapi
 uvicorn
