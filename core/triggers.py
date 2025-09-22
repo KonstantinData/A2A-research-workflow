@@ -67,14 +67,27 @@ def gather_calendar_triggers(
     log_step: Callable[[str, str, Dict[str, Any]], None] | None = None,
     contains_trigger: Callable[[Dict[str, Any]], bool] | None = None,
 ) -> List[Dict[str, Any]]:
-    if log_event is None:
-        from core.logging import log_event as default_log_event
-
-        log_event = default_log_event
     if log_step is None:
-        from core.utils import log_step as default_log_step
+        from app.core.logging import log_step as default_log_step
 
         log_step = default_log_step
+    if log_event is None:
+        from app.core.logging import log_step as _log_step_default
+
+        def default_log_event(record: Dict[str, Any]) -> None:
+            payload = dict(record)
+            severity = payload.pop("severity", "info")
+            status = str(payload.get("status") or "event").lower()
+            component = payload.pop("component", "calendar")
+            op = payload.pop("op", status)
+            message = payload.pop("message", payload.get("msg", op))
+            payload.setdefault("status", status)
+            payload.setdefault("msg", message)
+            payload.setdefault("component", component)
+            payload.setdefault("op", op)
+            _log_step_default(component, op, payload, severity=severity)
+
+        log_event = default_log_event
     if contains_trigger is None:
         from core.trigger_words import contains_trigger as default_contains_trigger
 
@@ -182,8 +195,25 @@ def gather_triggers(
     log_step: Callable[[str, str, Dict[str, Any]], None] | None = None,
     contains_trigger: Callable[[Dict[str, Any]], bool] | None = None,
 ) -> List[Dict[str, Any]]:
+    if log_step is None:
+        from app.core.logging import log_step as default_log_step
+
+        log_step = default_log_step
     if log_event is None:
-        from core.logging import log_event as default_log_event
+        from app.core.logging import log_step as _log_step_default
+
+        def default_log_event(record: Dict[str, Any]) -> None:
+            payload = dict(record)
+            severity = payload.pop("severity", "info")
+            status = str(payload.get("status") or "event").lower()
+            component = payload.pop("component", "calendar")
+            op = payload.pop("op", status)
+            message = payload.pop("message", payload.get("msg", op))
+            payload.setdefault("status", status)
+            payload.setdefault("msg", message)
+            payload.setdefault("component", component)
+            payload.setdefault("op", op)
+            _log_step_default(component, op, payload, severity=severity)
 
         log_event = default_log_event
 
