@@ -12,12 +12,12 @@ unified API.
 
 from __future__ import annotations
 
-import os
 import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Mapping
 
 from config.settings import SETTINGS
+
 
 try:
     from weasyprint import HTML  # type: ignore
@@ -110,7 +110,7 @@ def _write_empty_pdf(out_path: Path, reason: str | None) -> None:
 
 def _write_html_pdf(html: str, out_path: Path) -> None:
     if HTML is None:
-        if os.getenv("LIVE_MODE", "1") == "1":
+        if SETTINGS.live_mode == 1:
             raise RuntimeError("WeasyPrint not available in LIVE mode")
         raise RuntimeError("WeasyPrint not available")
     HTML(string=html).write_pdf(str(out_path))
@@ -145,7 +145,7 @@ def render_pdf(
 ) -> Path:
     """Render ``rows`` into a PDF table and return the written path."""
 
-    live_mode = os.getenv("LIVE_MODE", "1") == "1"
+    live_mode = SETTINGS.live_mode == 1
 
     if live_mode:
         _ensure_weasyprint()

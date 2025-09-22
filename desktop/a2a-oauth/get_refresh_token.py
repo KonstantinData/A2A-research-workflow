@@ -17,12 +17,13 @@ from __future__ import annotations
 
 import http.server
 import json
-import os
 import threading
 import urllib.parse
 
 import requests
 from dotenv import load_dotenv
+
+from config.settings import Settings
 
 
 AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -126,8 +127,9 @@ def exchange_code_for_tokens(client_id: str, client_secret: str, code: str) -> d
 def main() -> None:
     load_dotenv()
 
-    client_id = os.getenv("GOOGLE_CLIENT_ID")
-    client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+    settings = Settings()
+    client_id = settings.google_client_id
+    client_secret = settings.google_client_secret
     if not client_id or not client_secret:
         raise SystemExit(
             "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set in the environment/.env file."

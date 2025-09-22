@@ -33,6 +33,7 @@ def test_pdf_raises_in_live_mode(tmp_path, monkeypatch):
     rows = []
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("LIVE_MODE", "1")
+    monkeypatch.setattr(SETTINGS, "live_mode", 1, raising=False)
     monkeypatch.setattr(pdf_render, "HTML", None)
     with pytest.raises(RuntimeError):
         pdf_render.render_pdf(rows, ["company_name"], {"reason": "no_triggers"})

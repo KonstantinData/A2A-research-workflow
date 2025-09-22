@@ -28,3 +28,4 @@ python-dotenv
 # Optional: FastAPI for web interface
 fastapi
 uvicorn
+

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import os, re
+import os
 import time
 import datetime as dt
+import re
+from pathlib import Path
 from typing import Any, Dict, List
 
 from config.settings import SETTINGS
@@ -75,9 +77,9 @@ def contains_trigger(text: str) -> bool:
     if not text:
         return False
     text_lower = text.lower()
-    trigger_words_file = os.getenv("TRIGGER_WORDS_FILE", "config/trigger_words.txt")
+    trigger_words_file = SETTINGS.trigger_words_path or Path("config/trigger_words.txt")
     try:
-        with open(trigger_words_file, 'r', encoding='utf-8') as f:
+        with Path(trigger_words_file).open('r', encoding='utf-8') as f:
             trigger_words = [line.strip().lower() for line in f if line.strip()]
         return any(word in text_lower for word in trigger_words)
     except (OSError, IOError):
@@ -108,8 +110,7 @@ def fetch_events() -> List[Normalized]:
     results: List[Normalized] = []
     if not build or not Credentials:
         log_step("calendar", "google_api_client_missing", {}, severity="error")
-        # Use raw env so tests that set LIVE_MODE=1 get the expected RuntimeError
-        if os.getenv("LIVE_MODE", "1") == "1":
+        if SETTINGS.live_mode == 1:
             raise RuntimeError("google_api_client_missing")
         return results
     try:
@@ -154,7 +155,7 @@ def fetch_events() -> List[Normalized]:
             except Exception as e:
                 if attempt >= MAX_ATTEMPTS:
                     code, hint = classify_oauth_error(e)
-                    cid_tail = (os.getenv("GOOGLE_CLIENT_ID") or "")[-8:]
+                    cid_tail = (SETTINGS.google_client_id or "")[-8:]
                     log_step(
                         "calendar",
                         "fetch_error",
@@ -233,7 +234,7 @@ def fetch_events() -> List[Normalized]:
         log_step("calendar", "fetch_ok", {"calendars": cal_ids, "count": len(results)})
     except Exception as e:  # pragma: no cover
         code, hint = classify_oauth_error(e)
-        cid_tail = (os.getenv("GOOGLE_CLIENT_ID") or "")[-8:]
+        cid_tail = (SETTINGS.google_client_id or "")[-8:]
         log_step(
             "calendar",
             "fetch_error",

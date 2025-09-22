@@ -6,10 +6,12 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from integrations import email_sender, mailer
+from config.settings import SETTINGS
 
 
 def test_send_email_blocked_by_allowlist(monkeypatch):
     monkeypatch.setenv("ALLOWLIST_EMAIL_DOMAIN", "condata.io")
+    monkeypatch.setattr(SETTINGS, "allowlist_email_domain", "condata.io", raising=False)
 
     deliveries: list[tuple] = []
     monkeypatch.setattr(

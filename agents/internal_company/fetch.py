@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Tuple, Optional, List
@@ -40,13 +39,13 @@ _CACHE: Dict[str, Tuple[float, Raw]] = {}
 # Domain-to-company mapping for O(1) lookups
 _DOMAIN_MAPPING: Dict[str, str] = {}
 _CACHE_CLIENT = None
-REDIS_URL = os.getenv("INTERNAL_FETCH_REDIS_URL")
+REDIS_URL = SETTINGS.internal_fetch_redis_url
 if REDIS_URL and redis is not None:
     try:
         _CACHE_CLIENT = redis.Redis.from_url(REDIS_URL)
     except Exception:  # pragma: no cover - Redis connection failed
         _CACHE_CLIENT = None
-CACHE_TTL_SECONDS = int(os.getenv("INTERNAL_FETCH_CACHE_TTL", "3600"))
+CACHE_TTL_SECONDS = int(SETTINGS.internal_fetch_cache_ttl or 0) or 3600
 
 
 def _iso(dt: Optional[datetime]) -> Optional[str]:

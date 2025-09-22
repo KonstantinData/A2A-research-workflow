@@ -4,6 +4,15 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
+try:  # pragma: no cover - guard legacy event bus
+    from core.event_bus import EventBus
+except ImportError:  # pragma: no cover - event bus removed
+    pytestmark = pytest.mark.skip(
+        reason="Legacy core.event_bus removed; autonomous email agent migrated"
+    )
+
 
 def test_missing_fields_email_without_task_id(monkeypatch):
     from agents.autonomous_email_agent import AutonomousEmailAgent

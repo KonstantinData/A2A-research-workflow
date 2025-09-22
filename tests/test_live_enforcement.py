@@ -1,45 +1,41 @@
-import os
+from __future__ import annotations
+
+import importlib
+
 import pytest
-import sys, pathlib
 
-import config.env as env_module
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-import core.orchestrator as orch
-
-def test_live_guard_fails_without_env(monkeypatch):
-    monkeypatch.setenv("LIVE_MODE","1")
-    for k in [
-        "GOOGLE_CLIENT_ID",
-        "GOOGLE_CLIENT_SECRET",
-        "GOOGLE_REFRESH_TOKEN",
-        "SMTP_HOST",
-        "SMTP_PORT",
-        "SMTP_USER",
-        "SMTP_PASS",
-        "MAIL_FROM",
-        "HUBSPOT_ACCESS_TOKEN",
-    ]:
-        monkeypatch.delenv(k, raising=False)
-    with pytest.raises(Exception):
-        orch._assert_live_ready()
+from config.env import ensure_mail_from
+from config.settings import Settings, SETTINGS
 
 
-def test_live_guard_accepts_legacy_smtp_from(monkeypatch, caplog):
-    monkeypatch.setenv("LIVE_MODE", "1")
-    monkeypatch.setenv("GOOGLE_CLIENT_ID", "client")
-    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "secret")
-    monkeypatch.setenv("GOOGLE_REFRESH_TOKEN", "refresh")
-    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
-    monkeypatch.setenv("SMTP_PORT", "587")
-    monkeypatch.setenv("SMTP_USER", "user@example.com")
-    monkeypatch.setenv("SMTP_PASS", "password")
-    monkeypatch.setenv("HUBSPOT_ACCESS_TOKEN", "token")
+def test_core_modules_raise_import_error():
+    with pytest.raises(ImportError) as exc:
+        importlib.import_module("core.orchestrator")
+    assert "app.core.orchestrator" in str(exc.value)
+
+    with pytest.raises(ImportError) as exc_bus:
+        importlib.import_module("core.event_bus")
+    assert "app.core" in str(exc_bus.value)
+
+    with pytest.raises(ImportError) as exc_logging:
+        importlib.import_module("core.logging")
+    assert "app.core" in str(exc_logging.value)
+
+
+def test_ensure_mail_from_prefers_config(monkeypatch):
+    monkeypatch.setattr(SETTINGS, "mail_from", "configured@example.com")
+    monkeypatch.setattr(SETTINGS, "smtp_user", "smtp@example.com")
+    assert ensure_mail_from() == "configured@example.com"
+
+
+def test_ensure_mail_from_falls_back_to_smtp_user(monkeypatch):
+    monkeypatch.setattr(SETTINGS, "mail_from", "")
+    monkeypatch.setattr(SETTINGS, "smtp_user", "smtp@example.com")
+    assert ensure_mail_from() == "smtp@example.com"
+
+
+def test_settings_aliases_resolve(monkeypatch):
     monkeypatch.delenv("MAIL_FROM", raising=False)
-    monkeypatch.setenv("SMTP_FROM", "legacy@example.com")
-    monkeypatch.setattr(env_module, "_warned_smtp_from", False)
-
-    with caplog.at_level("WARNING", logger="config.env"):
-        orch._assert_live_ready()
-
-    assert os.getenv("MAIL_FROM") == "legacy@example.com"
-    assert any("SMTP_FROM is deprecated" in rec.message for rec in caplog.records)
+    monkeypatch.setenv("SMTP_FROM", "alias@example.com")
+    fresh = Settings()
+    assert fresh.mail_from == "alias@example.com"

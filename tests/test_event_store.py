@@ -9,6 +9,7 @@ import pytest
 
 from app.core.events import Event, EventUpdate
 from app.core.status import EventStatus
+from config.settings import SETTINGS
 
 
 @pytest.fixture()
@@ -17,6 +18,10 @@ def fresh_store(tmp_path, monkeypatch):
 
     db_path = tmp_path / "events.db"
     monkeypatch.setenv("TASKS_DB_PATH", str(db_path))
+    monkeypatch.setattr(SETTINGS, "tasks_db_path", db_path, raising=False)
+    monkeypatch.setattr(SETTINGS, "event_db_path", db_path, raising=False)
+    monkeypatch.setattr(SETTINGS, "event_db_url", "", raising=False)
+    monkeypatch.setattr(SETTINGS, "tasks_db_url", "", raising=False)
 
     from app.core import event_store as event_store_module
 
@@ -137,4 +142,21 @@ def test_optimistic_concurrency_detected(fresh_store, monkeypatch):
     latest = store.get(event.event_id)
     assert latest is not None
     assert latest.status is EventStatus.PENDING
+
+
+def test_connection_pragmas_configured(fresh_store):
+    store = fresh_store
+
+    with store._connect() as conn:  # noqa: SLF001 - intentional for test visibility
+        journal_mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
+        synchronous = conn.execute("PRAGMA synchronous").fetchone()[0]
+        busy_timeout = conn.execute("PRAGMA busy_timeout").fetchone()[0]
+        temp_store = conn.execute("PRAGMA temp_store").fetchone()[0]
+        foreign_keys = conn.execute("PRAGMA foreign_keys").fetchone()[0]
+
+    assert str(journal_mode).lower() == "wal"
+    assert int(synchronous) == 1  # NORMAL
+    assert int(busy_timeout) == 5000
+    assert int(temp_store) == 2  # MEMORY
+    assert int(foreign_keys) == 1
 

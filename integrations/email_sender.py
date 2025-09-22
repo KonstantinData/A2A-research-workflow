@@ -12,12 +12,12 @@ import inspect
 from datetime import datetime
 from email.utils import make_msgid
 from typing import Mapping, Optional, Sequence
-import os
 import time
 from pathlib import Path
 import re
 
 from config.env import ensure_mail_from
+from config.settings import SETTINGS
 from .mailer import send_email as _send_email  # tatsächlicher SMTP/Provider-Client
 from core.utils import log_step
 from app.integrations import email_reader
@@ -48,7 +48,7 @@ def _validate_recipient(to: str) -> str | None:
     cleaned_to = to.strip()
     allow_env = (
         getattr(SETTINGS, "allowlist_email_domain", None)
-        or os.getenv("ALLOWLIST_EMAIL_DOMAIN", "")
+        or SETTINGS.allowlist_email_domain
     ).strip()
     allowed_domain = allow_env.lstrip("@").lower()
 
@@ -75,8 +75,8 @@ def _validate_recipient(to: str) -> str | None:
         sender_address = (
             getattr(SETTINGS, "mail_from", None)
             or getattr(SETTINGS, "smtp_user", None)
-            or os.getenv("MAIL_FROM", "")
-            or os.getenv("SMTP_USER", "")
+            or SETTINGS.mail_from
+            or SETTINGS.smtp_user
             or ""
         )
         sender_domain = (
@@ -158,25 +158,17 @@ def _deliver(
     headers: Optional[Mapping[str, str]] = None,
 ) -> None:
     """Send message using environment configured SMTP credentials."""
-    host = getattr(SETTINGS, "smtp_host", None) or os.environ.get("SMTP_HOST")
-    try:
-        port_value = (
-            getattr(SETTINGS, "smtp_port", None) or os.environ.get("SMTP_PORT") or 587
-        )
-        port = int(port_value)
-    except (TypeError, ValueError):
-        port = 587
-    user = getattr(SETTINGS, "smtp_user", None) or os.environ.get("SMTP_USER")
-    password = getattr(SETTINGS, "smtp_pass", None) or os.environ.get("SMTP_PASS")
+    host = SETTINGS.smtp_host or ""
+    port = int(SETTINGS.smtp_port or 587)
+    user = SETTINGS.smtp_user or ""
+    password = SETTINGS.smtp_pass or ""
     ensure_mail_from()
     mail_from = (
-        getattr(SETTINGS, "mail_from", None)
-        or os.environ.get("MAIL_FROM")
+        SETTINGS.mail_from
         or user
     )
     secure = str(
-        getattr(SETTINGS, "smtp_secure", None)
-        or os.environ.get("SMTP_SECURE")
+        SETTINGS.smtp_secure
         or "ssl"
     ).lower()
     if not host or not user or not password:
@@ -185,7 +177,7 @@ def _deliver(
         return
     allow_env = (
         getattr(SETTINGS, "allowlist_email_domain", None)
-        or os.getenv("ALLOWLIST_EMAIL_DOMAIN", "")
+        or SETTINGS.allowlist_email_domain
     ).strip()
     allowed_domain = allow_env.lstrip("@").lower() or None
 
@@ -494,7 +486,7 @@ Thanks a lot for your support!
 """
 
     # Allow reminders only for a configured company domain (optional)
-    allow = os.getenv("ALLOWLIST_EMAIL_DOMAIN")
+    allow = SETTINGS.allowlist_email_domain
     if allow and not to.lower().endswith(f"@{allow.lower()}"):
         log_step(
             "mailer",

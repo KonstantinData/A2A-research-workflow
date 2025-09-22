@@ -14,12 +14,13 @@ compatible with both we honour ``TASKS_DB_URL`` when present and fall back to
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 import json
-import os
 import sqlite3
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 import logging
+
+from config.settings import SETTINGS
 
 # ---------------------------------------------------------------------------
 # Database setup
@@ -27,12 +28,13 @@ import logging
 # Determine database location.  ``TASKS_DB_URL`` is expected to contain a
 # ``sqlite:///`` style URL while ``TASKS_DB_PATH`` points directly to a file.  We
 # normalise both to a simple ``Path`` for ``sqlite3``.
-DEFAULT_DB_PATH = Path(os.getenv("TASKS_DB_PATH", Path.cwd() / "data" / "tasks.db"))
-_db_url = os.getenv('TASKS_DB_URL')
-if _db_url:
-    DB_PATH = Path(_db_url.replace('sqlite:///', '', 1))
+DEFAULT_DB_PATH = SETTINGS.root_dir / "data" / "tasks.db"
+if SETTINGS.tasks_db_url:
+    DB_PATH = Path(SETTINGS.tasks_db_url.replace('sqlite:///', '', 1))
+elif SETTINGS.tasks_db_path:
+    DB_PATH = SETTINGS.tasks_db_path
 else:
-    DB_PATH = Path(os.getenv('TASKS_DB_PATH', DEFAULT_DB_PATH))
+    DB_PATH = DEFAULT_DB_PATH
 
 logger = logging.getLogger(__name__)
 

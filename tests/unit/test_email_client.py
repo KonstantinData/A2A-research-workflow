@@ -1,5 +1,3 @@
-import logging
-import os
 from pathlib import Path
 import sys
 
@@ -8,7 +6,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from integrations import email_client
-import config.env as env_module
+from config.settings import SETTINGS
 
 
 def test_email_client_delegates_to_email_sender(monkeypatch):
@@ -29,7 +27,7 @@ def test_email_client_delegates_to_email_sender(monkeypatch):
         calls['subject'] = subject
         calls['body'] = body
 
-    monkeypatch.setenv('MAIL_FROM', 'bot@example.com')
+    monkeypatch.setattr(SETTINGS, "mail_from", "bot@example.com")
     monkeypatch.setattr(email_client.email_sender, 'send_email', fake_send)
 
     email_client.send_email('user@example.com', ['name', 'role'])
@@ -39,14 +37,15 @@ def test_email_client_delegates_to_email_sender(monkeypatch):
     assert '- role' in calls['body']
 
 
-def test_mail_from_falls_back_to_smtp_from(monkeypatch, caplog):
-    monkeypatch.delenv('MAIL_FROM', raising=False)
-    monkeypatch.setenv('SMTP_FROM', 'legacy@example.com')
-    monkeypatch.setattr(env_module, '_warned_smtp_from', False)
+def test_mail_from_raises_when_unconfigured(monkeypatch):
+    monkeypatch.setattr(SETTINGS, "mail_from", "")
+    monkeypatch.setattr(SETTINGS, "smtp_user", "")
 
-    with caplog.at_level(logging.WARNING, logger='config.env'):
-        value = email_client._mail_from()
+    with pytest.raises(RuntimeError):
+        email_client._mail_from()
 
-    assert value == 'legacy@example.com'
-    assert os.getenv('MAIL_FROM') == 'legacy@example.com'
-    assert any('SMTP_FROM is deprecated' in record.message for record in caplog.records)
+
+def test_mail_from_uses_smtp_user(monkeypatch):
+    monkeypatch.setattr(SETTINGS, "mail_from", "")
+    monkeypatch.setattr(SETTINGS, "smtp_user", "smtp@example.com")
+    assert email_client._mail_from() == "smtp@example.com"
