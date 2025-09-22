@@ -15,7 +15,7 @@
       "changeset": "changes/001-runtime-deps/",
       "adr": "ADR-001.md",
       "research_doc": "research/F001.md",
-      "status": "open"
+      "status": "complete"
     },
     {
       "id": "P002",
