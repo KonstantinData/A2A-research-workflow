@@ -1,0 +1,14 @@
+# Primary dependency input (compiled by pip-tools to requirements.lock.txt)
+google-api-python-client
+google-auth
+google-auth-oauthlib
+openai
+weasyprint
+requests
+pyyaml
+jsonschema
+jinja2
+reportlab
+python-dotenv
+fastapi
+uvicorn

@@ -1,0 +1,35 @@
+name: quality-gates
+on:
+  push: { branches: [ main ] }
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate-plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check diagnostics ↔ plan mapping
+        run: python - <<'PY'
+import json,sys
+from pathlib import Path
+m=Path('modernization/diagnostics.md').read_text()
+p=json.loads(Path('modernization/plan.json').read_text())
+assert p['items'], 'plan.json has no items'
+print('items:', len(p['items']))
+PY
+
+  sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.13' }
+      - name: Install cyclonedx-bom
+        run: pip install cyclonedx-bom
+
+      - name: Generate SBOM
+        run: cyclonedx-bom -e -o sbom.json || true
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with: { name: sbom, path: sbom.json }

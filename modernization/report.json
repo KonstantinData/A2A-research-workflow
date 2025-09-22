@@ -1,0 +1,1494 @@
+{
+  "inventory": {
+    "generated_at": "2025-09-22T14:50:49.699192Z",
+    "root": "/mnt/data/repo/A2A-research-workflow-main",
+    "counts": {
+      "files": 239,
+      "by_ext": {
+        "": 12,
+        ".md": 20,
+        ".py": 153,
+        ".txt": 6,
+        ".yml": 7,
+        ".html": 2,
+        ".json": 14,
+        ".db": 1,
+        ".jpg": 2,
+        ".jsonl": 19,
+        ".csv": 1,
+        ".pdf": 1,
+        ".j2": 1
+      }
+    },
+    "top_level_items": [
+      ".github",
+      ".gitignore",
+      "README.md",
+      "README_AUTONOMOUS.md",
+      "README_AUTONOMOUS_STATUS.md",
+      "TODO.md",
+      "a2a_logging",
+      "agents",
+      "api",
+      "app",
+      "artifacts",
+      "compliance",
+      "config",
+      "core",
+      "data",
+      "desktop",
+      "docs",
+      "images",
+      "integrations",
+      "logs",
+      "main_autonomous.py",
+      "main_autonomous_ci.py",
+      "ops",
+      "output",
+      "requirements-dev.txt",
+      "requirements.txt",
+      "schemas",
+      "scripts",
+      "test_autonomous_workflow.py",
+      "test_full_workflow.py",
+      "test_pdf_generation.py",
+      "tests"
+    ]
+  },
+  "files": [
+    {
+      "path": ".gitignore",
+      "size": 4702,
+      "mtime": "2025-09-22T14:42:07.629556",
+      "ext": ""
+    },
+    {
+      "path": "README.md",
+      "size": 13754,
+      "mtime": "2025-09-22T14:42:07.630434",
+      "ext": ".md"
+    },
+    {
+      "path": "README_AUTONOMOUS.md",
+      "size": 2060,
+      "mtime": "2025-09-22T14:42:07.630997",
+      "ext": ".md"
+    },
+    {
+      "path": "README_AUTONOMOUS_STATUS.md",
+      "size": 4837,
+      "mtime": "2025-09-22T14:42:07.633481",
+      "ext": ".md"
+    },
+    {
+      "path": "TODO.md",
+      "size": 4625,
+      "mtime": "2025-09-22T14:42:07.633980",
+      "ext": ".md"
+    },
+    {
+      "path": "main_autonomous.py",
+      "size": 767,
+      "mtime": "2025-09-22T14:42:07.715843",
+      "ext": ".py"
+    },
+    {
+      "path": "main_autonomous_ci.py",
+      "size": 1479,
+      "mtime": "2025-09-22T14:42:07.716121",
+      "ext": ".py"
+    },
+    {
+      "path": "requirements-dev.txt",
+      "size": 60,
+      "mtime": "2025-09-22T14:42:07.724157",
+      "ext": ".txt"
+    },
+    {
+      "path": "requirements.txt",
+      "size": 365,
+      "mtime": "2025-09-22T14:42:07.724499",
+      "ext": ".txt"
+    },
+    {
+      "path": "test_autonomous_workflow.py",
+      "size": 2164,
+      "mtime": "2025-09-22T14:42:07.728522",
+      "ext": ".py"
+    },
+    {
+      "path": "test_full_workflow.py",
+      "size": 2126,
+      "mtime": "2025-09-22T14:42:07.728716",
+      "ext": ".py"
+    },
+    {
+      "path": "test_pdf_generation.py",
+      "size": 1418,
+      "mtime": "2025-09-22T14:42:07.728972",
+      "ext": ".py"
+    },
+    {
+      "path": ".github/labels.yml",
+      "size": 204,
+      "mtime": "2025-09-22T14:42:07.625237",
+      "ext": ".yml"
+    },
+    {
+      "path": ".github/workflows/a2a.yml",
+      "size": 3925,
+      "mtime": "2025-09-22T14:42:07.626623",
+      "ext": ".yml"
+    },
+    {
+      "path": ".github/workflows/auto-issues.yml",
+      "size": 5146,
+      "mtime": "2025-09-22T14:42:07.627353",
+      "ext": ".yml"
+    },
+    {
+      "path": ".github/workflows/ci_cd.yml",
+      "size": 2087,
+      "mtime": "2025-09-22T14:42:07.627918",
+      "ext": ".yml"
+    },
+    {
+      "path": ".github/workflows/live_e2e.yml",
+      "size": 2861,
+      "mtime": "2025-09-22T14:42:07.628457",
+      "ext": ".yml"
+    },
+    {
+      "path": ".github/workflows/smtp_selftest.yml",
+      "size": 1567,
+      "mtime": "2025-09-22T14:42:07.628979",
+      "ext": ".yml"
+    },
+    {
+      "path": "a2a_logging/README.md",
+      "size": 280,
+      "mtime": "2025-09-22T14:42:07.634820",
+      "ext": ".md"
+    },
+    {
+      "path": "a2a_logging/__init__.py",
+      "size": 44,
+      "mtime": "2025-09-22T14:42:07.635077",
+      "ext": ".py"
+    },
+    {
+      "path": "a2a_logging/errors.py",
+      "size": 4364,
+      "mtime": "2025-09-22T14:42:07.635383",
+      "ext": ".py"
+    },
+    {
+      "path": "a2a_logging/jsonl_sink.py",
+      "size": 422,
+      "mtime": "2025-09-22T14:42:07.636061",
+      "ext": ".py"
+    },
+    {
+      "path": "a2a_logging/logger.py",
+      "size": 4074,
+      "mtime": "2025-09-22T14:42:07.636706",
+      "ext": ".py"
+    },
+    {
+      "path": "a2a_logging/notifications.py",
+      "size": 1064,
+      "mtime": "2025-09-22T14:42:07.637322",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/README.md",
+      "size": 5917,
+      "mtime": "2025-09-22T14:42:07.638029",
+      "ext": ".md"
+    },
+    {
+      "path": "agents/__init__.py",
+      "size": 48,
+      "mtime": "2025-09-22T14:42:07.638652",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/agent_company_detail_research.py",
+      "size": 7396,
+      "mtime": "2025-09-22T14:42:07.639444",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/agent_external_level1_company_search.py",
+      "size": 5752,
+      "mtime": "2025-09-22T14:42:07.639855",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/agent_external_level2_companies_search.py",
+      "size": 3415,
+      "mtime": "2025-09-22T14:42:07.640310",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/agent_internal_customer_research.py",
+      "size": 2311,
+      "mtime": "2025-09-22T14:42:07.640822",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/agent_internal_level2_company_search.py",
+      "size": 3181,
+      "mtime": "2025-09-22T14:42:07.641404",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/agent_internal_search.py",
+      "size": 9080,
+      "mtime": "2025-09-22T14:42:07.641881",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/autonomous_consolidation_agent.py",
+      "size": 1538,
+      "mtime": "2025-09-22T14:42:07.642653",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/autonomous_email_agent.py",
+      "size": 6285,
+      "mtime": "2025-09-22T14:42:07.643249",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/autonomous_field_completion_agent.py",
+      "size": 2537,
+      "mtime": "2025-09-22T14:42:07.643923",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/autonomous_report_agent.py",
+      "size": 2330,
+      "mtime": "2025-09-22T14:42:07.644215",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/autonomous_research_agent.py",
+      "size": 3218,
+      "mtime": "2025-09-22T14:42:07.644529",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/autonomous_utils.py",
+      "size": 2019,
+      "mtime": "2025-09-22T14:42:07.645077",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/company_data.py",
+      "size": 9329,
+      "mtime": "2025-09-22T14:42:07.645546",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/digest.py",
+      "size": 838,
+      "mtime": "2025-09-22T14:42:07.646035",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/email_listener.py",
+      "size": 8261,
+      "mtime": "2025-09-22T14:42:07.646786",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/field_completion_agent.py",
+      "size": 17006,
+      "mtime": "2025-09-22T14:42:07.647325",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/recovery_agent.py",
+      "size": 5067,
+      "mtime": "2025-09-22T14:42:07.649568",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/reminder_service.py",
+      "size": 10218,
+      "mtime": "2025-09-22T14:42:07.649905",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/templates.py",
+      "size": 984,
+      "mtime": "2025-09-22T14:42:07.650380",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/internal_company/__init__.py",
+      "size": 57,
+      "mtime": "2025-09-22T14:42:07.648007",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/internal_company/fetch.py",
+      "size": 8704,
+      "mtime": "2025-09-22T14:42:07.648314",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/internal_company/normalize.py",
+      "size": 1567,
+      "mtime": "2025-09-22T14:42:07.648674",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/internal_company/plugins.py",
+      "size": 1076,
+      "mtime": "2025-09-22T14:42:07.649056",
+      "ext": ".py"
+    },
+    {
+      "path": "agents/internal_company/run.py",
+      "size": 2790,
+      "mtime": "2025-09-22T14:42:07.649400",
+      "ext": ".py"
+    },
+    {
+      "path": "api/workflow_api.py",
+      "size": 3202,
+      "mtime": "2025-09-22T14:42:07.650828",
+      "ext": ".py"
+    },
+    {
+      "path": "app/app/__init__.py",
+      "size": 0,
+      "mtime": "2025-09-22T14:42:07.651137",
+      "ext": ".py"
+    },
+    {
+      "path": "app/app/main.py",
+      "size": 1449,
+      "mtime": "2025-09-22T14:42:07.651454",
+      "ext": ".py"
+    },
+    {
+      "path": "app/app/worker.py",
+      "size": 3440,
+      "mtime": "2025-09-22T14:42:07.651843",
+      "ext": ".py"
+    },
+    {
+      "path": "app/core/autonomous.py",
+      "size": 3950,
+      "mtime": "2025-09-22T14:42:07.652421",
+      "ext": ".py"
+    },
+    {
+      "path": "app/core/event_bus.py",
+      "size": 3767,
+      "mtime": "2025-09-22T14:42:07.652785",
+      "ext": ".py"
+    },
+    {
+      "path": "app/core/event_store.py",
+      "size": 12074,
+      "mtime": "2025-09-22T14:42:07.653391",
+      "ext": ".py"
+    },
+    {
+      "path": "app/core/events.py",
+      "size": 933,
+      "mtime": "2025-09-22T14:42:07.653785",
+      "ext": ".py"
+    },
+    {
+      "path": "app/core/id_factory.py",
+      "size": 1068,
+      "mtime": "2025-09-22T14:42:07.654211",
+      "ext": ".py"
+    },
+    {
+      "path": "app/core/logging.py",
+      "size": 7221,
+      "mtime": "2025-09-22T14:42:07.654787",
+      "ext": ".py"
+    },
+    {
+      "path": "app/core/orchestrator.py",
+      "size": 18770,
+      "mtime": "2025-09-22T14:42:07.655161",
+      "ext": ".py"
+    },
+    {
+      "path": "app/core/query.py",
+      "size": 911,
+      "mtime": "2025-09-22T14:42:07.656073",
+      "ext": ".py"
+    },
+    {
+      "path": "app/core/schema.py",
+      "size": 841,
+      "mtime": "2025-09-22T14:42:07.656634",
+      "ext": ".py"
+    },
+    {
+      "path": "app/core/status.py",
+      "size": 614,
+      "mtime": "2025-09-22T14:42:07.657089",
+      "ext": ".py"
+    },
+    {
+      "path": "app/core/validation.py",
+      "size": 2349,
+      "mtime": "2025-09-22T14:42:07.657573",
+      "ext": ".py"
+    },
+    {
+      "path": "app/core/policy/retry.py",
+      "size": 1178,
+      "mtime": "2025-09-22T14:42:07.655581",
+      "ext": ".py"
+    },
+    {
+      "path": "app/integrations/__init__.py",
+      "size": 47,
+      "mtime": "2025-09-22T14:42:07.658111",
+      "ext": ".py"
+    },
+    {
+      "path": "app/integrations/email_reader.py",
+      "size": 5562,
+      "mtime": "2025-09-22T14:42:07.658770",
+      "ext": ".py"
+    },
+    {
+      "path": "app/integrations/mailer.py",
+      "size": 3377,
+      "mtime": "2025-09-22T14:42:07.659321",
+      "ext": ".py"
+    },
+    {
+      "path": "app/integrations/templates/email_body.html",
+      "size": 250,
+      "mtime": "2025-09-22T14:42:07.659677",
+      "ext": ".html"
+    },
+    {
+      "path": "app/integrations/templates/email_body.txt",
+      "size": 151,
+      "mtime": "2025-09-22T14:42:07.659889",
+      "ext": ".txt"
+    },
+    {
+      "path": "artifacts/.gitkeep",
+      "size": 0,
+      "mtime": "2025-09-22T14:42:07.660062",
+      "ext": ""
+    },
+    {
+      "path": "artifacts/internal_customer_companies.json",
+      "size": 2,
+      "mtime": "2025-09-22T14:42:07.660198",
+      "ext": ".json"
+    },
+    {
+      "path": "artifacts/matching_crm_companies.json",
+      "size": 100,
+      "mtime": "2025-09-22T14:42:07.660521",
+      "ext": ".json"
+    },
+    {
+      "path": "artifacts/neighbor_level1_companies.json",
+      "size": 2,
+      "mtime": "2025-09-22T14:42:07.660949",
+      "ext": ".json"
+    },
+    {
+      "path": "artifacts/neighbor_level2_companies.json",
+      "size": 2,
+      "mtime": "2025-09-22T14:42:07.661124",
+      "ext": ".json"
+    },
+    {
+      "path": "artifacts/new_company_search_mahle_com.json",
+      "size": 869,
+      "mtime": "2025-09-22T14:42:07.661312",
+      "ext": ".json"
+    },
+    {
+      "path": "compliance/README.md",
+      "size": 254,
+      "mtime": "2025-09-22T14:42:07.661476",
+      "ext": ".md"
+    },
+    {
+      "path": "compliance/gdpr.py",
+      "size": 2090,
+      "mtime": "2025-09-22T14:42:07.661610",
+      "ext": ".py"
+    },
+    {
+      "path": "config/README.md",
+      "size": 376,
+      "mtime": "2025-09-22T14:42:07.661941",
+      "ext": ".md"
+    },
+    {
+      "path": "config/__init__.py",
+      "size": 47,
+      "mtime": "2025-09-22T14:42:07.662135",
+      "ext": ".py"
+    },
+    {
+      "path": "config/env.py",
+      "size": 476,
+      "mtime": "2025-09-22T14:42:07.686683",
+      "ext": ".py"
+    },
+    {
+      "path": "config/required_fields.json",
+      "size": 443,
+      "mtime": "2025-09-22T14:42:07.687396",
+      "ext": ".json"
+    },
+    {
+      "path": "config/settings.py",
+      "size": 9472,
+      "mtime": "2025-09-22T14:42:07.688350",
+      "ext": ".py"
+    },
+    {
+      "path": "config/trigger_words.txt",
+      "size": 392,
+      "mtime": "2025-09-22T14:42:07.688710",
+      "ext": ".txt"
+    },
+    {
+      "path": "core/README.md",
+      "size": 695,
+      "mtime": "2025-09-22T14:42:07.689329",
+      "ext": ".md"
+    },
+    {
+      "path": "core/__init__.py",
+      "size": 48,
+      "mtime": "2025-09-22T14:42:07.689705",
+      "ext": ".py"
+    },
+    {
+      "path": "core/agent_controller.py",
+      "size": 11719,
+      "mtime": "2025-09-22T14:42:07.690049",
+      "ext": ".py"
+    },
+    {
+      "path": "core/circuit_breaker.py",
+      "size": 3378,
+      "mtime": "2025-09-22T14:42:07.690752",
+      "ext": ".py"
+    },
+    {
+      "path": "core/classify.py",
+      "size": 3978,
+      "mtime": "2025-09-22T14:42:07.691304",
+      "ext": ".py"
+    },
+    {
+      "path": "core/consolidate.py",
+      "size": 1764,
+      "mtime": "2025-09-22T14:42:07.691641",
+      "ext": ".py"
+    },
+    {
+      "path": "core/duplicate_check.py",
+      "size": 1088,
+      "mtime": "2025-09-22T14:42:07.692016",
+      "ext": ".py"
+    },
+    {
+      "path": "core/event_bus.py",
+      "size": 241,
+      "mtime": "2025-09-22T14:42:07.692473",
+      "ext": ".py"
+    },
+    {
+      "path": "core/exports.py",
+      "size": 4343,
+      "mtime": "2025-09-22T14:42:07.692793",
+      "ext": ".py"
+    },
+    {
+      "path": "core/hubspot_ops.py",
+      "size": 3923,
+      "mtime": "2025-09-22T14:42:07.693271",
+      "ext": ".py"
+    },
+    {
+      "path": "core/logging.py",
+      "size": 213,
+      "mtime": "2025-09-22T14:42:07.693580",
+      "ext": ".py"
+    },
+    {
+      "path": "core/orchestrator.py",
+      "size": 223,
+      "mtime": "2025-09-22T14:42:07.693801",
+      "ext": ".py"
+    },
+    {
+      "path": "core/parser.py",
+      "size": 716,
+      "mtime": "2025-09-22T14:42:07.694478",
+      "ext": ".py"
+    },
+    {
+      "path": "core/run_loop.py",
+      "size": 13299,
+      "mtime": "2025-09-22T14:42:07.694905",
+      "ext": ".py"
+    },
+    {
+      "path": "core/services.py",
+      "size": 3065,
+      "mtime": "2025-09-22T14:42:07.695346",
+      "ext": ".py"
+    },
+    {
+      "path": "core/statuses.py",
+      "size": 533,
+      "mtime": "2025-09-22T14:42:07.695791",
+      "ext": ".py"
+    },
+    {
+      "path": "core/summarize.py",
+      "size": 2011,
+      "mtime": "2025-09-22T14:42:07.696016",
+      "ext": ".py"
+    },
+    {
+      "path": "core/tasks.py",
+      "size": 7417,
+      "mtime": "2025-09-22T14:42:07.696259",
+      "ext": ".py"
+    },
+    {
+      "path": "core/trigger_words.py",
+      "size": 9565,
+      "mtime": "2025-09-22T14:42:07.696771",
+      "ext": ".py"
+    },
+    {
+      "path": "core/triggers.py",
+      "size": 10086,
+      "mtime": "2025-09-22T14:42:07.697227",
+      "ext": ".py"
+    },
+    {
+      "path": "core/utils.py",
+      "size": 9887,
+      "mtime": "2025-09-22T14:42:07.697776",
+      "ext": ".py"
+    },
+    {
+      "path": "data/tasks.db",
+      "size": 16384,
+      "mtime": "2025-09-22T14:42:07.698601",
+      "ext": ".db"
+    },
+    {
+      "path": "desktop/a2a-oauth/get_refresh_token.py",
+      "size": 5074,
+      "mtime": "2025-09-22T14:42:07.699390",
+      "ext": ".py"
+    },
+    {
+      "path": "docs/email_reply_processing.md",
+      "size": 1969,
+      "mtime": "2025-09-22T14:42:07.699744",
+      "ext": ".md"
+    },
+    {
+      "path": "docs/hubspot_mapping.md",
+      "size": 3423,
+      "mtime": "2025-09-22T14:42:07.700143",
+      "ext": ".md"
+    },
+    {
+      "path": "docs/status_model.md",
+      "size": 611,
+      "mtime": "2025-09-22T14:42:07.700470",
+      "ext": ".md"
+    },
+    {
+      "path": "images/.gitkeep",
+      "size": 0,
+      "mtime": "2025-09-22T14:42:07.700723",
+      "ext": ""
+    },
+    {
+      "path": "images/Prozess Ausschnitt 1 A2A Research Workflow.jpg",
+      "size": 167165,
+      "mtime": "2025-09-22T14:42:07.703189",
+      "ext": ".jpg"
+    },
+    {
+      "path": "images/Prozess Ausschnitt 2 A2A Research Workflow.jpg",
+      "size": 117487,
+      "mtime": "2025-09-22T14:42:07.705276",
+      "ext": ".jpg"
+    },
+    {
+      "path": "integrations/README.md",
+      "size": 683,
+      "mtime": "2025-09-22T14:42:07.705817",
+      "ext": ".md"
+    },
+    {
+      "path": "integrations/__init__.py",
+      "size": 47,
+      "mtime": "2025-09-22T14:42:07.706421",
+      "ext": ".py"
+    },
+    {
+      "path": "integrations/email_client.py",
+      "size": 2483,
+      "mtime": "2025-09-22T14:42:07.706743",
+      "ext": ".py"
+    },
+    {
+      "path": "integrations/email_reader.py",
+      "size": 13489,
+      "mtime": "2025-09-22T14:42:07.707330",
+      "ext": ".py"
+    },
+    {
+      "path": "integrations/email_sender.py",
+      "size": 16934,
+      "mtime": "2025-09-22T14:42:07.707819",
+      "ext": ".py"
+    },
+    {
+      "path": "integrations/google_calendar.py",
+      "size": 8508,
+      "mtime": "2025-09-22T14:42:07.708424",
+      "ext": ".py"
+    },
+    {
+      "path": "integrations/google_oauth.py",
+      "size": 5648,
+      "mtime": "2025-09-22T14:42:07.708919",
+      "ext": ".py"
+    },
+    {
+      "path": "integrations/graph_storage.py",
+      "size": 2203,
+      "mtime": "2025-09-22T14:42:07.709556",
+      "ext": ".py"
+    },
+    {
+      "path": "integrations/hubspot_api.py",
+      "size": 19219,
+      "mtime": "2025-09-22T14:42:07.709882",
+      "ext": ".py"
+    },
+    {
+      "path": "integrations/mailer.py",
+      "size": 3910,
+      "mtime": "2025-09-22T14:42:07.710119",
+      "ext": ".py"
+    },
+    {
+      "path": "integrations/trigger_words.py",
+      "size": 102,
+      "mtime": "2025-09-22T14:42:07.711400",
+      "ext": ".py"
+    },
+    {
+      "path": "integrations/web_scraper.py",
+      "size": 3126,
+      "mtime": "2025-09-22T14:42:07.711574",
+      "ext": ".py"
+    },
+    {
+      "path": "integrations/templates/README.md",
+      "size": 369,
+      "mtime": "2025-09-22T14:42:07.710676",
+      "ext": ".md"
+    },
+    {
+      "path": "integrations/templates/email_body.html",
+      "size": 204,
+      "mtime": "2025-09-22T14:42:07.710907",
+      "ext": ".html"
+    },
+    {
+      "path": "integrations/templates/email_body.txt",
+      "size": 128,
+      "mtime": "2025-09-22T14:42:07.711037",
+      "ext": ".txt"
+    },
+    {
+      "path": "integrations/templates/email_subject.txt",
+      "size": 34,
+      "mtime": "2025-09-22T14:42:07.711250",
+      "ext": ".txt"
+    },
+    {
+      "path": "logs/agent_internal_search/2025/09/19.jsonl",
+      "size": 831,
+      "mtime": "2025-09-22T14:42:07.711914",
+      "ext": ".jsonl"
+    },
+    {
+      "path": "logs/workflows/2025-09-19T14-09-41_workflow.jsonl",
+      "size": 548,
+      "mtime": "2025-09-22T14:42:07.712101",
+      "ext": ".jsonl"
+    },
+    {
+      "path": "logs/workflows/2025-09-19T14-10-13_workflow.jsonl",
+      "size": 344,
+      "mtime": "2025-09-22T14:42:07.712286",
+      "ext": ".jsonl"
+    },
+    {
+      "path": "logs/workflows/2025-09-19T23-26-40_workflow.jsonl",
+      "size": 220,
+      "mtime": "2025-09-22T14:42:07.712438",
+      "ext": ".jsonl"
+    },
+    {
+      "path": "logs/workflows/2025-09-20T17-31-40_workflow.jsonl",
+      "size": 190,
+      "mtime": "2025-09-22T14:42:07.712560",
+      "ext": ".jsonl"
+    },
+    {
+      "path": "logs/workflows/agent_registry.jsonl",
+      "size": 18606,
+      "mtime": "2025-09-22T14:42:07.712722",
+      "ext": ".jsonl"
+    },
+    {
+      "path": "logs/workflows/autonomous_orchestrator.jsonl",
+      "size": 4466,
+      "mtime": "2025-09-22T14:42:07.712887",
+      "ext": ".jsonl"
+    },
+    {
+      "path": "logs/workflows/calendar.jsonl",
+      "size": 3280,
+      "mtime": "2025-09-22T14:42:07.713056",
+      "ext": ".jsonl"
+    },
+    {
+      "path": "logs/workflows/event_bus.jsonl",
+      "size": 8966,
+      "mtime": "2025-09-22T14:42:07.713202",
+      "ext": ".jsonl"
+    },
+    {
+      "path": "logs/workflows/external_search_agent.jsonl",
+      "size": 602,
+      "mtime": "2025-09-22T14:42:07.713346",
+      "ext": ".jsonl"
+    },
+    {
+      "path": "logs/workflows/field_completion.jsonl",
+      "size": 5635,
+      "mtime": "2025-09-22T14:42:07.713516",
+      "ext": ".jsonl"
+    },
+    {
+      "path": "logs/workflows/field_completion_agent.jsonl",
+      "size": 620,
+      "mtime": "2025-09-22T14:42:07.713642",
+      "ext": ".jsonl"
+    },
+    {
+      "path": "logs/workflows/google_oauth.jsonl",
+      "size": 229,
+      "mtime": "2025-09-22T14:42:07.713784",
+      "ext": ".jsonl"
+    },
+    {
+      "path": "logs/workflows/internal_search_agent.jsonl",
+      "size": 1233,
+      "mtime": "2025-09-22T14:42:07.713954",
+      "ext": ".jsonl"
+    },
+    {
+      "path": "logs/workflows/main.jsonl",
+      "size": 1342,
+      "mtime": "2025-09-22T14:42:07.714097",
+      "ext": ".jsonl"
+    },
+    {
+      "path": "logs/workflows/test.jsonl",
+      "size": 1596,
+      "mtime": "2025-09-22T14:42:07.714576",
+      "ext": ".jsonl"
+    },
+    {
+      "path": "logs/workflows/wf-20250920-133744-d84b57.jsonl",
+      "size": 170,
+      "mtime": "2025-09-22T14:42:07.715176",
+      "ext": ".jsonl"
+    },
+    {
+      "path": "logs/workflows/workflow_coordinator.jsonl",
+      "size": 605,
+      "mtime": "2025-09-22T14:42:07.715394",
+      "ext": ".jsonl"
+    },
+    {
+      "path": "ops/CONFIG.md",
+      "size": 972,
+      "mtime": "2025-09-22T14:42:07.716389",
+      "ext": ".md"
+    },
+    {
+      "path": "ops/Dockerfile",
+      "size": 980,
+      "mtime": "2025-09-22T14:42:07.716660",
+      "ext": ""
+    },
+    {
+      "path": "ops/Makefile",
+      "size": 158,
+      "mtime": "2025-09-22T14:42:07.716913",
+      "ext": ""
+    },
+    {
+      "path": "ops/README.md",
+      "size": 513,
+      "mtime": "2025-09-22T14:42:07.717056",
+      "ext": ".md"
+    },
+    {
+      "path": "ops/SECURITY.md",
+      "size": 79,
+      "mtime": "2025-09-22T14:42:07.717334",
+      "ext": ".md"
+    },
+    {
+      "path": "ops/docker-compose.yml",
+      "size": 662,
+      "mtime": "2025-09-22T14:42:07.717524",
+      "ext": ".yml"
+    },
+    {
+      "path": "ops/no_demo_guard.py",
+      "size": 613,
+      "mtime": "2025-09-22T14:42:07.717705",
+      "ext": ".py"
+    },
+    {
+      "path": "ops/no_legacy_oauth_guard.py",
+      "size": 780,
+      "mtime": "2025-09-22T14:42:07.718112",
+      "ext": ".py"
+    },
+    {
+      "path": "output/README.md",
+      "size": 801,
+      "mtime": "2025-09-22T14:42:07.718917",
+      "ext": ".md"
+    },
+    {
+      "path": "output/__init__.py",
+      "size": 54,
+      "mtime": "2025-09-22T14:42:07.719375",
+      "ext": ".py"
+    },
+    {
+      "path": "output/csv_export.py",
+      "size": 653,
+      "mtime": "2025-09-22T14:42:07.719645",
+      "ext": ".py"
+    },
+    {
+      "path": "output/pdf_render.py",
+      "size": 7231,
+      "mtime": "2025-09-22T14:42:07.722924",
+      "ext": ".py"
+    },
+    {
+      "path": "output/exports/.gitkeep",
+      "size": 0,
+      "mtime": "2025-09-22T14:42:07.719796",
+      "ext": ""
+    },
+    {
+      "path": "output/exports/data.csv",
+      "size": 133,
+      "mtime": "2025-09-22T14:42:07.720391",
+      "ext": ".csv"
+    },
+    {
+      "path": "output/exports/report.pdf",
+      "size": 7665,
+      "mtime": "2025-09-22T14:42:07.721239",
+      "ext": ".pdf"
+    },
+    {
+      "path": "output/exports/csv/.gitkeep",
+      "size": 0,
+      "mtime": "2025-09-22T14:42:07.720163",
+      "ext": ""
+    },
+    {
+      "path": "output/exports/pdf/.gitkeep",
+      "size": 0,
+      "mtime": "2025-09-22T14:42:07.720759",
+      "ext": ""
+    },
+    {
+      "path": "output/exports/run_logs/calendar.jsonl",
+      "size": 1762,
+      "mtime": "2025-09-22T14:42:07.721895",
+      "ext": ".jsonl"
+    },
+    {
+      "path": "output/exports/run_logs/summary.json",
+      "size": 290,
+      "mtime": "2025-09-22T14:42:07.722553",
+      "ext": ".json"
+    },
+    {
+      "path": "output/templates/pdf/.gitkeep",
+      "size": 0,
+      "mtime": "2025-09-22T14:42:07.723272",
+      "ext": ""
+    },
+    {
+      "path": "output/templates/pdf/report.html.j2",
+      "size": 836,
+      "mtime": "2025-09-22T14:42:07.723933",
+      "ext": ".j2"
+    },
+    {
+      "path": "schemas/README.md",
+      "size": 284,
+      "mtime": "2025-09-22T14:42:07.725464",
+      "ext": ".md"
+    },
+    {
+      "path": "schemas/company.core.schema.json",
+      "size": 1864,
+      "mtime": "2025-09-22T14:42:07.726073",
+      "ext": ".json"
+    },
+    {
+      "path": "schemas/graph.edge.schema.json",
+      "size": 320,
+      "mtime": "2025-09-22T14:42:07.727537",
+      "ext": ".json"
+    },
+    {
+      "path": "schemas/graph.node.schema.json",
+      "size": 268,
+      "mtime": "2025-09-22T14:42:07.727836",
+      "ext": ".json"
+    },
+    {
+      "path": "schemas/events/EmailSendRequested.schema.json",
+      "size": 434,
+      "mtime": "2025-09-22T14:42:07.726675",
+      "ext": ".json"
+    },
+    {
+      "path": "schemas/events/EventBase.schema.json",
+      "size": 1799,
+      "mtime": "2025-09-22T14:42:07.726977",
+      "ext": ".json"
+    },
+    {
+      "path": "schemas/events/ReportReady.schema.json",
+      "size": 411,
+      "mtime": "2025-09-22T14:42:07.727232",
+      "ext": ".json"
+    },
+    {
+      "path": "schemas/events/UserReplyReceived.schema.json",
+      "size": 420,
+      "mtime": "2025-09-22T14:42:07.727381",
+      "ext": ".json"
+    },
+    {
+      "path": "schemas/views/.gitkeep",
+      "size": 0,
+      "mtime": "2025-09-22T14:42:07.728015",
+      "ext": ""
+    },
+    {
+      "path": "scripts/migrate_event_ids.py",
+      "size": 6239,
+      "mtime": "2025-09-22T14:42:07.728322",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/README.md",
+      "size": 317,
+      "mtime": "2025-09-22T14:42:07.729388",
+      "ext": ".md"
+    },
+    {
+      "path": "tests/calendar_auth_test.py",
+      "size": 2652,
+      "mtime": "2025-09-22T14:42:07.729565",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/conftest.py",
+      "size": 1948,
+      "mtime": "2025-09-22T14:42:07.729704",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/email_imap_test.py",
+      "size": 8384,
+      "mtime": "2025-09-22T14:42:07.730720",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/email_smtp_test.py",
+      "size": 3800,
+      "mtime": "2025-09-22T14:42:07.731426",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/test_calendar_fetch.py",
+      "size": 3331,
+      "mtime": "2025-09-22T14:42:07.733381",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/test_ci_cd_workflow_yaml.py",
+      "size": 412,
+      "mtime": "2025-09-22T14:42:07.733808",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/test_email_reference_parse.py",
+      "size": 1100,
+      "mtime": "2025-09-22T14:42:07.734193",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/test_email_sender.py",
+      "size": 860,
+      "mtime": "2025-09-22T14:42:07.734650",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/test_event_store.py",
+      "size": 5555,
+      "mtime": "2025-09-22T14:42:07.735334",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/test_exports_safety.py",
+      "size": 1552,
+      "mtime": "2025-09-22T14:42:07.735820",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/test_google_calendar.py",
+      "size": 458,
+      "mtime": "2025-09-22T14:42:07.736212",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/test_google_oauth_env_mapping.py",
+      "size": 1766,
+      "mtime": "2025-09-22T14:42:07.736711",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/test_live_enforcement.py",
+      "size": 1366,
+      "mtime": "2025-09-22T14:42:07.737126",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/test_orchestrator.py",
+      "size": 4624,
+      "mtime": "2025-09-22T14:42:07.737550",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/test_trigger_words.py",
+      "size": 2729,
+      "mtime": "2025-09-22T14:42:07.737979",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/test_utils.py",
+      "size": 348,
+      "mtime": "2025-09-22T14:42:07.738687",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/test_waiting_user_flow.py",
+      "size": 5215,
+      "mtime": "2025-09-22T14:42:07.739043",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/trigger_test.py",
+      "size": 8218,
+      "mtime": "2025-09-22T14:42:07.739826",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/e2e/.gitkeep",
+      "size": 0,
+      "mtime": "2025-09-22T14:42:07.729839",
+      "ext": ""
+    },
+    {
+      "path": "tests/e2e/test_artifact_integrity.py",
+      "size": 967,
+      "mtime": "2025-09-22T14:42:07.730020",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/e2e/test_idle_artifacts.py",
+      "size": 973,
+      "mtime": "2025-09-22T14:42:07.730178",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/integration/.gitkeep",
+      "size": 0,
+      "mtime": "2025-09-22T14:42:07.731639",
+      "ext": ""
+    },
+    {
+      "path": "tests/integration/test_neighbor_companies.py",
+      "size": 2368,
+      "mtime": "2025-09-22T14:42:07.731967",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/integration/test_workflow_end_to_end.py",
+      "size": 7817,
+      "mtime": "2025-09-22T14:42:07.732548",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/integration/test_workflow_outputs.py",
+      "size": 2275,
+      "mtime": "2025-09-22T14:42:07.733001",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_as_trigger_from_event.py",
+      "size": 2047,
+      "mtime": "2025-09-22T14:42:07.741260",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_as_trigger_from_event_fields.py",
+      "size": 2292,
+      "mtime": "2025-09-22T14:42:07.741851",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_autonomous_email_agent.py",
+      "size": 3313,
+      "mtime": "2025-09-22T14:42:07.742454",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_autonomous_utils.py",
+      "size": 1588,
+      "mtime": "2025-09-22T14:42:07.742948",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_calendar_missing_creds_idle.py",
+      "size": 1177,
+      "mtime": "2025-09-22T14:42:07.743455",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_calendar_triggers.py",
+      "size": 2340,
+      "mtime": "2025-09-22T14:42:07.743890",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_classify.py",
+      "size": 1121,
+      "mtime": "2025-09-22T14:42:07.744355",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_consolidate.py",
+      "size": 1052,
+      "mtime": "2025-09-22T14:42:07.745082",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_digest.py",
+      "size": 1851,
+      "mtime": "2025-09-22T14:42:07.745480",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_duplicate_check.py",
+      "size": 1496,
+      "mtime": "2025-09-22T14:42:07.745810",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_email_allowlist.py",
+      "size": 2989,
+      "mtime": "2025-09-22T14:42:07.746308",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_email_attachments.py",
+      "size": 2531,
+      "mtime": "2025-09-22T14:42:07.746767",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_email_client.py",
+      "size": 1369,
+      "mtime": "2025-09-22T14:42:07.747360",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_email_reader_processing.py",
+      "size": 3297,
+      "mtime": "2025-09-22T14:42:07.747841",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_email_sender_reminder.py",
+      "size": 1758,
+      "mtime": "2025-09-22T14:42:07.748342",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_errors.py",
+      "size": 4619,
+      "mtime": "2025-09-22T14:42:07.749040",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_field_completion_agent.py",
+      "size": 1080,
+      "mtime": "2025-09-22T14:42:07.749436",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_finalize_single_shot.py",
+      "size": 679,
+      "mtime": "2025-09-22T14:42:07.749670",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_gdpr.py",
+      "size": 644,
+      "mtime": "2025-09-22T14:42:07.749874",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_google_calendar_error_logging.py",
+      "size": 3064,
+      "mtime": "2025-09-22T14:42:07.750282",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_hubspot_api.py",
+      "size": 9739,
+      "mtime": "2025-09-22T14:42:07.750785",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_internal_company_fetch.py",
+      "size": 1420,
+      "mtime": "2025-09-22T14:42:07.751435",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_internal_company_run.py",
+      "size": 2059,
+      "mtime": "2025-09-22T14:42:07.752069",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_jsonl_sink.py",
+      "size": 584,
+      "mtime": "2025-09-22T14:42:07.787125",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_logger.py",
+      "size": 692,
+      "mtime": "2025-09-22T14:42:07.788435",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_orchestrator_exit.py",
+      "size": 3067,
+      "mtime": "2025-09-22T14:42:07.788938",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_orchestrator_logging.py",
+      "size": 4896,
+      "mtime": "2025-09-22T14:42:07.789572",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_recovery_agent.py",
+      "size": 2327,
+      "mtime": "2025-09-22T14:42:07.790102",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_reminder_scheduler.py",
+      "size": 6195,
+      "mtime": "2025-09-22T14:42:07.791191",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_run_loop_notify_reminders.py",
+      "size": 1044,
+      "mtime": "2025-09-22T14:42:07.791886",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_severity.py",
+      "size": 1998,
+      "mtime": "2025-09-22T14:42:07.792766",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_summary_aggregation.py",
+      "size": 934,
+      "mtime": "2025-09-22T14:42:07.793351",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/test_tasks.py",
+      "size": 1049,
+      "mtime": "2025-09-22T14:42:07.794132",
+      "ext": ".py"
+    },
+    {
+      "path": "tests/unit/agents/internal_company/test_run.py",
+      "size": 2342,
+      "mtime": "2025-09-22T14:42:07.740869",
+      "ext": ".py"
+    }
+  ]
+}

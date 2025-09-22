@@ -1,0 +1,57 @@
+{
+  "generated_at": "2025-09-22T14:50:49.704477Z",
+  "items": [
+    {
+      "id": "P001",
+      "source": "finding:F001",
+      "title": "Upgrade to Python 3.13 base; introduce pip-tools lock and constraints; pin core deps",
+      "prereqs": [],
+      "acceptance": [
+        "`docker build` uses python:3.13-slim",
+        "CI compiles requirements.lock with hashes",
+        "App boots and tests pass"
+      ],
+      "risk": "Medium",
+      "changeset": "changes/001-runtime-deps/",
+      "adr": "ADR-001.md",
+      "research_doc": "research/F001.md",
+      "status": "open"
+    },
+    {
+      "id": "P002",
+      "source": "finding:F002",
+      "title": "Enforce event-driven path; deprecate legacy side-effect agents; centralize exports",
+      "prereqs": [
+        "P001"
+      ],
+      "acceptance": [
+        "Importing legacy agent raises RuntimeError",
+        "CI test asserts deprecation",
+        "Worker handles EmailSendRequested & ExportCSVRequested"
+      ],
+      "risk": "Medium",
+      "changeset": "changes/002-guardrails-event-bus/",
+      "adr": "ADR-002.md",
+      "research_doc": "research/F002.md",
+      "status": "open"
+    },
+    {
+      "id": "P003",
+      "source": "finding:F003,F005",
+      "title": "Add CI quality gates (plan/ADR validation, apply-dry-run) and SBOM+SCA job",
+      "prereqs": [
+        "P001"
+      ],
+      "acceptance": [
+        "New workflow .github/workflows/quality.yml runs gates",
+        "SBOM artifact uploaded",
+        "Fail if research/ADR missing for non-draft changes"
+      ],
+      "risk": "Low",
+      "changeset": "changes/003-ci-gates-sbom/",
+      "adr": "ADR-003.md",
+      "research_doc": "research/F003.md",
+      "status": "open"
+    }
+  ]
+}
