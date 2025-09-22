@@ -94,9 +94,20 @@ def _resolve_db_path() -> Path:
 _DB_PATH = _resolve_db_path()
 
 
+def _configure_connection(conn: sqlite3.Connection) -> None:
+    """Apply the standard SQLite pragmas required for reliable operation."""
+
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+    conn.execute("PRAGMA temp_store=MEMORY")
+    conn.execute("PRAGMA foreign_keys=ON")
+
+
 def _connect() -> sqlite3.Connection:
     _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(_DB_PATH)
+    _configure_connection(conn)
     conn.row_factory = sqlite3.Row
     conn.execute(
         """

@@ -143,3 +143,20 @@ def test_optimistic_concurrency_detected(fresh_store, monkeypatch):
     assert latest is not None
     assert latest.status is EventStatus.PENDING
 
+
+def test_connection_pragmas_configured(fresh_store):
+    store = fresh_store
+
+    with store._connect() as conn:  # noqa: SLF001 - intentional for test visibility
+        journal_mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
+        synchronous = conn.execute("PRAGMA synchronous").fetchone()[0]
+        busy_timeout = conn.execute("PRAGMA busy_timeout").fetchone()[0]
+        temp_store = conn.execute("PRAGMA temp_store").fetchone()[0]
+        foreign_keys = conn.execute("PRAGMA foreign_keys").fetchone()[0]
+
+    assert str(journal_mode).lower() == "wal"
+    assert int(synchronous) == 1  # NORMAL
+    assert int(busy_timeout) == 5000
+    assert int(temp_store) == 2  # MEMORY
+    assert int(foreign_keys) == 1
+
