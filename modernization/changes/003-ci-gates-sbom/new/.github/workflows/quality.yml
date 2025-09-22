@@ -29,11 +29,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Generate CycloneDX SBOM
-        uses: CycloneDX/gh-python-sbom@v3
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          format: json
-          output: sbom.json
+          python-version: '3.11'
+
+      - name: Install SBOM tooling
+        run: pip install cyclonedx-bom
+
+      - name: Generate CycloneDX SBOM
+        run: cyclonedx-py --format json --output sbom.json
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
