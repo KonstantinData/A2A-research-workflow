@@ -1,4 +1,0 @@
--r requirements.in
-pip-tools
-ruff
-flake8

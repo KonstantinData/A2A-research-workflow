@@ -9,10 +9,6 @@ for f in agents/autonomous_report_agent.py agents/autonomous_email_agent.py agen
 path = 'REPO/' + '/mnt/data/repo/A2A-research-workflow-main'
 PY
 done
-# Copy the shim files over the originals
-cp_or_echo modernization/changes/002-guardrails-event-bus/new/agents.autonomous_report_agent.py agents/autonomous_report_agent.py
-cp_or_echo modernization/changes/002-guardrails-event-bus/new/agents.autonomous_email_agent.py agents/autonomous_email_agent.py
-cp_or_echo modernization/changes/002-guardrails-event-bus/new/agents.autonomous_research_agent.py agents/autonomous_research_agent.py
-mkdir_or_echo tests
-cp_or_echo modernization/changes/002-guardrails-event-bus/new/tests/test_legacy_agents_deprecated.py tests/test_legacy_agents_deprecated.py
+# Legacy shim files and test have been permanently removed from the repository
+echo "Note: Legacy agent shims and deprecated test have been permanently removed"
 echo 'Apply 002 done.'
