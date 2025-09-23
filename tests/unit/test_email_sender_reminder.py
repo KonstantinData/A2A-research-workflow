@@ -2,10 +2,25 @@ import datetime as dt
 import sys
 from pathlib import Path
 
+import pytest
+
 # Projekt-Root in den Pfad aufnehmen
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from integrations import email_sender
+from config import settings as settings_module
+
+
+def _set_allowlist(monkeypatch: pytest.MonkeyPatch, domains: set[str]) -> None:
+    normalised = {d.lower() for d in domains}
+    monkeypatch.setattr(settings_module, "EMAIL_ALLOWLIST", normalised, raising=False)
+    primary = sorted(normalised)[0] if normalised else ""
+    monkeypatch.setattr(
+        settings_module.SETTINGS,
+        "allowlist_email_domain",
+        primary,
+        raising=False,
+    )
 
 
 def test_send_reminder_formats_subject_and_body(monkeypatch):
@@ -24,6 +39,7 @@ def test_send_reminder_formats_subject_and_body(monkeypatch):
         captured["subject"] = subject
         captured["body"] = body
 
+    _set_allowlist(monkeypatch, {"condata.io"})
     # Allowlist passend zur Empfängeradresse setzen, damit send_reminder() nicht frühzeitig abbricht
     monkeypatch.setenv("ALLOWLIST_EMAIL_DOMAIN", "condata.io")
 

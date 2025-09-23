@@ -6,6 +6,19 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from integrations import email_sender
+from config import settings as settings_module
+
+
+def _set_allowlist(monkeypatch: pytest.MonkeyPatch, domains: set[str]) -> None:
+    normalised = {d.lower() for d in domains}
+    monkeypatch.setattr(settings_module, "EMAIL_ALLOWLIST", normalised, raising=False)
+    primary = sorted(normalised)[0] if normalised else ""
+    monkeypatch.setattr(
+        settings_module.SETTINGS,
+        "allowlist_email_domain",
+        primary,
+        raising=False,
+    )
 
 
 def test_small_attachment_sent(monkeypatch, tmp_path):
@@ -21,6 +34,7 @@ def test_small_attachment_sent(monkeypatch, tmp_path):
     def fake_validate(to):
         return to  # Always return the recipient as valid
 
+    _set_allowlist(monkeypatch, {"b"})
     # Allowlist deaktivieren, sonst kehrt send_email() früh zurück
     monkeypatch.setenv("ALLOWLIST_EMAIL_DOMAIN", "")
     monkeypatch.setenv("LIVE_MODE", "0")
@@ -56,6 +70,7 @@ def test_large_attachment_skipped(monkeypatch, tmp_path):
     logs = []
     monkeypatch.setattr(email_sender, "log_step", lambda *a, **k: logs.append((a, k)))
 
+    _set_allowlist(monkeypatch, {"b"})
     # Allowlist deaktivieren
     monkeypatch.setenv("ALLOWLIST_EMAIL_DOMAIN", "")
     monkeypatch.setenv("LIVE_MODE", "0")
