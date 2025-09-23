@@ -30,6 +30,21 @@ flowchart LR
    The Google Calendar integration requires the
    `google-api-python-client` and `google-auth` packages. Missing Google
    API libraries log a `google_api_client_missing` step for Calendar.
+
+   For the default development setup install the extended requirements
+   file instead:
+   ```bash
+   pip install -r requirements-dev.txt
+   ```
+   This installs the pinned runtime dependencies together with
+   `pip-tools`, making `pip-compile`/`pip-sync` available for maintaining
+   the lock file.
+
+   Regenerate the hashed lock file after updating
+   `requirements.in` via:
+   ```bash
+   scripts/update_lockfile.sh
+   ```
 3. Set required environment variables as needed. SMTP/IMAP/HubSpot/Google variables are listed in [`.env.example`](.env.example) and documented in [`ops/CONFIG.md`](ops/CONFIG.md).
 4. Adjust trigger words in `config/trigger_words.txt` or point `TRIGGER_WORDS_FILE` to a custom list.
 
