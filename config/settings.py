@@ -7,6 +7,34 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
 
+
+def _parse_allowlist(raw: str) -> set[str]:
+    return {
+        item.strip().lower().lstrip("@")
+        for item in raw.split(",")
+        if item.strip()
+    }
+
+
+EMAIL_ALLOWLIST = _parse_allowlist(
+    os.getenv("EMAIL_ALLOWLIST", "example.com,company.com")
+)
+_legacy_allow = os.getenv("ALLOWLIST_EMAIL_DOMAIN", "").strip()
+if _legacy_allow:
+    EMAIL_ALLOWLIST.add(_legacy_allow.lstrip("@").lower())
+
+
+def email_allowed(addr: str) -> bool:
+    if not addr or "@" not in addr:
+        return False
+    domain = addr.rsplit("@", 1)[-1].strip().lower()
+    if not domain:
+        return False
+    return any(
+        domain == allowed or domain.endswith(f".{allowed}")
+        for allowed in EMAIL_ALLOWLIST
+    )
+
 _logger = logging.getLogger(__name__)
 
 
@@ -242,4 +270,4 @@ def _optional_path(name: str) -> Optional[Path]:
 
 SETTINGS = Settings()
 
-__all__ = ["SETTINGS", "Settings"]
+__all__ = ["SETTINGS", "Settings", "EMAIL_ALLOWLIST", "email_allowed"]
