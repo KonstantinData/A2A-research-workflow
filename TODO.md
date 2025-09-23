@@ -3,8 +3,8 @@
 ## 🔴 Hohe Priorität (Sicherheit)
 
 ### Cross-Site Scripting (XSS)
-- [ ] **agents/autonomous_email_agent.py** (Zeile 54-71): E-Mail-Body-Konstruktion sanitisieren
-  - User-Input aus `event.payload["missing"]` wird ohne Sanitisierung in E-Mail eingefügt
+- [ ] **integrations/mailer.py** (Zeile 60-77): E-Mail-Body-Konstruktion sanitisieren
+  - User-Input aus Event-Payloads wird ohne Sanitisierung in E-Mail eingefügt
   - HTML-Escaping implementieren falls E-Mail-Client HTML rendert
 
 ### Authorization Issues  
@@ -33,7 +33,6 @@
 - [ ] **integrations/hubspot_api.py** (Zeile 549-555): String-Operationen cachen
 - [ ] **agents/reminder_service.py** (Zeile 196-205): JSONL-Parsing optimieren
 - [ ] **core/autonomous_orchestrator.py** (Zeile 21-29): Lazy Agent-Initialisierung
-- [ ] **agents/autonomous_report_agent.py** (Zeile 36-41): Thread-Pool für Event-Handling
 
 ## 🟢 Niedrige Priorität (Code Quality)
 
