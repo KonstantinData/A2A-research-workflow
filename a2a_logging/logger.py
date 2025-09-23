@@ -19,7 +19,14 @@ import sys
 import logging as _py_logging
 
 from config.settings import SETTINGS
-from .sanitize import sanitize_message
+
+try:  # pragma: no cover - import fallback depends on test harness behaviour
+    from .sanitize import sanitize_message
+except ImportError:  # pragma: no cover
+    # When this module is loaded via ``importlib.util.spec_from_file_location``
+    # in legacy tests it has no package context, so fall back to an absolute
+    # import to keep the formatter usable.
+    from a2a_logging.sanitize import sanitize_message
 
 
 class JSONFormatter(_py_logging.Formatter):
