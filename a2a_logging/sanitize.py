@@ -18,7 +18,7 @@ def _hash_value(value: str) -> str:
 
 
 def _replacement(label: str) -> Callable[[re.Match[str]], str]:
-    """Return a substitution callback that replaces matches with placeholders."""
+    """Return a substitution callback that replaces matches with hashed stand-ins."""
 
     def _sub(match: re.Match[str]) -> str:
         value = match.group(0)
@@ -38,7 +38,7 @@ _PHONE_PATTERN: Pattern[str] = re.compile(
 
 
 def sanitize_message(message: str) -> str:
-    """Replace common PII patterns in ``message`` with hashed placeholders."""
+    """Replace common PII patterns in ``message`` with hashed surrogates."""
 
     sanitized = _EMAIL_PATTERN.sub(_replacement("email"), message)
     sanitized = _PHONE_PATTERN.sub(_replacement("phone"), sanitized)
