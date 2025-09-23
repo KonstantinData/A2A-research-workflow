@@ -17,11 +17,10 @@ from pathlib import Path
 import re
 
 from config.env import ensure_mail_from
-from config.settings import SETTINGS
+from config.settings import SETTINGS, email_allowed
 from .mailer import send_email as _send_email  # tatsächlicher SMTP/Provider-Client
 from core.utils import log_step
 from app.integrations import email_reader
-from config.settings import SETTINGS
 from app.core.policy.retry import MAX_ATTEMPTS, backoff_seconds
 
 
@@ -94,6 +93,11 @@ def _validate_recipient(to: str) -> str | None:
             return None
 
     return cleaned_to
+
+
+def _assert_allowlisted(address: str) -> None:
+    domain = address.rsplit("@", 1)[-1].strip().lower()
+    assert email_allowed(address), f"Recipient domain '{domain}' is not allowlisted"
 
 
 def _supports_keyword_argument(func, name: str) -> bool:
@@ -182,6 +186,7 @@ def _deliver(
     allowed_domain = allow_env.lstrip("@").lower() or None
 
     validated_to = to.strip()
+    _assert_allowlisted(validated_to)
 
     _send_email(
         host,
@@ -214,6 +219,8 @@ def send(
     """
     Generische Send-Funktion, die Tests monkeypatchen.
     """
+    _assert_allowlisted(to)
+
     validated_to = _validate_recipient(to)
     if not validated_to:
         return
@@ -263,6 +270,8 @@ def send_email(
     replies can be matched to pending workflow items.  When provided a
     deterministic ``Message-ID`` is generated and persisted for the IMAP reply
     processor."""
+
+    _assert_allowlisted(to)
 
     validated_to = _validate_recipient(to)
     if not validated_to:

@@ -6,11 +6,12 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from integrations import email_sender, mailer
+from config import settings as settings_module
 from config.settings import SETTINGS
 
 
 def test_send_email_blocked_by_allowlist(monkeypatch):
-    monkeypatch.setenv("ALLOWLIST_EMAIL_DOMAIN", "condata.io")
+    monkeypatch.setattr(settings_module, "EMAIL_ALLOWLIST", {"condata.io"}, raising=False)
     monkeypatch.setattr(SETTINGS, "allowlist_email_domain", "condata.io", raising=False)
 
     deliveries: list[tuple] = []
@@ -18,13 +19,10 @@ def test_send_email_blocked_by_allowlist(monkeypatch):
         email_sender, "_deliver", lambda *a, **k: deliveries.append((a, k))
     )
 
-    logs: list[tuple] = []
-    monkeypatch.setattr(email_sender, "log_step", lambda *a, **k: logs.append((a, k)))
-
-    email_sender.send_email("person@other.com", "subject", "body")
+    with pytest.raises(AssertionError):
+        email_sender.send_email("person@other.com", "subject", "body")
 
     assert deliveries == []
-    assert any(args[1] == "email_skipped_invalid_domain" for args, _ in logs)
 
 
 def test_mailer_blocks_non_allowlisted_domain(monkeypatch):
