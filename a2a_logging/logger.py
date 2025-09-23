@@ -19,6 +19,7 @@ import sys
 import logging as _py_logging
 
 from config.settings import SETTINGS
+from .sanitize import sanitize_message
 
 
 class JSONFormatter(_py_logging.Formatter):
@@ -29,7 +30,7 @@ class JSONFormatter(_py_logging.Formatter):
             "run_id": getattr(record, "run_id", None),
             "stage": getattr(record, "stage", None),
             "level": record.levelname.lower(),
-            "message": record.getMessage(),
+            "message": sanitize_message(record.getMessage()),
         }
 
         if record.exc_info:
