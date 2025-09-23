@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.autonomous import autonomous_orchestrator
@@ -93,7 +94,7 @@ async def readyz() -> dict[str, bool]:
     """Readiness probe endpoint."""
 
     try:
-        list_events(limit=1, offset=0)
+        await run_in_threadpool(list_events, limit=1, offset=0)
     except Exception as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=503, detail="Event store unavailable") from exc
     return {"ready": True}

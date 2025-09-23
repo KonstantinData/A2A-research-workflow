@@ -1,0 +1,5 @@
+# Development dependencies extend the pinned runtime lock file
+-r requirements.lock.txt
+pytest
+pytest-asyncio
+httpx

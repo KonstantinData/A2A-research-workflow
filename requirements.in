@@ -1,0 +1,14 @@
+# Runtime dependencies for the A2A autonomous workflow application
+fastapi
+uvicorn
+pydantic
+requests
+python-dotenv
+google-api-python-client
+google-auth-oauthlib
+jsonschema
+PyYAML
+openai
+weasyprint
+jinja2
+reportlab

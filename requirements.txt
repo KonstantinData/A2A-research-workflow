@@ -1,0 +1,3 @@
+# Convenience shim so CI caching logic sees a requirements.txt file.
+# The actual pinned versions (with hashes) live in requirements.lock.txt.
+-r requirements.lock.txt
