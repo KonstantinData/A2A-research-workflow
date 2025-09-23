@@ -81,6 +81,24 @@ async def root() -> dict[str, str]:
     return {"message": "A2A Autonomous Workflow API", "status": "running"}
 
 
+@app.get("/healthz")
+async def healthz() -> dict[str, bool]:
+    """Liveness probe endpoint."""
+
+    return {"ok": True}
+
+
+@app.get("/readyz")
+async def readyz() -> dict[str, bool]:
+    """Readiness probe endpoint."""
+
+    try:
+        list_events(limit=1, offset=0)
+    except Exception as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=503, detail="Event store unavailable") from exc
+    return {"ready": True}
+
+
 @app.post("/trigger", response_model=TriggerResponse)
 async def create_trigger(request: TriggerRequest) -> TriggerResponse:
     trigger_data = request.model_dump(exclude_none=True)
