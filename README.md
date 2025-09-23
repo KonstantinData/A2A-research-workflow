@@ -23,9 +23,17 @@ flowchart LR
 ## Setup Instructions
 
 1. Create and activate a Python 3.11 environment.
-2. Install dependencies:
+2. Install dependencies using pip-tools:
    ```bash
-   pip install -r requirements.txt
+   # Install pip-tools if not already available
+   pip install pip-tools
+   
+   # Install dependencies from lock file
+   make sync
+   ```
+   Alternatively, install directly from requirements:
+   ```bash
+   pip install -r requirements.lock.txt
    ```
    The Google Calendar integration requires the
    `google-api-python-client` and `google-auth` packages. Missing Google
@@ -300,7 +308,7 @@ cannot bypass the allowlist.
 
 Key directories:
 
-- `agents/` – individual research agents.
+- `agents/` – research agents (event-driven architecture).
 - `core/` – orchestration, classification, consolidation, and workflow helpers.
 - `integrations/` – external service clients (HubSpot, Google, email) and templates.
 - `output/` – PDF and CSV rendering utilities. The `pdf_render.render_pdf`
@@ -312,6 +320,7 @@ Key directories:
 - `tests/` – unit, integration, and end-to-end tests.
 - `ops/` – operational files such as Dockerfile and CI/CD configs.
 - `config/` – centralised runtime settings (see `config/settings.py`) and trigger word lists.
+- `app/` – event-driven worker and API services.
 ## License
 
 MIT
