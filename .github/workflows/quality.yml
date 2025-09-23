@@ -5,6 +5,39 @@ on:
   workflow_dispatch:
 
 jobs:
+  tests:
+    name: Unit tests with coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Run tests with coverage
+        env:
+          A2A_TEST_MODE: '1'
+          LIVE_MODE: '0'
+        run: |
+          python -m pip install coverage
+          coverage run -m pytest
+          coverage xml
+          coverage report --fail-under=80
+
+      - name: Upload coverage.xml
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.xml
+
   validate-plan:
     name: Validate modernization plan
     runs-on: ubuntu-latest
