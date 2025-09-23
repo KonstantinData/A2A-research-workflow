@@ -2,3 +2,4 @@
 pip-tools
 ruff
 flake8
+pytest
