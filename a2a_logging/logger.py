@@ -20,6 +20,14 @@ import logging as _py_logging
 
 from config.settings import SETTINGS
 
+try:  # pragma: no cover - import fallback depends on test harness behaviour
+    from .sanitize import sanitize_message
+except ImportError:  # pragma: no cover
+    # When this module is loaded via ``importlib.util.spec_from_file_location``
+    # in legacy tests it has no package context, so fall back to an absolute
+    # import to keep the formatter usable.
+    from a2a_logging.sanitize import sanitize_message
+
 
 class JSONFormatter(_py_logging.Formatter):
     """Format log records as JSON."""
@@ -29,7 +37,7 @@ class JSONFormatter(_py_logging.Formatter):
             "run_id": getattr(record, "run_id", None),
             "stage": getattr(record, "stage", None),
             "level": record.levelname.lower(),
-            "message": record.getMessage(),
+            "message": sanitize_message(record.getMessage()),
         }
 
         if record.exc_info:
